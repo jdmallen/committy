@@ -2,7 +2,6 @@ namespace Committy.Tests;
 
 public class GitServiceTests
 {
-	private readonly GitService _gitService = new();
 
 	[Fact]
 	public async Task GetStagedDiffAsync_NoGitRepo_ThrowsInvalidOperationException()

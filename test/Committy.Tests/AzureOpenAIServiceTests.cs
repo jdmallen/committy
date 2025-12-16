@@ -6,14 +6,10 @@ namespace Committy.Tests;
 
 public class AzureOpenAIServiceTests
 {
-	private readonly AzureOpenAIService _azureOpenAIService;
-
-	public AzureOpenAIServiceTests()
-	{
-		var mockHandler = Substitute.For<HttpMessageHandler>();
-		var httpClient = new HttpClient(mockHandler);
-		_azureOpenAIService = new AzureOpenAIService(httpClient);
-	}
+	private const string TestPatch = "test patch";
+	private const string TestApiKey = "test-api-key";
+	private const string TestEndpoint = "https://test.openai.azure.com";
+	private const string TestDeployment = "gpt-4";
 
 	[Fact]
 	public void AzureOpenAIService_Constructor_SetsHttpClient()
@@ -30,7 +26,7 @@ public class AzureOpenAIServiceTests
 	[Fact]
 	public async Task GenerateCommitMessageSuggestionsAsync_WithMockHttpClient_CanTestLogic()
 	{
-		// This demonstrates how we test the parsing logic with Azure OpenAI response format
+		// Arrange
 		var testHandler = new TestHttpMessageHandler("""
 		{
 			"choices": [
@@ -43,15 +39,15 @@ public class AzureOpenAIServiceTests
 		}
 		""");
 
-		var testHttpClient = new HttpClient(testHandler);
+		using var testHttpClient = new HttpClient(testHandler);
 		var testService = new AzureOpenAIService(testHttpClient);
 
 		// Act
 		List<string> result = await testService.GenerateCommitMessageSuggestionsAsync(
-			"test patch", 
-			"test-api-key", 
-			"https://test.openai.azure.com", 
-			"gpt-4");
+			TestPatch, 
+			TestApiKey, 
+			TestEndpoint, 
+			TestDeployment);
 
 		// Assert
 		Assert.Equal(5, result.Count);
@@ -60,33 +56,31 @@ public class AzureOpenAIServiceTests
 		Assert.Equal("docs: update readme", result[2]);
 		Assert.StartsWith("feat: implement changes", result[3]); // Fallback suggestions
 		Assert.StartsWith("feat: implement changes", result[4]);
-
-		testHttpClient.Dispose();
 	}
 
 	[Fact]
 	public async Task GenerateCommitMessageSuggestionsAsync_ErrorResponse_ThrowsHttpRequestException()
 	{
+		// Arrange
 		var testHandler = new TestHttpMessageHandler("Unauthorized", HttpStatusCode.Unauthorized);
-		var testHttpClient = new HttpClient(testHandler);
+		using var testHttpClient = new HttpClient(testHandler);
 		var testService = new AzureOpenAIService(testHttpClient);
 
 		// Act & Assert
 		var exception = await Assert.ThrowsAsync<HttpRequestException>(
 			() => testService.GenerateCommitMessageSuggestionsAsync(
-				"test patch",
+				TestPatch,
 				"invalid-key",
-				"https://test.openai.azure.com",
-				"gpt-4"));
+				TestEndpoint,
+				TestDeployment));
 
 		Assert.Contains("Azure OpenAI API request failed: Unauthorized", exception.Message);
-
-		testHttpClient.Dispose();
 	}
 
 	[Fact]
 	public async Task GenerateCommitMessageSuggestionsAsync_EmptyResponse_ReturnsFallbackSuggestions()
 	{
+		// Arrange
 		var testHandler = new TestHttpMessageHandler("""
 		{
 			"choices": [
@@ -99,26 +93,25 @@ public class AzureOpenAIServiceTests
 		}
 		""");
 
-		var testHttpClient = new HttpClient(testHandler);
+		using var testHttpClient = new HttpClient(testHandler);
 		var testService = new AzureOpenAIService(testHttpClient);
 
 		// Act
 		List<string> result = await testService.GenerateCommitMessageSuggestionsAsync(
-			"test patch",
-			"test-api-key",
-			"https://test.openai.azure.com",
-			"gpt-4");
+			TestPatch,
+			TestApiKey,
+			TestEndpoint,
+			TestDeployment);
 
 		// Assert
 		Assert.Equal(5, result.Count);
 		Assert.All(result, suggestion => Assert.StartsWith("feat: implement changes", suggestion));
-
-		testHttpClient.Dispose();
 	}
 
 	[Fact]
 	public async Task GenerateCommitMessageSuggestionsAsync_InsufficientSuggestions_FillsWithDefaults()
 	{
+		// Arrange
 		var testHandler = new TestHttpMessageHandler("""
 		{
 			"choices": [
@@ -131,15 +124,15 @@ public class AzureOpenAIServiceTests
 		}
 		""");
 
-		var testHttpClient = new HttpClient(testHandler);
+		using var testHttpClient = new HttpClient(testHandler);
 		var testService = new AzureOpenAIService(testHttpClient);
 
 		// Act
 		List<string> result = await testService.GenerateCommitMessageSuggestionsAsync(
-			"test patch",
-			"test-api-key",
-			"https://test.openai.azure.com",
-			"gpt-4");
+			TestPatch,
+			TestApiKey,
+			TestEndpoint,
+			TestDeployment);
 
 		// Assert
 		Assert.Equal(5, result.Count);
@@ -148,8 +141,6 @@ public class AzureOpenAIServiceTests
 		Assert.Equal("feat: implement changes (3)", result[2]);
 		Assert.Equal("feat: implement changes (4)", result[3]);
 		Assert.Equal("feat: implement changes (5)", result[4]);
-
-		testHttpClient.Dispose();
 	}
 }
 

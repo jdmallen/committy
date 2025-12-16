@@ -9,7 +9,7 @@ public class GitServiceTests
 		// Act & Assert
 		// This test assumes we're not in a git repository or have no staged changes
 		var exception = await Assert.ThrowsAsync<InvalidOperationException>(
-			GitService.GetStagedDiffAsync);
+			() => GitService.GetStagedDiffAsync(CancellationToken.None));
 
 		Assert.NotNull(exception.Message);
 	}

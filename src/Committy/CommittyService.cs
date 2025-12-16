@@ -8,7 +8,8 @@ public class CommittyService(IAzureOpenAIService azureOpenAIService)
 		string patch,
 		string apiKey,
 		string endpoint,
-		string deploymentName)
+		string deploymentName,
+		CancellationToken cancellationToken = default)
 	{
 		if (string.IsNullOrWhiteSpace(patch))
 		{
@@ -39,7 +40,8 @@ public class CommittyService(IAzureOpenAIService azureOpenAIService)
 					patch,
 					apiKey,
 					endpoint,
-					deploymentName);
+					deploymentName,
+					cancellationToken).ConfigureAwait(false);
 
 			return suggestions;
 		}
@@ -51,13 +53,13 @@ public class CommittyService(IAzureOpenAIService azureOpenAIService)
 		}
 	}
 
-	public async Task<string> ReadPatchFromStdinAsync()
+	public async Task<string> ReadPatchFromStdinAsync(CancellationToken cancellationToken = default)
 	{
 		if (Console.IsInputRedirected)
 		{
 			using var reader = new StreamReader(Console.OpenStandardInput(), Console.InputEncoding);
 
-			return await reader.ReadToEndAsync();
+			return await reader.ReadToEndAsync(cancellationToken).ConfigureAwait(false);
 		}
 		else
 		{
@@ -66,11 +68,11 @@ public class CommittyService(IAzureOpenAIService azureOpenAIService)
 		}
 	}
 
-	public async Task CopyToClipboardAsync(string text)
+	public async Task CopyToClipboardAsync(string text, CancellationToken cancellationToken = default)
 	{
 		try
 		{
-			await TextCopy.ClipboardService.SetTextAsync(text);
+			await TextCopy.ClipboardService.SetTextAsync(text, cancellationToken).ConfigureAwait(false);
 		}
 		catch (Exception)
 		{
@@ -79,7 +81,7 @@ public class CommittyService(IAzureOpenAIService azureOpenAIService)
 			if (!_clipboardWarningShown)
 			{
 				await Console.Error.WriteLineAsync(
-					"Warning: Clipboard functionality not available on this system");
+					"Warning: Clipboard functionality not available on this system").ConfigureAwait(false);
 				_clipboardWarningShown = true;
 			}
 		}

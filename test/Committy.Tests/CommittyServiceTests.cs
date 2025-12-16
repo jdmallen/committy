@@ -29,7 +29,7 @@ public class CommittyServiceTests
 		};
 
 		_mockAzureOpenAIService
-			.GenerateCommitMessageSuggestionsAsync(patch, apiKey, endpoint, deploymentName)
+			.GenerateCommitMessageSuggestionsAsync(patch, apiKey, endpoint, deploymentName, CancellationToken.None)
 			.Returns(expectedSuggestions);
 
 		// Act
@@ -38,12 +38,13 @@ public class CommittyServiceTests
 				patch,
 				apiKey,
 				endpoint,
-				deploymentName);
+				deploymentName,
+				CancellationToken.None);
 
 		// Assert
 		Assert.Equal(expectedSuggestions, result);
 		await _mockAzureOpenAIService.Received(1)
-			.GenerateCommitMessageSuggestionsAsync(patch, apiKey, endpoint, deploymentName);
+			.GenerateCommitMessageSuggestionsAsync(patch, apiKey, endpoint, deploymentName, CancellationToken.None);
 	}
 
 	[Theory]
@@ -63,7 +64,8 @@ public class CommittyServiceTests
 				invalidPatch,
 				apiKey,
 				endpoint,
-				deploymentName));
+				deploymentName,
+				CancellationToken.None));
 
 		Assert.Equal("Patch cannot be null or empty (Parameter 'patch')", exception.Message);
 	}
@@ -82,7 +84,8 @@ public class CommittyServiceTests
 				null!,
 				apiKey,
 				endpoint,
-				deploymentName));
+				deploymentName,
+				CancellationToken.None));
 
 		Assert.Equal("Patch cannot be null or empty (Parameter 'patch')", exception.Message);
 	}
@@ -104,7 +107,8 @@ public class CommittyServiceTests
 				patch,
 				invalidApiKey,
 				endpoint,
-				deploymentName));
+				deploymentName,
+				CancellationToken.None));
 
 		Assert.Equal("API key cannot be null or empty (Parameter 'apiKey')", exception.Message);
 	}
@@ -123,7 +127,8 @@ public class CommittyServiceTests
 				patch,
 				null!,
 				endpoint,
-				deploymentName));
+				deploymentName,
+				CancellationToken.None));
 
 		Assert.Equal("API key cannot be null or empty (Parameter 'apiKey')", exception.Message);
 	}
@@ -145,7 +150,8 @@ public class CommittyServiceTests
 				patch,
 				apiKey,
 				invalidEndpoint,
-				deploymentName));
+				deploymentName,
+				CancellationToken.None));
 
 		Assert.Equal("Endpoint cannot be null or empty (Parameter 'endpoint')", exception.Message);
 	}
@@ -168,7 +174,8 @@ public class CommittyServiceTests
 				patch,
 				apiKey,
 				endpoint,
-				invalidDeploymentName));
+				invalidDeploymentName,
+				CancellationToken.None));
 
 		Assert.Equal(
 			"Deployment name cannot be null or empty (Parameter 'deploymentName')",
@@ -187,7 +194,7 @@ public class CommittyServiceTests
 		var innerException = new HttpRequestException("API request failed");
 
 		_mockAzureOpenAIService
-			.GenerateCommitMessageSuggestionsAsync(patch, apiKey, endpoint, deploymentName)
+			.GenerateCommitMessageSuggestionsAsync(patch, apiKey, endpoint, deploymentName, CancellationToken.None)
 			.ThrowsAsync(innerException);
 
 		// Act & Assert
@@ -196,7 +203,8 @@ public class CommittyServiceTests
 				patch,
 				apiKey,
 				endpoint,
-				deploymentName));
+				deploymentName,
+				CancellationToken.None));
 
 		Assert.StartsWith("Failed to generate commit message suggestions:", exception.Message);
 		Assert.Equal(innerException, exception.InnerException);
@@ -211,7 +219,7 @@ public class CommittyServiceTests
 		// Act & Assert
 		Task<InvalidOperationException> exception =
 			Assert.ThrowsAsync<InvalidOperationException>(() =>
-				_committyService.ReadPatchFromStdinAsync());
+				_committyService.ReadPatchFromStdinAsync(CancellationToken.None));
 
 		Assert.NotNull(exception);
 	}
@@ -223,13 +231,13 @@ public class CommittyServiceTests
 		const string text = "feat: add new feature";
 
 		// Act & Assert - should not throw
-		await _committyService.CopyToClipboardAsync(text);
+		await _committyService.CopyToClipboardAsync(text, CancellationToken.None);
 	}
 
 	[Fact]
 	public async Task CopyToClipboardAsync_NullText_DoesNotThrow()
 	{
 		// Act & Assert - should not throw
-		await _committyService.CopyToClipboardAsync(null!);
+		await _committyService.CopyToClipboardAsync(null!, CancellationToken.None);
 	}
 }

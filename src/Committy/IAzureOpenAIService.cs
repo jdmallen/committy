@@ -6,5 +6,6 @@ public interface IAzureOpenAIService
 		string patch,
 		string apiKey,
 		string endpoint,
-		string deploymentName);
+		string deploymentName,
+		CancellationToken cancellationToken = default);
 }

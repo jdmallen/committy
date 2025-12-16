@@ -9,12 +9,12 @@ public class GitService
 	/// Gets staged diff for manual execution fallback.
 	/// In hook usage, diff comes via stdin instead.
 	/// </summary>
-	public static async Task<string> GetStagedDiffAsync()
+	public static async Task<string> GetStagedDiffAsync(CancellationToken cancellationToken = default)
 	{
 		BufferedCommandResult result = await Cli.Wrap("git")
 			.WithArguments(["diff", "--cached"])
 			.WithValidation(CommandResultValidation.None)
-			.ExecuteBufferedAsync();
+			.ExecuteBufferedAsync(cancellationToken).ConfigureAwait(false);
 
 		if (result.ExitCode != 0)
 		{

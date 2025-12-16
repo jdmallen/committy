@@ -1,4 +1,5 @@
 using System.CommandLine;
+using System.CommandLine.Invocation;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Hosting;
 
@@ -8,41 +9,48 @@ internal class Program
 {
 	private static async Task<int> Main(string[] args)
 	{
+		var apiKeyOption = new Option<string?>(
+			aliases: ["--api-key", "-k"],
+			description:
+			"Azure OpenAI API key (can also be set via AZURE_OPENAI_API_KEY environment variable)");
+		var endpointOption = new Option<string?>(
+			aliases: ["--endpoint", "-e"],
+			description:
+			"Azure OpenAI endpoint URL (can also be set via AZURE_OPENAI_ENDPOINT environment variable)");
+		var deploymentOption = new Option<string?>(
+			aliases: ["--deployment", "-d"],
+			description:
+			"Azure OpenAI deployment name (can also be set via AZURE_OPENAI_DEPLOYMENT environment variable)");
+		var stdinOption = new Option<bool>(
+			aliases: ["--stdin"],
+			description: "Read patch from stdin instead of git diff --cached (default when no args)");
+		var clipboardOption = new Option<bool>(
+			aliases: ["--clipboard", "-c"],
+			description: "Copy first suggestion to clipboard");
+
 		var rootCommand = new RootCommand("Generate AI-powered commit messages from git patches")
 		{
-			new Option<string?>(
-				aliases: ["--api-key", "-k"],
-				description:
-				"Azure OpenAI API key (can also be set via AZURE_OPENAI_API_KEY environment variable)"),
-			new Option<string?>(
-				aliases: ["--endpoint", "-e"],
-				description:
-				"Azure OpenAI endpoint URL (can also be set via AZURE_OPENAI_ENDPOINT environment variable)"),
-			new Option<string?>(
-				aliases: ["--deployment", "-d"],
-				description:
-				"Azure OpenAI deployment name (can also be set via AZURE_OPENAI_DEPLOYMENT environment variable)"),
-			new Option<bool>(
-				aliases: ["--stdin"],
-				description: "Read patch from stdin instead of git diff --cached (default when no args)"),
-			new Option<bool>(
-				aliases: ["--clipboard", "-c"],
-				description: "Copy first suggestion to clipboard"),
+			apiKeyOption,
+			endpointOption,
+			deploymentOption,
+			stdinOption,
+			clipboardOption
 		};
 
 		rootCommand.SetHandler(
-			async (apiKey, endpoint, deployment, useStdin, copyToClipboard) =>
+			async (InvocationContext context) =>
 			{
-				HostApplicationBuilder builder = Host.CreateApplicationBuilder();
+				var apiKey = context.ParseResult.GetValueForOption(apiKeyOption);
+				var endpoint = context.ParseResult.GetValueForOption(endpointOption);
+				var deployment = context.ParseResult.GetValueForOption(deploymentOption);
+				var useStdin = context.ParseResult.GetValueForOption(stdinOption);
+				var copyToClipboard = context.ParseResult.GetValueForOption(clipboardOption);
+				var cancellationToken = context.GetCancellationToken();
 
-				builder.Services.AddHttpClient<AzureOpenAIService>();
-				builder.Services.AddSingleton<IAzureOpenAIService, AzureOpenAIService>();
-				builder.Services.AddSingleton<CommittyService>();
-				builder.Services.AddSingleton<GitService>();
-
-				IHost host = builder.Build();
-
-				var committyService = host.Services.GetRequiredService<CommittyService>();
+				// Direct instantiation for better CLI performance
+				using var httpClient = new HttpClient();
+				var azureOpenAIService = new AzureOpenAIService(httpClient);
+				var committyService = new CommittyService(azureOpenAIService);
 
 				try
 				{
@@ -79,12 +87,12 @@ internal class Program
 					// Determine input source: stdin vs git diff
 					if (useStdin || Console.IsInputRedirected)
 					{
-						patch = await committyService.ReadPatchFromStdinAsync();
+						patch = await committyService.ReadPatchFromStdinAsync(cancellationToken);
 					}
 					else
 					{
 						// Direct git usage (fallback for manual execution)
-						patch = await GitService.GetStagedDiffAsync();
+						patch = await GitService.GetStagedDiffAsync(cancellationToken);
 					}
 
 					if (string.IsNullOrWhiteSpace(patch))
@@ -97,7 +105,8 @@ internal class Program
 						patch,
 						effectiveApiKey,
 						effectiveEndpoint,
-						effectiveDeployment);
+						effectiveDeployment,
+						cancellationToken);
 
 					// Output suggestions (for hook to capture)
 					foreach (string suggestion in suggestions)
@@ -108,20 +117,21 @@ internal class Program
 					// Optional clipboard copy for convenience
 					if (copyToClipboard && suggestions.Count > 0)
 					{
-						await committyService.CopyToClipboardAsync(suggestions[0]);
+						await committyService.CopyToClipboardAsync(suggestions[0], cancellationToken);
 					}
+				}
+				catch (OperationCanceledException)
+				{
+					// Graceful shutdown on cancellation
+					Environment.Exit(130); // Standard exit code for SIGINT
 				}
 				catch (Exception ex)
 				{
 					await Console.Error.WriteLineAsync($"Error: {ex.Message}");
 					Environment.Exit(1);
 				}
-			},
-			new Option<string?>("--api-key"),
-			new Option<string?>("--endpoint"),
-			new Option<string?>("--deployment"),
-			new Option<bool>("--stdin"),
-			new Option<bool>("--clipboard"));
+			});
+
 
 		return await rootCommand.InvokeAsync(args);
 	}

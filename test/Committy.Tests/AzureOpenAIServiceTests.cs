@@ -47,7 +47,8 @@ public class AzureOpenAIServiceTests
 			TestPatch, 
 			TestApiKey, 
 			TestEndpoint, 
-			TestDeployment);
+			TestDeployment,
+			CancellationToken.None);
 
 		// Assert
 		Assert.Equal(5, result.Count);
@@ -72,7 +73,8 @@ public class AzureOpenAIServiceTests
 				TestPatch,
 				"invalid-key",
 				TestEndpoint,
-				TestDeployment));
+				TestDeployment,
+				CancellationToken.None));
 
 		Assert.Contains("Azure OpenAI API request failed: Unauthorized", exception.Message);
 	}
@@ -101,7 +103,8 @@ public class AzureOpenAIServiceTests
 			TestPatch,
 			TestApiKey,
 			TestEndpoint,
-			TestDeployment);
+			TestDeployment,
+			CancellationToken.None);
 
 		// Assert
 		Assert.Equal(5, result.Count);
@@ -132,7 +135,8 @@ public class AzureOpenAIServiceTests
 			TestPatch,
 			TestApiKey,
 			TestEndpoint,
-			TestDeployment);
+			TestDeployment,
+			CancellationToken.None);
 
 		// Assert
 		Assert.Equal(5, result.Count);

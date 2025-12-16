@@ -69,7 +69,7 @@ public class CommittyService
 			// Only show warning once to avoid spam
 			if (!_clipboardWarningShown)
 			{
-				Console.Error.WriteLine("Warning: Clipboard functionality not available (xsel/xclip not installed)");
+				Console.Error.WriteLine("Warning: Clipboard functionality not available on this system");
 				_clipboardWarningShown = true;
 			}
 		}

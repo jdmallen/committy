@@ -68,7 +68,7 @@ echo "# Generating AI commit message suggestions..." >> "$COMMIT_MSG_FILE"
 echo "#" >> "$COMMIT_MSG_FILE"
 
 # Get suggestions and format them as comments
-if SUGGESTIONS=$(committy --no-commit 2>/dev/null); then
+if SUGGESTIONS=$(git diff --cached | committy --stdin 2>/dev/null); then
     echo "# AI-generated suggestions (uncomment and edit as needed):" >> "$COMMIT_MSG_FILE"
     echo "#" >> "$COMMIT_MSG_FILE"
     

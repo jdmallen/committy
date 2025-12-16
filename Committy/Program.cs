@@ -8,17 +8,20 @@ internal class Program
 {
 	private static async Task<int> Main(string[] args)
 	{
-		var rootCommand = new RootCommand("Generate AI-powered commit messages from git staged changes")
+		var rootCommand = new RootCommand("Generate AI-powered commit messages from git patches")
 		{
 			new Option<string?>(
 				aliases: ["--api-key", "-k"],
 				description: "Claude API key (can also be set via CLAUDE_API_KEY environment variable)"),
 			new Option<bool>(
-				aliases: ["--no-commit", "-n"],
-				description: "Generate commit message but don't commit (just copy to clipboard)")
+				aliases: ["--stdin"],
+				description: "Read patch from stdin instead of git diff --cached (default when no args)"),
+			new Option<bool>(
+				aliases: ["--clipboard", "-c"],
+				description: "Copy first suggestion to clipboard")
 		};
 
-		rootCommand.SetHandler(async (string? apiKey, bool noCommit) =>
+		rootCommand.SetHandler(async (string? apiKey, bool useStdin, bool copyToClipboard) =>
 		{
 			var builder = Host.CreateApplicationBuilder();
 			
@@ -28,28 +31,16 @@ internal class Program
 				client.DefaultRequestHeaders.Add("anthropic-version", "2023-06-01");
 			});
 
-			builder.Services.AddSingleton<CommitMessageGenerator>();
+			builder.Services.AddSingleton<CommittyService>();
 			builder.Services.AddSingleton<GitService>();
 
 			var host = builder.Build();
 
-			var generator = host.Services.GetRequiredService<CommitMessageGenerator>();
+			var committyService = host.Services.GetRequiredService<CommittyService>();
 			var gitService = host.Services.GetRequiredService<GitService>();
 
 			try
 			{
-				if (!await gitService.IsGitRepositoryAsync())
-				{
-					Console.Error.WriteLine("Error: Not a git repository.");
-					Environment.Exit(1);
-				}
-
-				if (!await gitService.HasStagedChangesAsync())
-				{
-					Console.Error.WriteLine("Error: No staged changes found. Use 'git add' to stage files for commit.");
-					Environment.Exit(1);
-				}
-
 				var effectiveApiKey = apiKey ?? Environment.GetEnvironmentVariable("CLAUDE_API_KEY");
 				
 				if (string.IsNullOrEmpty(effectiveApiKey))
@@ -58,32 +49,37 @@ internal class Program
 					Environment.Exit(1);
 				}
 
-				Console.WriteLine("Reading staged changes...");
-				var patch = await gitService.GetStagedDiffAsync();
-				
-				UserInterface.ShowStagedChanges(patch);
+				string patch;
 
-				Console.WriteLine("Generating commit message suggestions...");
-				var suggestions = await generator.GenerateCommitMessageSuggestionsAsync(patch, effectiveApiKey);
-				
-				var selectedMessage = UserInterface.SelectCommitMessage(suggestions);
-				
-				if (noCommit)
+				// Determine input source: stdin vs git diff
+				if (useStdin || Console.IsInputRedirected)
 				{
-					Console.WriteLine($"Commit message: {selectedMessage}");
-					await TextCopy.ClipboardService.SetTextAsync(selectedMessage);
-					Console.WriteLine("✓ Commit message copied to clipboard");
-					return;
-				}
-
-				if (UserInterface.ConfirmCommit(selectedMessage))
-				{
-					await gitService.CommitAsync(selectedMessage);
-					Console.WriteLine("✓ Changes committed successfully!");
+					patch = await committyService.ReadPatchFromStdinAsync();
 				}
 				else
 				{
-					Console.WriteLine("Commit cancelled.");
+					// Direct git usage (fallback for manual execution)
+					patch = await gitService.GetStagedDiffAsync();
+				}
+				
+				if (string.IsNullOrWhiteSpace(patch))
+				{
+					Console.Error.WriteLine("Error: No patch data available.");
+					Environment.Exit(1);
+				}
+
+				var suggestions = await committyService.GenerateCommitMessageSuggestionsAsync(patch, effectiveApiKey);
+				
+				// Output suggestions (for hook to capture)
+				foreach (var suggestion in suggestions)
+				{
+					Console.WriteLine(suggestion);
+				}
+
+				// Optional clipboard copy for convenience
+				if (copyToClipboard && suggestions.Count > 0)
+				{
+					await committyService.CopyToClipboardAsync(suggestions[0]);
 				}
 			}
 			catch (Exception ex)
@@ -91,7 +87,7 @@ internal class Program
 				Console.Error.WriteLine($"Error: {ex.Message}");
 				Environment.Exit(1);
 			}
-		}, new Option<string?>("--api-key"), new Option<bool>("--no-commit"));
+		}, new Option<string?>("--api-key"), new Option<bool>("--stdin"), new Option<bool>("--clipboard"));
 
 		return await rootCommand.InvokeAsync(args);
 	}

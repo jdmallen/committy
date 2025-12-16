@@ -12,7 +12,7 @@ public class ClaudeService
 		_httpClient = httpClient;
 	}
 
-	public async Task<string> GenerateCommitMessageAsync(string patch, string apiKey)
+	public async Task<List<string>> GenerateCommitMessageSuggestionsAsync(string patch, string apiKey)
 	{
 		_httpClient.DefaultRequestHeaders.Authorization = new("Bearer", apiKey);
 
@@ -21,7 +21,7 @@ public class ClaudeService
 		var request = new
 		{
 			model = "claude-3-5-sonnet-20241022",
-			max_tokens = 200,
+			max_tokens = 400,
 			messages = new[]
 			{
 				new { role = "user", content = prompt }
@@ -51,31 +51,72 @@ public class ClaudeService
 			.GetProperty("text")
 			.GetString();
 
-		return messageContent?.Trim() ?? "feat: implement changes";
+		var suggestions = ParseSuggestions(messageContent?.Trim() ?? "feat: implement changes");
+		return suggestions;
 	}
 
 	private static string BuildPrompt(string patch)
 	{
-		return $@"Generate a concise, conventional commit message for the following git patch. Follow these guidelines:
+		var sb = new StringBuilder();
+		sb.AppendLine("Generate exactly 5 different commit messages following Conventional Commits v1.0.0 specification.");
+		sb.AppendLine();
+		sb.AppendLine("FORMAT: <type>[optional scope]: <description>");
+		sb.AppendLine();
+		sb.AppendLine("TYPES:");
+		sb.AppendLine("- feat: new feature");
+		sb.AppendLine("- fix: bug fix");
+		sb.AppendLine("- docs: documentation");
+		sb.AppendLine("- style: code style/formatting");
+		sb.AppendLine("- refactor: code refactoring");
+		sb.AppendLine("- perf: performance improvement");
+		sb.AppendLine("- test: adding/updating tests");
+		sb.AppendLine("- build: build system changes");
+		sb.AppendLine("- ci: CI configuration");
+		sb.AppendLine("- chore: maintenance tasks");
+		sb.AppendLine();
+		sb.AppendLine("RULES:");
+		sb.AppendLine("1. Use imperative mood: 'add' not 'adds' or 'added'");
+		sb.AppendLine("2. No period at end");
+		sb.AppendLine("3. Keep under 50 characters when possible");
+		sb.AppendLine("4. Add scope when it clarifies context");
+		sb.AppendLine("5. Use ! for breaking changes: feat!: or feat(api)!:");
+		sb.AppendLine();
+		sb.AppendLine("EXAMPLES:");
+		sb.AppendLine("feat(auth): add OAuth2 integration");
+		sb.AppendLine("fix(api): prevent memory leak in parser");
+		sb.AppendLine("docs: update installation guide");
+		sb.AppendLine("perf(db): optimize query performance");
+		sb.AppendLine("feat!: remove deprecated login API");
+		sb.AppendLine();
+		sb.AppendLine("Git patch:");
+		sb.AppendLine("```");
+		sb.AppendLine(patch);
+		sb.AppendLine("```");
+		sb.AppendLine();
+		sb.AppendLine("Return exactly 5 commit messages, one per line, no numbering or bullets:");
 
-1. Use conventional commit format: type(scope): description
-2. Common types: feat, fix, docs, style, refactor, test, chore
-3. Keep description under 50 characters when possible
-4. Focus on the 'what' and 'why', not the 'how'
-5. Use imperative mood (""add"" not ""adds"" or ""added"")
-6. Don't end with a period
+		return sb.ToString();
+	}
 
-Examples:
-- feat(auth): add OAuth2 login support
-- fix(api): handle null response in user service
-- docs: update API documentation
-- refactor: extract validation logic
+	private static List<string> ParseSuggestions(string response)
+	{
+		var lines = response.Split(['\r', '\n'], StringSplitOptions.RemoveEmptyEntries)
+			.Select(line => line.Trim())
+			.Where(line => !string.IsNullOrEmpty(line))
+			.ToList();
 
-Git patch:
-```
-{patch}
-```
+		if (lines.Count >= 5)
+		{
+			return lines.Take(5).ToList();
+		}
 
-Return only the commit message, nothing else.";
+		var suggestions = lines.ToList();
+		
+		while (suggestions.Count < 5)
+		{
+			suggestions.Add($"feat: implement changes ({suggestions.Count + 1})");
+		}
+
+		return suggestions;
 	}
 }

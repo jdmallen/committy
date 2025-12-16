@@ -9,7 +9,7 @@ public class CommitMessageGenerator
 		_claudeService = claudeService;
 	}
 
-	public async Task<string> GenerateCommitMessageAsync(string patch, string apiKey)
+	public async Task<List<string>> GenerateCommitMessageSuggestionsAsync(string patch, string apiKey)
 	{
 		if (string.IsNullOrWhiteSpace(patch))
 		{
@@ -23,13 +23,13 @@ public class CommitMessageGenerator
 
 		try
 		{
-			var commitMessage = await _claudeService.GenerateCommitMessageAsync(patch, apiKey);
+			var suggestions = await _claudeService.GenerateCommitMessageSuggestionsAsync(patch, apiKey);
 			
-			return commitMessage.Trim();
+			return suggestions;
 		}
 		catch (Exception ex)
 		{
-			throw new InvalidOperationException($"Failed to generate commit message: {ex.Message}", ex);
+			throw new InvalidOperationException($"Failed to generate commit message suggestions: {ex.Message}", ex);
 		}
 	}
 }

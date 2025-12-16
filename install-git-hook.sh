@@ -57,9 +57,10 @@ if git diff --cached --quiet; then
     exit 0
 fi
 
-# Check for API key
-if [ -z "$CLAUDE_API_KEY" ]; then
-    echo "# CLAUDE_API_KEY not set - skipping AI commit message generation" >> "$COMMIT_MSG_FILE"
+# Check for Azure OpenAI configuration
+if [ -z "$AZURE_OPENAI_API_KEY" ] || [ -z "$AZURE_OPENAI_ENDPOINT" ] || [ -z "$AZURE_OPENAI_DEPLOYMENT" ]; then
+    echo "# Azure OpenAI configuration incomplete - skipping AI commit message generation" >> "$COMMIT_MSG_FILE"
+    echo "# Required: AZURE_OPENAI_API_KEY, AZURE_OPENAI_ENDPOINT, AZURE_OPENAI_DEPLOYMENT" >> "$COMMIT_MSG_FILE"
     exit 0
 fi
 
@@ -68,7 +69,7 @@ echo "# Generating AI commit message suggestions..." >> "$COMMIT_MSG_FILE"
 echo "#" >> "$COMMIT_MSG_FILE"
 
 # Get suggestions and format them as comments
-if SUGGESTIONS=$(git diff --cached | committy --stdin 2>/dev/null); then
+if SUGGESTIONS=$(git diff --cached | committy --stdin --api-key "$AZURE_OPENAI_API_KEY" --endpoint "$AZURE_OPENAI_ENDPOINT" --deployment "$AZURE_OPENAI_DEPLOYMENT" 2>/dev/null); then
     echo "# AI-generated suggestions (uncomment and edit as needed):" >> "$COMMIT_MSG_FILE"
     echo "#" >> "$COMMIT_MSG_FILE"
     
@@ -108,8 +109,10 @@ else
 fi
 
 echo ""
-echo "Make sure to set your Claude API key:"
-echo "  export CLAUDE_API_KEY=your_api_key_here"
+echo "Make sure to set your Azure OpenAI configuration:"
+echo "  export AZURE_OPENAI_API_KEY=your_api_key_here"
+echo "  export AZURE_OPENAI_ENDPOINT=https://your-endpoint.openai.azure.com"
+echo "  export AZURE_OPENAI_DEPLOYMENT=your-deployment-name"
 echo ""
 echo "Test it by staging some changes and running:"
 echo "  git commit"

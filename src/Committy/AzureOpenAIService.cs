@@ -3,52 +3,60 @@ using System.Text.Json;
 
 namespace Committy;
 
-public class ClaudeService
+public class AzureOpenAIService : IAzureOpenAIService
 {
 	private readonly HttpClient _httpClient;
 
-	public ClaudeService(HttpClient httpClient)
+	public AzureOpenAIService(HttpClient httpClient)
 	{
 		_httpClient = httpClient;
 	}
 
-	public async Task<List<string>> GenerateCommitMessageSuggestionsAsync(string patch, string apiKey)
+	public async Task<List<string>> GenerateCommitMessageSuggestionsAsync(string patch, string apiKey, string endpoint, string deploymentName)
 	{
-		_httpClient.DefaultRequestHeaders.Authorization = new("Bearer", apiKey);
+		_httpClient.DefaultRequestHeaders.Clear();
+		_httpClient.DefaultRequestHeaders.Add("api-key", apiKey);
 
 		var prompt = BuildPrompt(patch);
-		
+
 		var request = new
 		{
-			model = "claude-3-5-sonnet-20241022",
-			max_tokens = 400,
 			messages = new[]
 			{
+				new { role = "system", content = "You are a helpful assistant that generates conventional commit messages." },
 				new { role = "user", content = prompt }
-			}
+			},
+			max_tokens = 400,
+			temperature = 0.1,
+			top_p = 1.0,
+			frequency_penalty = 0,
+			presence_penalty = 0
 		};
 
-		var json = JsonSerializer.Serialize(request, new JsonSerializerOptions 
-		{ 
-			PropertyNamingPolicy = JsonNamingPolicy.SnakeCaseLower 
+		var json = JsonSerializer.Serialize(request, new JsonSerializerOptions
+		{
+			PropertyNamingPolicy = JsonNamingPolicy.SnakeCaseLower
 		});
 
 		var content = new StringContent(json, Encoding.UTF8, "application/json");
+
+		var requestUrl = $"{endpoint.TrimEnd('/')}/openai/deployments/{deploymentName}/chat/completions?api-version=2024-02-15-preview";
 		
-		var response = await _httpClient.PostAsync("v1/messages", content);
-		
+		var response = await _httpClient.PostAsync(requestUrl, content);
+
 		if (!response.IsSuccessStatusCode)
 		{
 			var errorContent = await response.Content.ReadAsStringAsync();
-			throw new HttpRequestException($"Claude API request failed: {response.StatusCode} - {errorContent}");
+			throw new HttpRequestException($"Azure OpenAI API request failed: {response.StatusCode} - {errorContent}");
 		}
 
 		var responseContent = await response.Content.ReadAsStringAsync();
 		var responseObj = JsonSerializer.Deserialize<JsonElement>(responseContent);
-		
+
 		var messageContent = responseObj
-			.GetProperty("content")[0]
-			.GetProperty("text")
+			.GetProperty("choices")[0]
+			.GetProperty("message")
+			.GetProperty("content")
 			.GetString();
 
 		var suggestions = ParseSuggestions(messageContent?.Trim() ?? "feat: implement changes");

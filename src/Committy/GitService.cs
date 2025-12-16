@@ -9,9 +9,9 @@ public class GitService
 	/// Gets staged diff for manual execution fallback.
 	/// In hook usage, diff comes via stdin instead.
 	/// </summary>
-	public async Task<string> GetStagedDiffAsync()
+	public static async Task<string> GetStagedDiffAsync()
 	{
-		var result = await Cli.Wrap("git")
+		BufferedCommandResult result = await Cli.Wrap("git")
 			.WithArguments(["diff", "--cached"])
 			.WithValidation(CommandResultValidation.None)
 			.ExecuteBufferedAsync();
@@ -21,11 +21,9 @@ public class GitService
 			throw new InvalidOperationException($"Git diff failed: {result.StandardError}");
 		}
 
-		if (string.IsNullOrWhiteSpace(result.StandardOutput))
-		{
-			throw new InvalidOperationException("No staged changes found. Use 'git add' to stage files for commit.");
-		}
-
-		return result.StandardOutput;
+		return string.IsNullOrWhiteSpace(result.StandardOutput)
+			? throw new InvalidOperationException(
+				"No staged changes found. Use 'git add' to stage files for commit.")
+			: result.StandardOutput;
 	}
 }

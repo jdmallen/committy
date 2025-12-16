@@ -1,16 +1,14 @@
 namespace Committy;
 
-public class CommittyService
+public class CommittyService(IAzureOpenAIService azureOpenAIService)
 {
-	private readonly IAzureOpenAIService _azureOpenAIService;
-	private static bool _clipboardWarningShown = false;
+	private static bool _clipboardWarningShown;
 
-	public CommittyService(IAzureOpenAIService azureOpenAIService)
-	{
-		_azureOpenAIService = azureOpenAIService;
-	}
-
-	public async Task<List<string>> GenerateCommitMessageSuggestionsAsync(string patch, string apiKey, string endpoint, string deploymentName)
+	public async Task<List<string>> GenerateCommitMessageSuggestionsAsync(
+		string patch,
+		string apiKey,
+		string endpoint,
+		string deploymentName)
 	{
 		if (string.IsNullOrWhiteSpace(patch))
 		{
@@ -29,18 +27,27 @@ public class CommittyService
 
 		if (string.IsNullOrWhiteSpace(deploymentName))
 		{
-			throw new ArgumentException("Deployment name cannot be null or empty", nameof(deploymentName));
+			throw new ArgumentException(
+				"Deployment name cannot be null or empty",
+				nameof(deploymentName));
 		}
 
 		try
 		{
-			var suggestions = await _azureOpenAIService.GenerateCommitMessageSuggestionsAsync(patch, apiKey, endpoint, deploymentName);
-			
+			List<string> suggestions =
+				await azureOpenAIService.GenerateCommitMessageSuggestionsAsync(
+					patch,
+					apiKey,
+					endpoint,
+					deploymentName);
+
 			return suggestions;
 		}
 		catch (Exception ex)
 		{
-			throw new InvalidOperationException($"Failed to generate commit message suggestions: {ex.Message}", ex);
+			throw new InvalidOperationException(
+				$"Failed to generate commit message suggestions: {ex.Message}",
+				ex);
 		}
 	}
 
@@ -49,11 +56,13 @@ public class CommittyService
 		if (Console.IsInputRedirected)
 		{
 			using var reader = new StreamReader(Console.OpenStandardInput(), Console.InputEncoding);
+
 			return await reader.ReadToEndAsync();
 		}
 		else
 		{
-			throw new InvalidOperationException("No input data available. Please pipe git patch data to stdin.");
+			throw new InvalidOperationException(
+				"No input data available. Please pipe git patch data to stdin.");
 		}
 	}
 
@@ -69,7 +78,8 @@ public class CommittyService
 			// Only show warning once to avoid spam
 			if (!_clipboardWarningShown)
 			{
-				Console.Error.WriteLine("Warning: Clipboard functionality not available on this system");
+				await Console.Error.WriteLineAsync(
+					"Warning: Clipboard functionality not available on this system");
 				_clipboardWarningShown = true;
 			}
 		}

@@ -1,6 +1,5 @@
 using NSubstitute;
 using NSubstitute.ExceptionExtensions;
-using Xunit;
 
 namespace Committy.Tests;
 
@@ -16,18 +15,17 @@ public class CommittyServiceTests
 	}
 
 	[Fact]
-	public async Task GenerateCommitMessageSuggestionsAsync_ValidParameters_ReturnsExpectedSuggestions()
+	public async Task
+		GenerateCommitMessageSuggestionsAsync_ValidParameters_ReturnsExpectedSuggestions()
 	{
 		// Arrange
-		var patch = "diff --git a/file.txt b/file.txt\n+added line";
-		var apiKey = "test-api-key";
-		var endpoint = "https://test.openai.azure.com";
-		var deploymentName = "gpt-4";
+		const string patch = "diff --git a/file.txt b/file.txt\n+added line";
+		const string apiKey = "test-api-key";
+		const string endpoint = "https://test.openai.azure.com";
+		const string deploymentName = "gpt-4";
 		var expectedSuggestions = new List<string>
 		{
-			"feat: add new functionality",
-			"fix: resolve bug in parser",
-			"docs: update documentation"
+			"feat: add new functionality", "fix: resolve bug in parser", "docs: update documentation",
 		};
 
 		_mockAzureOpenAIService
@@ -35,26 +33,37 @@ public class CommittyServiceTests
 			.Returns(expectedSuggestions);
 
 		// Act
-		var result = await _committyService.GenerateCommitMessageSuggestionsAsync(patch, apiKey, endpoint, deploymentName);
+		List<string> result =
+			await _committyService.GenerateCommitMessageSuggestionsAsync(
+				patch,
+				apiKey,
+				endpoint,
+				deploymentName);
 
 		// Assert
 		Assert.Equal(expectedSuggestions, result);
-		await _mockAzureOpenAIService.Received(1).GenerateCommitMessageSuggestionsAsync(patch, apiKey, endpoint, deploymentName);
+		await _mockAzureOpenAIService.Received(1)
+			.GenerateCommitMessageSuggestionsAsync(patch, apiKey, endpoint, deploymentName);
 	}
 
 	[Theory]
 	[InlineData("")]
 	[InlineData("   ")]
-	public async Task GenerateCommitMessageSuggestionsAsync_InvalidPatch_ThrowsArgumentException(string invalidPatch)
+	public async Task GenerateCommitMessageSuggestionsAsync_InvalidPatch_ThrowsArgumentException(
+		string invalidPatch)
 	{
 		// Arrange
-		var apiKey = "test-api-key";
-		var endpoint = "https://test.openai.azure.com";
-		var deploymentName = "gpt-4";
+		const string apiKey = "test-api-key";
+		const string endpoint = "https://test.openai.azure.com";
+		const string deploymentName = "gpt-4";
 
 		// Act & Assert
-		var exception = await Assert.ThrowsAsync<ArgumentException>(
-			() => _committyService.GenerateCommitMessageSuggestionsAsync(invalidPatch, apiKey, endpoint, deploymentName));
+		var exception = await Assert.ThrowsAsync<ArgumentException>(() =>
+			_committyService.GenerateCommitMessageSuggestionsAsync(
+				invalidPatch,
+				apiKey,
+				endpoint,
+				deploymentName));
 
 		Assert.Equal("Patch cannot be null or empty (Parameter 'patch')", exception.Message);
 	}
@@ -63,13 +72,17 @@ public class CommittyServiceTests
 	public async Task GenerateCommitMessageSuggestionsAsync_NullPatch_ThrowsArgumentException()
 	{
 		// Arrange
-		var apiKey = "test-api-key";
-		var endpoint = "https://test.openai.azure.com";
-		var deploymentName = "gpt-4";
+		const string apiKey = "test-api-key";
+		const string endpoint = "https://test.openai.azure.com";
+		const string deploymentName = "gpt-4";
 
 		// Act & Assert
-		var exception = await Assert.ThrowsAsync<ArgumentException>(
-			() => _committyService.GenerateCommitMessageSuggestionsAsync(null!, apiKey, endpoint, deploymentName));
+		var exception = await Assert.ThrowsAsync<ArgumentException>(() =>
+			_committyService.GenerateCommitMessageSuggestionsAsync(
+				null!,
+				apiKey,
+				endpoint,
+				deploymentName));
 
 		Assert.Equal("Patch cannot be null or empty (Parameter 'patch')", exception.Message);
 	}
@@ -77,16 +90,21 @@ public class CommittyServiceTests
 	[Theory]
 	[InlineData("")]
 	[InlineData("   ")]
-	public async Task GenerateCommitMessageSuggestionsAsync_InvalidApiKey_ThrowsArgumentException(string invalidApiKey)
+	public async Task GenerateCommitMessageSuggestionsAsync_InvalidApiKey_ThrowsArgumentException(
+		string invalidApiKey)
 	{
 		// Arrange
-		var patch = "diff --git a/file.txt b/file.txt\n+added line";
-		var endpoint = "https://test.openai.azure.com";
-		var deploymentName = "gpt-4";
+		const string patch = "diff --git a/file.txt b/file.txt\n+added line";
+		const string endpoint = "https://test.openai.azure.com";
+		const string deploymentName = "gpt-4";
 
 		// Act & Assert
-		var exception = await Assert.ThrowsAsync<ArgumentException>(
-			() => _committyService.GenerateCommitMessageSuggestionsAsync(patch, invalidApiKey, endpoint, deploymentName));
+		var exception = await Assert.ThrowsAsync<ArgumentException>(() =>
+			_committyService.GenerateCommitMessageSuggestionsAsync(
+				patch,
+				invalidApiKey,
+				endpoint,
+				deploymentName));
 
 		Assert.Equal("API key cannot be null or empty (Parameter 'apiKey')", exception.Message);
 	}
@@ -95,13 +113,17 @@ public class CommittyServiceTests
 	public async Task GenerateCommitMessageSuggestionsAsync_NullApiKey_ThrowsArgumentException()
 	{
 		// Arrange
-		var patch = "diff --git a/file.txt b/file.txt\n+added line";
-		var endpoint = "https://test.openai.azure.com";
-		var deploymentName = "gpt-4";
+		const string patch = "diff --git a/file.txt b/file.txt\n+added line";
+		const string endpoint = "https://test.openai.azure.com";
+		const string deploymentName = "gpt-4";
 
 		// Act & Assert
-		var exception = await Assert.ThrowsAsync<ArgumentException>(
-			() => _committyService.GenerateCommitMessageSuggestionsAsync(patch, null!, endpoint, deploymentName));
+		var exception = await Assert.ThrowsAsync<ArgumentException>(() =>
+			_committyService.GenerateCommitMessageSuggestionsAsync(
+				patch,
+				null!,
+				endpoint,
+				deploymentName));
 
 		Assert.Equal("API key cannot be null or empty (Parameter 'apiKey')", exception.Message);
 	}
@@ -109,16 +131,21 @@ public class CommittyServiceTests
 	[Theory]
 	[InlineData("")]
 	[InlineData("   ")]
-	public async Task GenerateCommitMessageSuggestionsAsync_InvalidEndpoint_ThrowsArgumentException(string invalidEndpoint)
+	public async Task GenerateCommitMessageSuggestionsAsync_InvalidEndpoint_ThrowsArgumentException(
+		string invalidEndpoint)
 	{
 		// Arrange
-		var patch = "diff --git a/file.txt b/file.txt\n+added line";
-		var apiKey = "test-api-key";
-		var deploymentName = "gpt-4";
+		const string patch = "diff --git a/file.txt b/file.txt\n+added line";
+		const string apiKey = "test-api-key";
+		const string deploymentName = "gpt-4";
 
 		// Act & Assert
-		var exception = await Assert.ThrowsAsync<ArgumentException>(
-			() => _committyService.GenerateCommitMessageSuggestionsAsync(patch, apiKey, invalidEndpoint, deploymentName));
+		var exception = await Assert.ThrowsAsync<ArgumentException>(() =>
+			_committyService.GenerateCommitMessageSuggestionsAsync(
+				patch,
+				apiKey,
+				invalidEndpoint,
+				deploymentName));
 
 		Assert.Equal("Endpoint cannot be null or empty (Parameter 'endpoint')", exception.Message);
 	}
@@ -126,28 +153,37 @@ public class CommittyServiceTests
 	[Theory]
 	[InlineData("")]
 	[InlineData("   ")]
-	public async Task GenerateCommitMessageSuggestionsAsync_InvalidDeploymentName_ThrowsArgumentException(string invalidDeploymentName)
+	public async Task
+		GenerateCommitMessageSuggestionsAsync_InvalidDeploymentName_ThrowsArgumentException(
+			string invalidDeploymentName)
 	{
 		// Arrange
-		var patch = "diff --git a/file.txt b/file.txt\n+added line";
-		var apiKey = "test-api-key";
-		var endpoint = "https://test.openai.azure.com";
+		const string patch = "diff --git a/file.txt b/file.txt\n+added line";
+		const string apiKey = "test-api-key";
+		const string endpoint = "https://test.openai.azure.com";
 
 		// Act & Assert
-		var exception = await Assert.ThrowsAsync<ArgumentException>(
-			() => _committyService.GenerateCommitMessageSuggestionsAsync(patch, apiKey, endpoint, invalidDeploymentName));
+		var exception = await Assert.ThrowsAsync<ArgumentException>(() =>
+			_committyService.GenerateCommitMessageSuggestionsAsync(
+				patch,
+				apiKey,
+				endpoint,
+				invalidDeploymentName));
 
-		Assert.Equal("Deployment name cannot be null or empty (Parameter 'deploymentName')", exception.Message);
+		Assert.Equal(
+			"Deployment name cannot be null or empty (Parameter 'deploymentName')",
+			exception.Message);
 	}
 
 	[Fact]
-	public async Task GenerateCommitMessageSuggestionsAsync_AzureOpenAIServiceThrows_WrapsInInvalidOperationException()
+	public async Task
+		GenerateCommitMessageSuggestionsAsync_AzureOpenAIServiceThrows_WrapsInInvalidOperationException()
 	{
 		// Arrange
-		var patch = "diff --git a/file.txt b/file.txt\n+added line";
-		var apiKey = "test-api-key";
-		var endpoint = "https://test.openai.azure.com";
-		var deploymentName = "gpt-4";
+		const string patch = "diff --git a/file.txt b/file.txt\n+added line";
+		const string apiKey = "test-api-key";
+		const string endpoint = "https://test.openai.azure.com";
+		const string deploymentName = "gpt-4";
 		var innerException = new HttpRequestException("API request failed");
 
 		_mockAzureOpenAIService
@@ -155,8 +191,12 @@ public class CommittyServiceTests
 			.ThrowsAsync(innerException);
 
 		// Act & Assert
-		var exception = await Assert.ThrowsAsync<InvalidOperationException>(
-			() => _committyService.GenerateCommitMessageSuggestionsAsync(patch, apiKey, endpoint, deploymentName));
+		var exception = await Assert.ThrowsAsync<InvalidOperationException>(() =>
+			_committyService.GenerateCommitMessageSuggestionsAsync(
+				patch,
+				apiKey,
+				endpoint,
+				deploymentName));
 
 		Assert.StartsWith("Failed to generate commit message suggestions:", exception.Message);
 		Assert.Equal(innerException, exception.InnerException);
@@ -169,8 +209,9 @@ public class CommittyServiceTests
 		// In a real test environment, we might need to mock the console input
 
 		// Act & Assert
-		var exception = Assert.ThrowsAsync<InvalidOperationException>(
-			() => _committyService.ReadPatchFromStdinAsync());
+		Task<InvalidOperationException> exception =
+			Assert.ThrowsAsync<InvalidOperationException>(() =>
+				_committyService.ReadPatchFromStdinAsync());
 
 		Assert.NotNull(exception);
 	}
@@ -179,7 +220,7 @@ public class CommittyServiceTests
 	public async Task CopyToClipboardAsync_ValidText_DoesNotThrow()
 	{
 		// Arrange
-		var text = "feat: add new feature";
+		const string text = "feat: add new feature";
 
 		// Act & Assert - should not throw
 		await _committyService.CopyToClipboardAsync(text);

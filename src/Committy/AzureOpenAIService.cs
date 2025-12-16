@@ -3,70 +3,76 @@ using System.Text.Json;
 
 namespace Committy;
 
-public class AzureOpenAIService : IAzureOpenAIService
+public class AzureOpenAIService(HttpClient httpClient) : IAzureOpenAIService
 {
-	private readonly HttpClient _httpClient;
-
-	public AzureOpenAIService(HttpClient httpClient)
+	public async Task<List<string>> GenerateCommitMessageSuggestionsAsync(
+		string patch,
+		string apiKey,
+		string endpoint,
+		string deploymentName)
 	{
-		_httpClient = httpClient;
-	}
+		httpClient.DefaultRequestHeaders.Clear();
+		httpClient.DefaultRequestHeaders.Add("api-key", apiKey);
 
-	public async Task<List<string>> GenerateCommitMessageSuggestionsAsync(string patch, string apiKey, string endpoint, string deploymentName)
-	{
-		_httpClient.DefaultRequestHeaders.Clear();
-		_httpClient.DefaultRequestHeaders.Add("api-key", apiKey);
-
-		var prompt = BuildPrompt(patch);
+		string prompt = BuildPrompt(patch);
 
 		var request = new
 		{
 			messages = new[]
 			{
-				new { role = "system", content = "You are a helpful assistant that generates conventional commit messages." },
-				new { role = "user", content = prompt }
+				new
+				{
+					role = "system",
+					content = "You are a helpful assistant that generates conventional commit messages."
+				},
+				new { role = "user", content = prompt },
 			},
 			max_tokens = 400,
 			temperature = 0.1,
 			top_p = 1.0,
 			frequency_penalty = 0,
-			presence_penalty = 0
+			presence_penalty = 0,
 		};
 
-		var json = JsonSerializer.Serialize(request, new JsonSerializerOptions
-		{
-			PropertyNamingPolicy = JsonNamingPolicy.SnakeCaseLower
-		});
+		string json = JsonSerializer.Serialize(
+			request,
+			new JsonSerializerOptions { PropertyNamingPolicy = JsonNamingPolicy.SnakeCaseLower, });
 
 		var content = new StringContent(json, Encoding.UTF8, "application/json");
 
-		var requestUrl = $"{endpoint.TrimEnd('/')}/openai/deployments/{deploymentName}/chat/completions?api-version=2024-02-15-preview";
-		
-		var response = await _httpClient.PostAsync(requestUrl, content);
+		var requestUrl =
+			$"{endpoint.TrimEnd('/')}/openai/deployments/{deploymentName}/chat/completions?api-version=2024-02-15-preview";
+
+		HttpResponseMessage response = await httpClient.PostAsync(requestUrl, content);
 
 		if (!response.IsSuccessStatusCode)
 		{
-			var errorContent = await response.Content.ReadAsStringAsync();
-			throw new HttpRequestException($"Azure OpenAI API request failed: {response.StatusCode} - {errorContent}");
+			string errorContent = await response.Content.ReadAsStringAsync();
+
+			throw new HttpRequestException(
+				$"Azure OpenAI API request failed: {response.StatusCode} - {errorContent}");
 		}
 
-		var responseContent = await response.Content.ReadAsStringAsync();
+		string responseContent = await response.Content.ReadAsStringAsync();
 		var responseObj = JsonSerializer.Deserialize<JsonElement>(responseContent);
 
-		var messageContent = responseObj
+		string? messageContent = responseObj
 			.GetProperty("choices")[0]
 			.GetProperty("message")
 			.GetProperty("content")
 			.GetString();
 
-		var suggestions = ParseSuggestions(messageContent?.Trim() ?? "feat: implement changes");
+		List<string> suggestions =
+			ParseSuggestions(messageContent?.Trim() ?? "feat: implement changes");
+
 		return suggestions;
 	}
 
 	private static string BuildPrompt(string patch)
 	{
 		var sb = new StringBuilder();
-		sb.AppendLine("Generate exactly 5 different commit messages following Conventional Commits v1.0.0 specification.");
+		sb.AppendLine(
+			"Generate exactly 5 different commit messages following Conventional Commits v1.0.0 specification.");
 		sb.AppendLine();
 		sb.AppendLine("FORMAT: <type>[optional scope]: <description>");
 		sb.AppendLine();
@@ -108,7 +114,7 @@ public class AzureOpenAIService : IAzureOpenAIService
 
 	private static List<string> ParseSuggestions(string response)
 	{
-		var lines = response.Split(['\r', '\n'], StringSplitOptions.RemoveEmptyEntries)
+		List<string> lines = response.Split(['\r', '\n'], StringSplitOptions.RemoveEmptyEntries)
 			.Select(line => line.Trim())
 			.Where(line => !string.IsNullOrEmpty(line))
 			.ToList();
@@ -118,8 +124,8 @@ public class AzureOpenAIService : IAzureOpenAIService
 			return lines.Take(5).ToList();
 		}
 
-		var suggestions = lines.ToList();
-		
+		List<string> suggestions = lines.ToList();
+
 		while (suggestions.Count < 5)
 		{
 			suggestions.Add($"feat: implement changes ({suggestions.Count + 1})");

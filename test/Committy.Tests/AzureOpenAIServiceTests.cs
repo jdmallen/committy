@@ -1,21 +1,18 @@
 using NSubstitute;
 using System.Net;
 using System.Text;
-using Xunit;
 
 namespace Committy.Tests;
 
 public class AzureOpenAIServiceTests
 {
-	private readonly HttpMessageHandler _mockHandler;
-	private readonly HttpClient _httpClient;
 	private readonly AzureOpenAIService _azureOpenAIService;
 
 	public AzureOpenAIServiceTests()
 	{
-		_mockHandler = Substitute.For<HttpMessageHandler>();
-		_httpClient = new HttpClient(_mockHandler);
-		_azureOpenAIService = new AzureOpenAIService(_httpClient);
+		var mockHandler = Substitute.For<HttpMessageHandler>();
+		var httpClient = new HttpClient(mockHandler);
+		_azureOpenAIService = new AzureOpenAIService(httpClient);
 	}
 
 	[Fact]
@@ -50,7 +47,7 @@ public class AzureOpenAIServiceTests
 		var testService = new AzureOpenAIService(testHttpClient);
 
 		// Act
-		var result = await testService.GenerateCommitMessageSuggestionsAsync(
+		List<string> result = await testService.GenerateCommitMessageSuggestionsAsync(
 			"test patch", 
 			"test-api-key", 
 			"https://test.openai.azure.com", 
@@ -106,7 +103,7 @@ public class AzureOpenAIServiceTests
 		var testService = new AzureOpenAIService(testHttpClient);
 
 		// Act
-		var result = await testService.GenerateCommitMessageSuggestionsAsync(
+		List<string> result = await testService.GenerateCommitMessageSuggestionsAsync(
 			"test patch",
 			"test-api-key",
 			"https://test.openai.azure.com",
@@ -138,7 +135,7 @@ public class AzureOpenAIServiceTests
 		var testService = new AzureOpenAIService(testHttpClient);
 
 		// Act
-		var result = await testService.GenerateCommitMessageSuggestionsAsync(
+		List<string> result = await testService.GenerateCommitMessageSuggestionsAsync(
 			"test patch",
 			"test-api-key",
 			"https://test.openai.azure.com",
@@ -157,22 +154,17 @@ public class AzureOpenAIServiceTests
 }
 
 // Test helper class for HTTP testing - same as before but included for completeness
-public class TestHttpMessageHandler : HttpMessageHandler
+public class TestHttpMessageHandler(
+	string responseContent,
+	HttpStatusCode statusCode = HttpStatusCode.OK
+)
+	: HttpMessageHandler
 {
-	private readonly string _responseContent;
-	private readonly HttpStatusCode _statusCode;
-
-	public TestHttpMessageHandler(string responseContent, HttpStatusCode statusCode = HttpStatusCode.OK)
-	{
-		_responseContent = responseContent;
-		_statusCode = statusCode;
-	}
-
 	protected override Task<HttpResponseMessage> SendAsync(HttpRequestMessage request, CancellationToken cancellationToken)
 	{
-		var response = new HttpResponseMessage(_statusCode)
+		var response = new HttpResponseMessage(statusCode)
 		{
-			Content = new StringContent(_responseContent, Encoding.UTF8, "application/json")
+			Content = new StringContent(responseContent, Encoding.UTF8, "application/json"),
 		};
 
 		return Task.FromResult(response);

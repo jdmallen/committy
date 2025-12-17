@@ -1,7 +1,22 @@
 #!/bin/bash
 
 # Install committy as a git hook
-# Usage: ./install-git-hook.sh [--global]
+# Usage: ./install-git-hook.sh <repo-path>
+#        ./install-git-hook.sh --global
+
+# Check if arguments are provided
+if [ $# -eq 0 ]; then
+    echo "Error: Missing required argument"
+    echo ""
+    echo "Usage: ./install-git-hook.sh <repo-path>"
+    echo "   or: ./install-git-hook.sh --global"
+    echo ""
+    echo "Examples:"
+    echo "  ./install-git-hook.sh .              # Install in current directory"
+    echo "  ./install-git-hook.sh /path/to/repo  # Install in specific repo"
+    echo "  ./install-git-hook.sh --global       # Install as global template"
+    exit 1
+fi
 
 HOOK_TYPE="prepare-commit-msg"
 HOOK_SOURCE="./hooks/$HOOK_TYPE"
@@ -22,15 +37,30 @@ if [ "$1" = "--global" ]; then
     # Set global template directory
     git config --global init.templateDir "$HOME/.git-templates"
 else
-    echo "Installing local git hook..."
+    REPO_PATH="$1"
+    echo "Installing local git hook to: $REPO_PATH"
     
-    # Check if we're in a git repository
-    if ! git rev-parse --git-dir > /dev/null 2>&1; then
-        echo "Error: Not in a git repository. Run from repo root or use --global flag."
+    # Check if repo path exists
+    if [ ! -d "$REPO_PATH" ]; then
+        echo "Error: Repository path does not exist: $REPO_PATH"
         exit 1
     fi
     
-    HOOKS_DIR="$(git rev-parse --git-dir)/hooks"
+    # Convert to absolute path
+    REPO_PATH="$(cd "$REPO_PATH" && pwd)"
+    
+    # Check if it's a git repository
+    if ! git -C "$REPO_PATH" rev-parse --git-dir > /dev/null 2>&1; then
+        echo "Error: Not a valid git repository: $REPO_PATH"
+        exit 1
+    fi
+    
+    # Get git dir and convert to absolute path if needed
+    GIT_DIR="$(git -C "$REPO_PATH" rev-parse --git-dir)"
+    if [[ ! "$GIT_DIR" = /* ]]; then
+        GIT_DIR="$REPO_PATH/$GIT_DIR"
+    fi
+    HOOKS_DIR="$GIT_DIR/hooks"
 fi
 
 mkdir -p "$HOOKS_DIR"
@@ -47,7 +77,7 @@ if [ "$1" = "--global" ]; then
     echo    "include this hook. For existing repos, run:"
     echo    "  git init  # in each existing repository"
     echo -e "\nOr install locally in existing repos:"
-    echo    "  ./install-git-hook.sh"
+    echo    "  ./install-git-hook.sh /path/to/repo"
 else
     echo -e "\nHook installed for current repository."
     echo    "Now when you run 'git commit', AI suggestions will appear in your editor."

@@ -1,9 +1,26 @@
 # Install committy as a git hook (PowerShell version)
-# Usage: .\install-git-hook.ps1 [-Global]
+# Usage: .\install-git-hook.ps1 <repo-path>
+#        .\install-git-hook.ps1 -Global
 
 param(
+    [Parameter(Position = 0, ValueFromRemainingArguments = $true)]
+    [string]$RepoPath,
     [switch]$Global
 )
+
+# Check if no arguments are provided
+if ([string]::IsNullOrEmpty($RepoPath) -and -not $Global) {
+    Write-Host "Error: Missing required argument" -ForegroundColor Red
+    Write-Host ""
+    Write-Host "Usage: .\install-git-hook.ps1 <repo-path>"
+    Write-Host "   or: .\install-git-hook.ps1 -Global"
+    Write-Host ""
+    Write-Host "Examples:"
+    Write-Host "  .\install-git-hook.ps1 .              # Install in current directory"
+    Write-Host "  .\install-git-hook.ps1 C:\path\repo   # Install in specific repo"
+    Write-Host "  .\install-git-hook.ps1 -Global        # Install as global template"
+    exit 1
+}
 
 $HOOK_TYPE = "prepare-commit-msg"
 $HOOK_SOURCE = Join-Path (Get-Location) "hooks" $HOOK_TYPE
@@ -24,18 +41,33 @@ if ($Global) {
     # Set global template directory
     git config --global init.templateDir (Join-Path $env:USERPROFILE ".git-templates")
 } else {
-    Write-Host "Installing local git hook..."
+    Write-Host "Installing local git hook to: $RepoPath"
     
-    # Check if we're in a git repository
+    # Check if repo path exists
+    if (-not (Test-Path $RepoPath)) {
+        Write-Error "Error: Repository path does not exist: $RepoPath"
+        exit 1
+    }
+    
+    # Convert to absolute path
+    $RepoPath = (Resolve-Path $RepoPath).Path
+    
+    # Check if it's a git repository
     try {
-        $gitDir = git rev-parse --git-dir 2>$null
+        $gitDir = git -C $RepoPath rev-parse --git-dir 2>$null
         if ($LASTEXITCODE -ne 0) {
-            throw "Not in git repository"
+            throw "Not a valid git repository"
         }
+        
+        # If git-dir is relative, make it absolute
+        if (-not [System.IO.Path]::IsPathRooted($gitDir)) {
+            $gitDir = Join-Path $RepoPath $gitDir
+        }
+        
         $HOOKS_DIR = Join-Path $gitDir "hooks"
     }
     catch {
-        Write-Error "Error: Not in a git repository. Run from repo root or use -Global flag."
+        Write-Error "Error: Not a valid git repository: $RepoPath"
         exit 1
     }
 }
@@ -60,7 +92,7 @@ if ($Global) {
     Write-Host "  git init  # in each existing repository"
     Write-Host ""
     Write-Host "Or install locally in existing repos:"
-    Write-Host "  .\install-git-hook.ps1"
+    Write-Host "  .\install-git-hook.ps1 C:\path\to\repo"
 } else {
     Write-Host ""
     Write-Host "Hook installed for current repository."

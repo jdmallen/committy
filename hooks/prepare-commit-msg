@@ -46,6 +46,7 @@ if SUGGESTIONS=$(git diff --cached | committy --no-git 2>/dev/null); then
     # Add suggestions as commented lines at the top, before any existing content
     {
         echo ""
+        echo ""
         echo "# Please enter the commit message for your changes. Lines starting"
         echo "# with '#' will be ignored, and an empty message aborts the commit."
         echo "#"

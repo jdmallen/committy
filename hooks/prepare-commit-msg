@@ -37,23 +37,16 @@ echo "#" >> "$COMMIT_MSG_FILE"
 
 # Get suggestions and format them as comments
 if SUGGESTIONS=$(git diff --cached | committy --no-git 2>/dev/null); then
-    echo "# AI-generated suggestions (uncomment and edit as needed):" >> "$COMMIT_MSG_FILE"
-    echo "#" >> "$COMMIT_MSG_FILE"
-
     # Remove trailing newline from suggestions
     SUGGESTIONS=$(printf '%s' "$SUGGESTIONS")
-    
+
     # Add suggestions as commented lines at the top, before any existing content
     {
         echo ""
-        echo ""
-        echo "# Please enter the commit message for your changes. Lines starting"
-        echo "# with '#' will be ignored, and an empty message aborts the commit."
+        echo "$SUGGESTIONS" | sed 's/^/# /'
+        echo "# 🡅 Suggested commit messages from Committy (uncomment and edit as needed)🡅:"
         echo "#"
-        echo "# Suggested commit messages:"
-        echo "$SUGGESTIONS" | sed 's/^/#   /'
-        echo "#"
-        tail -n +5 "$COMMIT_MSG_FILE"
+        tail -n +2 "$COMMIT_MSG_FILE"
     } > "$COMMIT_MSG_FILE.tmp"
     mv "$COMMIT_MSG_FILE.tmp" "$COMMIT_MSG_FILE"
 

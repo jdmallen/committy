@@ -219,7 +219,7 @@ public class CommittyServiceTests
 		// Act & Assert
 		Task<InvalidOperationException> exception =
 			Assert.ThrowsAsync<InvalidOperationException>(() =>
-				_committyService.ReadPatchFromStdinAsync(CancellationToken.None));
+				CommittyService.ReadPatchFromStdinAsync(CancellationToken.None));
 
 		Assert.NotNull(exception);
 	}

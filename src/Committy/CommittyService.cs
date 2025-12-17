@@ -53,7 +53,7 @@ public class CommittyService(IAzureOpenAIService azureOpenAIService)
 		}
 	}
 
-	public async Task<string> ReadPatchFromStdinAsync(CancellationToken cancellationToken = default)
+	public static async Task<string> ReadPatchFromStdinAsync(CancellationToken cancellationToken = default)
 	{
 		if (Console.IsInputRedirected)
 		{

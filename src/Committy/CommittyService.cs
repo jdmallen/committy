@@ -68,7 +68,7 @@ public class CommittyService(IAzureOpenAIService azureOpenAIService)
 		}
 	}
 
-	public async Task CopyToClipboardAsync(string text, CancellationToken cancellationToken = default)
+	public static async Task CopyToClipboardAsync(string text, CancellationToken cancellationToken = default)
 	{
 		try
 		{
@@ -81,7 +81,7 @@ public class CommittyService(IAzureOpenAIService azureOpenAIService)
 			if (!_clipboardWarningShown)
 			{
 				await Console.Error.WriteLineAsync(
-					"Warning: Clipboard functionality not available on this system").ConfigureAwait(false);
+					"Warning: Clipboard functionality not available on this system. If running Linux, try installing `xsel` package.").ConfigureAwait(false);
 				_clipboardWarningShown = true;
 			}
 		}

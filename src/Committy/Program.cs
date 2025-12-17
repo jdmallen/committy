@@ -6,6 +6,10 @@ namespace Committy;
 [UsedImplicitly]
 internal class Program
 {
+	private const string AzureOpenAIApiKeyKey = "AZURE_OPENAI_API_KEY";
+	private const string AzureOpenAIEndpointKey = "AZURE_OPENAI_ENDPOINT_HOST";
+	private const string AzureOpenAIDeploymentKey = "AZURE_OPENAI_DEPLOYMENT";
+
 	private static async Task<int> Main(string[] args)
 	{
 		var apiKeyOption = new Option<string?>(
@@ -13,7 +17,7 @@ internal class Program
 			aliases: ["-k"])
 		{
 			Description =
-				"Azure OpenAI API key (can also be set via AZURE_OPENAI_API_KEY environment variable)",
+				$"Azure OpenAI API key (can also be set via {AzureOpenAIApiKeyKey} environment variable)",
 			HelpName = "API key",
 		};
 		var endpointOption = new Option<string?>(
@@ -21,7 +25,7 @@ internal class Program
 			aliases: ["-e"])
 		{
 			Description =
-				"Azure OpenAI endpoint URL (can also be set via AZURE_OPENAI_ENDPOINT environment variable)",
+				$"Azure OpenAI endpoint host URL (can also be set via {AzureOpenAIEndpointKey} environment variable); omit everything after the domain",
 			HelpName = "endpoint URL",
 		};
 		var deploymentOption = new Option<string?>(
@@ -30,12 +34,12 @@ internal class Program
 		{
 			DefaultValueFactory = _ => "gpt-4.1-mini",
 			Description =
-				"Azure OpenAI deployment name (can also be set via AZURE_OPENAI_DEPLOYMENT environment variable)",
+				$"Azure OpenAI deployment name (can also be set via {AzureOpenAIDeploymentKey} environment variable)",
 			HelpName = "deployment name",
 		};
-		var stdinOption = new Option<bool>(name: "--stdin")
+		var noGitOption = new Option<bool>(name: "--no-git")
 		{
-			Description = "Read patch from stdin instead of `git diff --cached` (default when no args)",
+			Description = "When committy is called with nothing in stdin, it will call `git diff --cached` directly; this option disables that behavior and relies solely on stdin",
 		};
 		var clipboardOption = new Option<bool>(
 			name: "--clipboard",
@@ -46,7 +50,7 @@ internal class Program
 			apiKeyOption,
 			endpointOption,
 			deploymentOption,
-			stdinOption,
+			noGitOption,
 			clipboardOption,
 		};
 
@@ -55,46 +59,46 @@ internal class Program
 			string? apiKey = parseResult.GetValue(apiKeyOption);
 			string? endpoint = parseResult.GetValue(endpointOption);
 			string? deployment = parseResult.GetValue(deploymentOption);
-			bool useStdin = parseResult.GetValue(stdinOption);
+			bool isGitAccessDisabled = parseResult.GetValue(noGitOption);
 			bool copyToClipboard = parseResult.GetValue(clipboardOption);
-
-			var azureOpenAIService = new AzureOpenAIService();
-			var committyService = new CommittyService(azureOpenAIService);
 
 			try
 			{
 				string? effectiveApiKey =
-					apiKey ?? Environment.GetEnvironmentVariable("AZURE_OPENAI_API_KEY");
+					apiKey ?? Environment.GetEnvironmentVariable(AzureOpenAIApiKeyKey);
 				string? effectiveEndpoint =
-					endpoint ?? Environment.GetEnvironmentVariable("AZURE_OPENAI_ENDPOINT");
+					endpoint ?? Environment.GetEnvironmentVariable(AzureOpenAIEndpointKey);
 				string? effectiveDeployment =
-					deployment ?? Environment.GetEnvironmentVariable("AZURE_OPENAI_DEPLOYMENT");
+					deployment ?? Environment.GetEnvironmentVariable(AzureOpenAIDeploymentKey);
 
 				if (string.IsNullOrEmpty(effectiveApiKey))
 				{
 					await Console.Error.WriteLineAsync(
-						"Error: Azure OpenAI API key is required. Set AZURE_OPENAI_API_KEY environment variable or use --api-key option.");
+						$"Error: Azure OpenAI API key is required. Set {AzureOpenAIApiKeyKey} environment variable or use --api-key option.");
 					Environment.Exit(1);
 				}
 
 				if (string.IsNullOrEmpty(effectiveEndpoint))
 				{
 					await Console.Error.WriteLineAsync(
-						"Error: Azure OpenAI endpoint is required. Set AZURE_OPENAI_ENDPOINT environment variable or use --endpoint option.");
+						$"Error: Azure OpenAI endpoint is required. Set {AzureOpenAIEndpointKey} environment variable or use --endpoint option.");
 					Environment.Exit(1);
 				}
+
+				// Initialize client
+				Http.Initialize(effectiveEndpoint);
 
 				if (string.IsNullOrEmpty(effectiveDeployment))
 				{
 					await Console.Error.WriteLineAsync(
-						"Error: Azure OpenAI deployment name is required. Set AZURE_OPENAI_DEPLOYMENT environment variable or use --deployment option.");
+						$"Error: Azure OpenAI deployment name is required. Set {AzureOpenAIDeploymentKey} environment variable or use --deployment option.");
 					Environment.Exit(1);
 				}
 
 				string patch;
 
 				// Determine input source: stdin vs git diff
-				if (useStdin || Console.IsInputRedirected)
+				if (isGitAccessDisabled || Console.IsInputRedirected)
 				{
 					patch = await CommittyService.ReadPatchFromStdinAsync(cancellationToken);
 				}
@@ -102,16 +106,6 @@ internal class Program
 				{
 					// Direct git usage (fallback for manual execution)
 					patch = await GitService.GetStagedDiffAsync(cancellationToken);
-
-#if DEBUG
-					if (string.IsNullOrWhiteSpace(patch))
-					{
-						// TEMP file read for debugging
-						patch = await File.ReadAllTextAsync(
-							@"~/git/hackathon25/test.diff",
-							cancellationToken);
-					}
-#endif
 				}
 
 				if (string.IsNullOrWhiteSpace(patch))
@@ -119,6 +113,10 @@ internal class Program
 					await Console.Error.WriteLineAsync("Error: No patch data available.");
 					Environment.Exit(1);
 				}
+
+				IHttpService httpService = new HttpService();
+				var azureOpenAIService = new AzureOpenAIService(httpService);
+				var committyService = new CommittyService(azureOpenAIService);
 
 				List<string> suggestions = await committyService.GenerateCommitMessageSuggestionsAsync(
 					patch,
@@ -136,7 +134,9 @@ internal class Program
 				// Optional clipboard copy for convenience
 				if (copyToClipboard && suggestions.Count > 0)
 				{
-					// call a copy to clipboard method
+					await CommittyService.CopyToClipboardAsync(
+						suggestions[0],
+						cancellationToken);
 				}
 			}
 			catch (OperationCanceledException)

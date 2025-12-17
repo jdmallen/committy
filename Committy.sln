@@ -6,6 +6,17 @@ Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "Committy", "src\Committy\Co
 EndProject
 Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "Committy.Tests", "test\Committy.Tests\Committy.Tests.csproj", "{A1B2C3D4-E5F6-7890-ABCD-EF1234567890}"
 EndProject
+Project("{2150E333-8FDC-42A3-9474-1A3956D46DE8}") = "Solution Items", "Solution Items", "{900AC644-C3A2-406A-81AC-FFAAE4FE2718}"
+	ProjectSection(SolutionItems) = preProject
+		install-git-hook.sh = install-git-hook.sh
+		install-git-hook.ps1 = install-git-hook.ps1
+		.gitignore = .gitignore
+		INSTALL.md = INSTALL.md
+		publish.sh = publish.sh
+		publish.ps1 = publish.ps1
+		.git\hooks\prepare-commit-msg = .git\hooks\prepare-commit-msg
+	EndProjectSection
+EndProject
 Global
 	GlobalSection(SolutionConfigurationPlatforms) = preSolution
 		Debug|Any CPU = Debug|Any CPU

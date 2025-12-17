@@ -1,5 +1,6 @@
 using NSubstitute;
-using OpenAI.Chat;
+using System.Net;
+using System.Text;
 
 namespace Committy.Tests;
 
@@ -21,63 +22,176 @@ public class AzureOpenAIServiceTests
 	}
 
 	[Fact]
-	public void AzureOpenAIService_ConstructorWithClient_CreatesInstance()
+	public void AzureOpenAIService_ConstructorWithHttpService_CreatesInstance()
 	{
 		// Arrange
-		var mockClient = Substitute.For<IAzureOpenAIClient>();
+		var mockHttpService = Substitute.For<IHttpService>();
 
 		// Act
-		var service = new AzureOpenAIService(mockClient);
+		var service = new AzureOpenAIService(mockHttpService);
 
 		// Assert
 		Assert.NotNull(service);
 	}
 
 	[Fact]
-	public async Task GenerateCommitMessageSuggestionsAsync_WithMockClient_CallsClientMethod()
+	public async Task GenerateCommitMessageSuggestionsAsync_ValidResponse_ParsesCorrectly()
 	{
 		// Arrange
-		var mockClient = Substitute.For<IAzureOpenAIClient>();
-		mockClient.CompleteChatAsync(
-			Arg.Any<IEnumerable<ChatMessage>>(),
-			Arg.Any<ChatCompletionOptions>(),
+		var mockHttpService = Substitute.For<IHttpService>();
+		var mockResponse = new HttpResponseMessage(HttpStatusCode.OK)
+		{
+			Content = new StringContent("""
+			{
+				"choices": [
+					{
+						"message": {
+							"content": "feat: add feature\nfix: bug\ndocs: update readme"
+						}
+					}
+				]
+			}
+			""", Encoding.UTF8, "application/json"),
+		};
+
+		mockHttpService.SendAsync(
+			Arg.Any<HttpRequestMessage>(),
 			Arg.Any<CancellationToken>())
-			.Returns(Task.FromException<ChatCompletion>(new NotImplementedException()));
+			.Returns(mockResponse);
 
-		var service = new AzureOpenAIService(mockClient);
+		var service = new AzureOpenAIService(mockHttpService);
 
-		// Act & Assert - we expect it to call the client even though it throws
-		try
+		// Act
+		List<string> result = await service.GenerateCommitMessageSuggestionsAsync(
+			TestPatch, TestApiKey, TestEndpoint, TestDeployment);
+
+		// Assert
+		Assert.Equal(5, result.Count);
+		Assert.Equal("feat: add feature", result[0]);
+		Assert.Equal("fix: bug", result[1]);
+		Assert.Equal("docs: update readme", result[2]);
+		Assert.StartsWith("feat: implement changes", result[3]);
+		Assert.StartsWith("feat: implement changes", result[4]);
+	}
+
+	[Fact]
+	public async Task GenerateCommitMessageSuggestionsAsync_EmptyResponse_ReturnsFallbackSuggestions()
+	{
+		// Arrange
+		var mockHttpService = Substitute.For<IHttpService>();
+		var mockResponse = new HttpResponseMessage(HttpStatusCode.OK)
 		{
-			await service.GenerateCommitMessageSuggestionsAsync(
-				TestPatch, TestApiKey, TestEndpoint, TestDeployment);
-		}
-		catch
-		{
-			// Expected
-		}
+			Content = new StringContent("""
+			{
+				"choices": [
+					{
+						"message": {
+							"content": ""
+						}
+					}
+				]
+			}
+			""", Encoding.UTF8, "application/json"),
+		};
 
-		await mockClient.Received(1).CompleteChatAsync(
-			Arg.Any<IEnumerable<ChatMessage>>(),
-			Arg.Any<ChatCompletionOptions>(),
-			Arg.Any<CancellationToken>());
+		mockHttpService.SendAsync(
+			Arg.Any<HttpRequestMessage>(),
+			Arg.Any<CancellationToken>())
+			.Returns(mockResponse);
+
+		var service = new AzureOpenAIService(mockHttpService);
+
+		// Act
+		List<string> result = await service.GenerateCommitMessageSuggestionsAsync(
+			TestPatch, TestApiKey, TestEndpoint, TestDeployment);
+
+		// Assert
+		Assert.Equal(5, result.Count);
+		Assert.All(result, suggestion => Assert.StartsWith("feat: implement changes", suggestion));
+	}
+
+	[Fact]
+	public async Task GenerateCommitMessageSuggestionsAsync_InsufficientSuggestions_FillsWithDefaults()
+	{
+		// Arrange
+		var mockHttpService = Substitute.For<IHttpService>();
+		var mockResponse = new HttpResponseMessage(HttpStatusCode.OK)
+		{
+			Content = new StringContent("""
+			{
+				"choices": [
+					{
+						"message": {
+							"content": "feat: add feature\nfix: resolve issue"
+						}
+					}
+				]
+			}
+			""", Encoding.UTF8, "application/json"),
+		};
+
+		mockHttpService.SendAsync(
+			Arg.Any<HttpRequestMessage>(),
+			Arg.Any<CancellationToken>())
+			.Returns(mockResponse);
+
+		var service = new AzureOpenAIService(mockHttpService);
+
+		// Act
+		List<string> result = await service.GenerateCommitMessageSuggestionsAsync(
+			TestPatch, TestApiKey, TestEndpoint, TestDeployment);
+
+		// Assert
+		Assert.Equal(5, result.Count);
+		Assert.Equal("feat: add feature", result[0]);
+		Assert.Equal("fix: resolve issue", result[1]);
+		Assert.Equal("feat: implement changes (3)", result[2]);
+		Assert.Equal("feat: implement changes (4)", result[3]);
+		Assert.Equal("feat: implement changes (5)", result[4]);
+	}
+
+	[Fact]
+	public async Task GenerateCommitMessageSuggestionsAsync_ErrorResponse_ThrowsHttpRequestException()
+	{
+		// Arrange
+		var mockHttpService = Substitute.For<IHttpService>();
+		var mockResponse = new HttpResponseMessage(HttpStatusCode.Unauthorized)
+		{
+			Content = new StringContent("Unauthorized", Encoding.UTF8, "application/json"),
+		};
+
+		mockHttpService.SendAsync(
+			Arg.Any<HttpRequestMessage>(),
+			Arg.Any<CancellationToken>())
+			.Returns(mockResponse);
+
+		var service = new AzureOpenAIService(mockHttpService);
+
+		// Act & Assert
+		var exception = await Assert.ThrowsAsync<HttpRequestException>(
+			() => service.GenerateCommitMessageSuggestionsAsync(
+				TestPatch,
+				"invalid-key",
+				TestEndpoint,
+				TestDeployment));
+
+		Assert.Contains("Azure OpenAI API request failed: Unauthorized", exception.Message);
 	}
 
 	[Fact]
 	public async Task GenerateCommitMessageSuggestionsAsync_CancellationToken_IsPropagated()
 	{
 		// Arrange
-		var mockClient = Substitute.For<IAzureOpenAIClient>();
+		var mockHttpService = Substitute.For<IHttpService>();
 		var cts = new CancellationTokenSource();
-		cts.Cancel();
+		await cts.CancelAsync();
 
-		mockClient.CompleteChatAsync(
-			Arg.Any<IEnumerable<ChatMessage>>(),
-			Arg.Any<ChatCompletionOptions>(),
+		mockHttpService.SendAsync(
+			Arg.Any<HttpRequestMessage>(),
 			Arg.Any<CancellationToken>())
-			.Returns(Task.FromCanceled<ChatCompletion>(cts.Token));
+			.Returns(Task.FromCanceled<HttpResponseMessage>(cts.Token));
 
-		var service = new AzureOpenAIService(mockClient);
+		var service = new AzureOpenAIService(mockHttpService);
 
 		// Act & Assert - TaskCanceledException is a subclass of OperationCanceledException
 		await Assert.ThrowsAsync<TaskCanceledException>(() =>
@@ -86,34 +200,41 @@ public class AzureOpenAIServiceTests
 	}
 
 	[Fact]
-	public async Task GenerateCommitMessageSuggestionsAsync_PassesTwoMessagesToClient()
+	public async Task GenerateCommitMessageSuggestionsAsync_ValidRequest_SendsCorrectApiKey()
 	{
 		// Arrange
-		var mockClient = Substitute.For<IAzureOpenAIClient>();
-		var capturedMessages = new List<ChatMessage>();
+		var mockHttpService = Substitute.For<IHttpService>();
+		var mockResponse = new HttpResponseMessage(HttpStatusCode.OK)
+		{
+			Content = new StringContent("""
+			{
+				"choices": [
+					{
+						"message": {
+							"content": "feat: test"
+						}
+					}
+				]
+			}
+			""", Encoding.UTF8, "application/json"),
+		};
 
-		mockClient.CompleteChatAsync(
-			Arg.Do<IEnumerable<ChatMessage>>(msgs => capturedMessages.AddRange(msgs)),
-			Arg.Any<ChatCompletionOptions>(),
+		mockHttpService.SendAsync(
+			Arg.Any<HttpRequestMessage>(),
 			Arg.Any<CancellationToken>())
-			.Returns(Task.FromException<ChatCompletion>(new NotImplementedException()));
+			.Returns(mockResponse);
 
-		var service = new AzureOpenAIService(mockClient);
+		var service = new AzureOpenAIService(mockHttpService);
 
 		// Act
-		try
-		{
-			await service.GenerateCommitMessageSuggestionsAsync(
-				TestPatch, TestApiKey, TestEndpoint, TestDeployment);
-		}
-		catch
-		{
-			// Expected
-		}
+		await service.GenerateCommitMessageSuggestionsAsync(
+			TestPatch, TestApiKey, TestEndpoint, TestDeployment);
 
 		// Assert
-		Assert.Equal(2, capturedMessages.Count);
-		Assert.IsType<SystemChatMessage>(capturedMessages[0]);
-		Assert.IsType<UserChatMessage>(capturedMessages[1]);
+		await mockHttpService.Received(1).SendAsync(
+			Arg.Is<HttpRequestMessage>(req => 
+				req.Headers.Contains("api-key") && 
+				req.Headers.GetValues("api-key").First() == TestApiKey),
+			Arg.Any<CancellationToken>());
 	}
 }

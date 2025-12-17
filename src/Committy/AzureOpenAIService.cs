@@ -1,20 +1,18 @@
-using System.ClientModel;
-using Azure.AI.OpenAI;
-using OpenAI;
-using OpenAI.Chat;
+using System.Text;
+using System.Text.Json;
 
 namespace Committy;
 
-public class AzureOpenAIService : IAzureOpenAIService
+public class AzureOpenAIService(IHttpService httpService) : IAzureOpenAIService
 {
-	// private readonly IAzureOpenAIClient? _client;
+	private const string ResourceUrlFormat =
+		"/openai/deployments/{0}/chat/completions?api-version=2024-10-21";
 
-	// public AzureOpenAIService() { }
+	private static readonly JsonSerializerOptions JsonOptions = new()	{
+		PropertyNamingPolicy = JsonNamingPolicy.SnakeCaseLower,
+	};
 
-	// public AzureOpenAIService(IAzureOpenAIClient client)
-	// {
-	// 	_client = client;
-	// }
+	public AzureOpenAIService() : this(new HttpService()) { }
 
 	public async Task<List<string>> GenerateCommitMessageSuggestionsAsync(
 		string patch,
@@ -23,42 +21,52 @@ public class AzureOpenAIService : IAzureOpenAIService
 		string deploymentName,
 		CancellationToken cancellationToken = default)
 	{
-		// IAzureOpenAIClient client = _client ?? new AzureOpenAIClientWrapper(deploymentName, apiKey, endpoint);
-
-		AzureOpenAIClient azureClient = new(
-			new Uri(endpoint),
-			new ApiKeyCredential(apiKey));
-
-		ChatClient chatClient = azureClient.GetChatClient(deploymentName);
-
-		var options = new ChatCompletionOptions
+		var request = new
 		{
-			MaxOutputTokenCount = 100,
-			ResponseFormat = ChatResponseFormat.CreateTextFormat(),
-			StoredOutputEnabled = false,
-			Temperature = 0.1F,
-			TopP = 1.0F,
-			FrequencyPenalty = 0,
-			PresencePenalty = 0,
-			ToolChoice = ChatToolChoice.CreateNoneChoice(),
+			messages = new[]
+			{
+				new
+				{
+					role = "system",
+					content = SystemPrompt,
+				},
+				new { role = "user", content = BuildUserPrompt(patch) },
+			},
+			max_tokens = 100,
+			temperature = 0.1,
+			top_p = 1.0,
+			frequency_penalty = 0,
+			presence_penalty = 0,
 		};
 
-		var messages = new List<ChatMessage> { BuildSystemPrompt(), BuildUserPrompt(patch) };
+		string json = JsonSerializer.Serialize(request, JsonOptions);
 
-		ChatCompletion completion = null;
+		var content = new StringContent(json, Encoding.UTF8, "application/json");
 
-		try
+		string requestUrl = string.Format(ResourceUrlFormat, deploymentName);
+
+		using var requestMessage = new HttpRequestMessage(HttpMethod.Post, requestUrl);
+		requestMessage.Content = content;
+		requestMessage.Headers.Add("api-key", apiKey);
+		HttpResponseMessage response = await httpService.SendAsync(requestMessage, cancellationToken).ConfigureAwait(false);
+
+		if (!response.IsSuccessStatusCode)
 		{
-			completion = await chatClient.CompleteChatAsync(messages, options, cancellationToken)
-				.ConfigureAwait(false);
-		}
-		catch (Exception ex)
-		{
-			throw;
+			string errorContent = await response.Content.ReadAsStringAsync(cancellationToken).ConfigureAwait(false);
+
+			throw new HttpRequestException(
+				$"Azure OpenAI API request failed: {response.StatusCode} - {errorContent}");
 		}
 
+		string responseContent = await response.Content.ReadAsStringAsync(cancellationToken).ConfigureAwait(false);
+		var responseObj = JsonSerializer.Deserialize<JsonElement>(responseContent);
+		string? messageContent = responseObj
+			.GetProperty("choices")[0]
+			.GetProperty("message")
+			.GetProperty("content")
+			.GetString();
 		List<string> suggestions =
-			ParseSuggestions(completion.Content[0].Text ?? "feat: implement changes");
+			ParseSuggestions(messageContent?.Trim() ?? "feat: implement changes");
 
 		return suggestions;
 	}
@@ -110,10 +118,8 @@ public class AzureOpenAIService : IAzureOpenAIService
 		Return exactly 5 commit messages, one per line, with no numbering, quotation marts, nor bullets:
 		""";
 
-	private static SystemChatMessage BuildSystemPrompt() => new SystemChatMessage(SystemPrompt);
-
-	private static UserChatMessage BuildUserPrompt(string patch) =>
-		new UserChatMessage(string.Format(UserPromptTemplate, patch));
+	private static string BuildUserPrompt(string patch) =>
+		string.Format(UserPromptTemplate, patch);
 
 	private static List<string> ParseSuggestions(string response)
 	{

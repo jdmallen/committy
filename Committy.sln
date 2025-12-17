@@ -14,7 +14,12 @@ Project("{2150E333-8FDC-42A3-9474-1A3956D46DE8}") = "Solution Items", "Solution 
 		INSTALL.md = INSTALL.md
 		publish.sh = publish.sh
 		publish.ps1 = publish.ps1
-		.git\hooks\prepare-commit-msg = .git\hooks\prepare-commit-msg
+		.git\hooks\prepare-commit-msg = hooks\prepare-commit-msg
+	EndProjectSection
+EndProject
+Project("{2150E333-8FDC-42A3-9474-1A3956D46DE8}") = "hooks", "hooks", "{34AA4188-4F3A-48A7-955E-48FCC82E8FCC}"
+	ProjectSection(SolutionItems) = preProject
+		hooks\prepare-commit-msg = hooks\prepare-commit-msg
 	EndProjectSection
 EndProject
 Global
@@ -37,5 +42,8 @@ Global
 	EndGlobalSection
 	GlobalSection(ExtensibilityGlobals) = postSolution
 		SolutionGuid = {9201E9D0-D332-4E11-8CA9-2F61C387F6F4}
+	EndGlobalSection
+	GlobalSection(NestedProjects) = preSolution
+		{34AA4188-4F3A-48A7-955E-48FCC82E8FCC} = {900AC644-C3A2-406A-81AC-FFAAE4FE2718}
 	EndGlobalSection
 EndGlobal

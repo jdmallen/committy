@@ -1,0 +1,1 @@
+Hello! This is the README for Committy, a tool to help you manage your git commits better.

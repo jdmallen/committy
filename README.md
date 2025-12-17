@@ -163,3 +163,6 @@ If clipboard tools aren't available, committy will show a one-time warning but c
 - **Windows PowerShell**: Use the `.ps1` script
 - **WSL**: Treat as Linux, use the `.sh` script
 - **macOS**: Works with both Bash and Zsh shells. I guess you can use PowerShell if you _really_ want to.
+
+## AI Disclosure
+Generative LLM tools were used to help modify tests and scripts, but this project was generally not "vibe coded."

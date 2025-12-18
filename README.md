@@ -15,8 +15,8 @@ Committy is a cross-platform .NET 10 console application that generates AI-power
 
 1. **Install Git Hook (Bash script):**
    ```bash
-   # Local installation (current repository)
-   ./install-git-hook.sh
+   # Local installation (specific repository)
+   ./install-git-hook.sh /path/to/repo
    
    # Global installation (all future repositories)
    ./install-git-hook.sh --global

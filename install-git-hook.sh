@@ -1,4 +1,4 @@
-#!/bin/bash
+#!/usr/bin/env bash
 
 # Install committy as a git hook
 # Usage: ./install-git-hook.sh <repo-path>

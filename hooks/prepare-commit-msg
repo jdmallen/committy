@@ -31,27 +31,38 @@ if [ -z "$AZURE_OPENAI_API_KEY" ] || [ -z "$AZURE_OPENAI_ENDPOINT_HOST" ] || [ -
     exit 0
 fi
 
-# Generate AI commit message suggestions
-echo "# Generating AI commit message suggestions..." >> "$COMMIT_MSG_FILE"
-echo "#" >> "$COMMIT_MSG_FILE"
+# Detect titles-only mode (default is single title + body)
+TITLES_ONLY=0
+case "$(printf '%s' "${COMMITTY_TITLES_ONLY:-}" | tr '[:upper:]' '[:lower:]')" in
+    1|true|yes|on) TITLES_ONLY=1 ;;
+esac
 
-# Get suggestions and format them as comments
+# Generate AI commit message(s) from staged diff
 if SUGGESTIONS=$(git diff --cached | committy --no-git 2>/dev/null); then
-    # Remove trailing newline from suggestions
+    # Strip trailing newline
     SUGGESTIONS=$(printf '%s' "$SUGGESTIONS")
 
-    # Add suggestions as commented lines at the top, before any existing content
-    {
-        echo ""
-        echo "$SUGGESTIONS" | sed 's/^/# /'
-        echo "# 🡅 Suggested commit messages from Committy (uncomment and edit as needed)🡅:"
-        echo "#"
-        tail -n +2 "$COMMIT_MSG_FILE"
-    } > "$COMMIT_MSG_FILE.tmp"
-    mv "$COMMIT_MSG_FILE.tmp" "$COMMIT_MSG_FILE"
+    if [ "$TITLES_ONLY" -eq 1 ]; then
+        # Multi-suggestion mode: insert commented suggestions above existing content
+        {
+            echo ""
+            echo "$SUGGESTIONS" | sed 's/^/# /'
+            echo "# 🡅 Suggested commit messages from Committy (uncomment and edit as needed)🡅:"
+            echo "#"
+            cat "$COMMIT_MSG_FILE"
+            echo "#"
+            echo "# Or write your own commit message above"
+        } > "$COMMIT_MSG_FILE.tmp"
+    else
+        # Title + body mode: pre-fill the commit message above git's default comments
+        {
+            echo "$SUGGESTIONS"
+            echo ""
+            cat "$COMMIT_MSG_FILE"
+        } > "$COMMIT_MSG_FILE.tmp"
+    fi
 
-    echo "#" >> "$COMMIT_MSG_FILE"
-    echo "# Or write your own commit message above" >> "$COMMIT_MSG_FILE"
+    mv "$COMMIT_MSG_FILE.tmp" "$COMMIT_MSG_FILE"
 else
     echo "# Failed to generate AI suggestions" >> "$COMMIT_MSG_FILE"
 fi

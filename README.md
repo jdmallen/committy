@@ -81,13 +81,27 @@ Committy is a cross-platform .NET 10 console application that generates AI-power
    [Environment]::SetEnvironmentVariable('AZURE_OPENAI_DEPLOYMENT', 'your-deployment-name', 'User')
    ```
 
+## Output Modes
+
+Committy has two output modes:
+
+- **Title + body (default)**: generates a single conventional commit message with a short title and a brief body summarizing the changes. The git hook pre-fills this into your commit message so you can edit or accept it.
+- **Titles only** (`--titles-only` / `-t`, or `COMMITTY_TITLES_ONLY=1`): generates 5 short title-only suggestions. The git hook inserts them as comments at the top of the commit message; uncomment the one you want.
+
+Set `COMMITTY_TITLES_ONLY=1` to make titles-only the default for both the CLI and the hook. Accepted truthy values: `1`, `true`, `yes`, `on` (case-insensitive).
+
 ## Manual Usage
 
 If you prefer not to use git hooks, you can run committy manually:
 
-#### Generate suggestions from staged changes:
+#### Generate a title + body message from staged changes (default):
 ```bash
 committy --api-key "your_key" --endpoint "https://your-endpoint.openai.azure.com" --deployment "your-deployment"
+```
+
+#### Generate 5 title-only suggestions:
+```bash
+committy --titles-only --api-key "your_key" --endpoint "https://your-endpoint.openai.azure.com" --deployment "your-deployment"
 ```
 
 #### Generate suggestions from stdin:
@@ -111,6 +125,7 @@ committy --clipboard --api-key "your_key" --endpoint "https://your-endpoint.open
 committy
 git diff --cached | committy
 committy --clipboard
+COMMITTY_TITLES_ONLY=1 committy   # one-shot titles-only mode
 ```
 
 ## Clipboard Support

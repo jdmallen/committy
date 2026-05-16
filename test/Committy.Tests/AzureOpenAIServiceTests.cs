@@ -63,7 +63,7 @@ public class AzureOpenAIServiceTests
 
 		// Act
 		List<string> result = await service.GenerateCommitMessageSuggestionsAsync(
-			TestPatch, TestApiKey, TestEndpoint, TestDeployment);
+			TestPatch, TestApiKey, TestEndpoint, TestDeployment, titlesOnly: true);
 
 		// Assert
 		Assert.Equal(5, result.Count);
@@ -103,7 +103,7 @@ public class AzureOpenAIServiceTests
 
 		// Act
 		List<string> result = await service.GenerateCommitMessageSuggestionsAsync(
-			TestPatch, TestApiKey, TestEndpoint, TestDeployment);
+			TestPatch, TestApiKey, TestEndpoint, TestDeployment, titlesOnly: true);
 
 		// Assert
 		Assert.Equal(5, result.Count);
@@ -139,7 +139,7 @@ public class AzureOpenAIServiceTests
 
 		// Act
 		List<string> result = await service.GenerateCommitMessageSuggestionsAsync(
-			TestPatch, TestApiKey, TestEndpoint, TestDeployment);
+			TestPatch, TestApiKey, TestEndpoint, TestDeployment, titlesOnly: true);
 
 		// Assert
 		Assert.Equal(5, result.Count);
@@ -196,7 +196,7 @@ public class AzureOpenAIServiceTests
 		// Act & Assert - TaskCanceledException is a subclass of OperationCanceledException
 		await Assert.ThrowsAsync<TaskCanceledException>(() =>
 			service.GenerateCommitMessageSuggestionsAsync(
-				TestPatch, TestApiKey, TestEndpoint, TestDeployment, cts.Token));
+				TestPatch, TestApiKey, TestEndpoint, TestDeployment, cancellationToken: cts.Token));
 	}
 
 	[Fact]
@@ -232,9 +232,115 @@ public class AzureOpenAIServiceTests
 
 		// Assert
 		await mockHttpService.Received(1).SendAsync(
-			Arg.Is<HttpRequestMessage>(req => 
-				req.Headers.Contains("api-key") && 
+			Arg.Is<HttpRequestMessage>(req =>
+				req.Headers.Contains("api-key") &&
 				req.Headers.GetValues("api-key").First() == TestApiKey),
 			Arg.Any<CancellationToken>());
+	}
+
+	[Fact]
+	public async Task GenerateCommitMessageSuggestionsAsync_TitleAndBodyMode_ReturnsSingleMessage()
+	{
+		// Arrange
+		var mockHttpService = Substitute.For<IHttpService>();
+		const string commitMessage =
+			"feat(auth): add OAuth2 integration\n\nReplace the password-only flow with Google OAuth2 sign-in.\nAdds a new /auth/oauth/google endpoint and token-validation\nmiddleware so existing API routes can opt in.";
+		string json = System.Text.Json.JsonSerializer.Serialize(new
+		{
+			choices = new[]
+			{
+				new { message = new { content = commitMessage } },
+			},
+		});
+		var mockResponse = new HttpResponseMessage(HttpStatusCode.OK)
+		{
+			Content = new StringContent(json, Encoding.UTF8, "application/json"),
+		};
+
+		mockHttpService.SendAsync(
+			Arg.Any<HttpRequestMessage>(),
+			Arg.Any<CancellationToken>())
+			.Returns(mockResponse);
+
+		var service = new AzureOpenAIService(mockHttpService);
+
+		// Act
+		List<string> result = await service.GenerateCommitMessageSuggestionsAsync(
+			TestPatch, TestApiKey, TestEndpoint, TestDeployment);
+
+		// Assert
+		Assert.Single(result);
+		Assert.Equal(commitMessage, result[0]);
+		Assert.Contains("\n\n", result[0]);
+	}
+
+	[Fact]
+	public async Task GenerateCommitMessageSuggestionsAsync_TitleAndBodyMode_EmptyResponse_ReturnsFallback()
+	{
+		// Arrange
+		var mockHttpService = Substitute.For<IHttpService>();
+		var mockResponse = new HttpResponseMessage(HttpStatusCode.OK)
+		{
+			Content = new StringContent("""
+			{
+				"choices": [
+					{
+						"message": {
+							"content": ""
+						}
+					}
+				]
+			}
+			""", Encoding.UTF8, "application/json"),
+		};
+
+		mockHttpService.SendAsync(
+			Arg.Any<HttpRequestMessage>(),
+			Arg.Any<CancellationToken>())
+			.Returns(mockResponse);
+
+		var service = new AzureOpenAIService(mockHttpService);
+
+		// Act
+		List<string> result = await service.GenerateCommitMessageSuggestionsAsync(
+			TestPatch, TestApiKey, TestEndpoint, TestDeployment);
+
+		// Assert
+		Assert.Single(result);
+		Assert.Equal("feat: implement changes", result[0]);
+	}
+
+	[Fact]
+	public async Task GenerateCommitMessageSuggestionsAsync_TitleAndBodyMode_NormalizesCrlf()
+	{
+		// Arrange
+		var mockHttpService = Substitute.For<IHttpService>();
+		string json = System.Text.Json.JsonSerializer.Serialize(new
+		{
+			choices = new[]
+			{
+				new { message = new { content = "feat: add thing\r\n\r\nDoes the thing.\r\nMore detail." } },
+			},
+		});
+		var mockResponse = new HttpResponseMessage(HttpStatusCode.OK)
+		{
+			Content = new StringContent(json, Encoding.UTF8, "application/json"),
+		};
+
+		mockHttpService.SendAsync(
+			Arg.Any<HttpRequestMessage>(),
+			Arg.Any<CancellationToken>())
+			.Returns(mockResponse);
+
+		var service = new AzureOpenAIService(mockHttpService);
+
+		// Act
+		List<string> result = await service.GenerateCommitMessageSuggestionsAsync(
+			TestPatch, TestApiKey, TestEndpoint, TestDeployment);
+
+		// Assert
+		Assert.Single(result);
+		Assert.DoesNotContain("\r", result[0]);
+		Assert.Equal("feat: add thing\n\nDoes the thing.\nMore detail.", result[0]);
 	}
 }

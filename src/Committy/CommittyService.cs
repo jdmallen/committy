@@ -9,6 +9,7 @@ public class CommittyService(IAzureOpenAIService azureOpenAIService)
 		string apiKey,
 		string endpoint,
 		string deploymentName,
+		bool titlesOnly = false,
 		CancellationToken cancellationToken = default)
 	{
 		if (string.IsNullOrWhiteSpace(patch))
@@ -41,6 +42,7 @@ public class CommittyService(IAzureOpenAIService azureOpenAIService)
 					apiKey,
 					endpoint,
 					deploymentName,
+					titlesOnly,
 					cancellationToken).ConfigureAwait(false);
 
 			return suggestions;

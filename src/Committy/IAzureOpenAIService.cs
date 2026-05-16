@@ -7,5 +7,6 @@ public interface IAzureOpenAIService
 		string apiKey,
 		string endpoint,
 		string deploymentName,
+		bool titlesOnly = false,
 		CancellationToken cancellationToken = default);
 }

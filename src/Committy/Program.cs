@@ -9,6 +9,7 @@ internal class Program
 	private const string AzureOpenAIApiKeyKey = "AZURE_OPENAI_API_KEY";
 	private const string AzureOpenAIEndpointKey = "AZURE_OPENAI_ENDPOINT_HOST";
 	private const string AzureOpenAIDeploymentKey = "AZURE_OPENAI_DEPLOYMENT";
+	private const string TitlesOnlyEnvKey = "COMMITTY_TITLES_ONLY";
 
 	private static async Task<int> Main(string[] args)
 	{
@@ -44,6 +45,13 @@ internal class Program
 		var clipboardOption = new Option<bool>(
 			name: "--clipboard",
 			aliases: ["-c"]) { Description = "Copy first suggestion to clipboard", };
+		var titlesOnlyOption = new Option<bool>(
+			name: "--titles-only",
+			aliases: ["-t"])
+		{
+			Description =
+				$"Generate 5 title-only suggestions instead of a single title+body message (can also be set via {TitlesOnlyEnvKey} environment variable)",
+		};
 
 		var rootCommand = new RootCommand("Generate AI-powered commit messages from git patches")
 		{
@@ -52,6 +60,7 @@ internal class Program
 			deploymentOption,
 			noGitOption,
 			clipboardOption,
+			titlesOnlyOption,
 		};
 
 		rootCommand.SetAction(async (parseResult, cancellationToken) =>
@@ -61,6 +70,8 @@ internal class Program
 			string? deployment = parseResult.GetValue(deploymentOption);
 			bool isGitAccessDisabled = parseResult.GetValue(noGitOption);
 			bool copyToClipboard = parseResult.GetValue(clipboardOption);
+			bool titlesOnly = parseResult.GetValue(titlesOnlyOption)
+				|| IsEnvFlagSet(Environment.GetEnvironmentVariable(TitlesOnlyEnvKey));
 
 			try
 			{
@@ -123,6 +134,7 @@ internal class Program
 					effectiveApiKey,
 					effectiveEndpoint,
 					effectiveDeployment,
+					titlesOnly,
 					cancellationToken);
 
 				// Output suggestions (for hook to capture)
@@ -151,5 +163,19 @@ internal class Program
 		});
 
 		return await rootCommand.Parse(args).InvokeAsync();
+	}
+
+	private static bool IsEnvFlagSet(string? value)
+	{
+		if (string.IsNullOrWhiteSpace(value))
+		{
+			return false;
+		}
+
+		return value.Trim().ToLowerInvariant() switch
+		{
+			"1" or "true" or "yes" or "on" => true,
+			_ => false,
+		};
 	}
 }

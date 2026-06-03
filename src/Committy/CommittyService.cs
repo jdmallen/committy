@@ -38,12 +38,12 @@ public class CommittyService(IAzureOpenAIService azureOpenAIService)
 		{
 			List<string> suggestions =
 				await azureOpenAIService.GenerateCommitMessageSuggestionsAsync(
-					patch,
-					apiKey,
-					endpoint,
-					deploymentName,
-					titlesOnly,
-					cancellationToken).ConfigureAwait(false);
+						patch,
+						apiKey,
+						deploymentName,
+						titlesOnly,
+						cancellationToken)
+					.ConfigureAwait(false);
 
 			return suggestions;
 		}
@@ -55,7 +55,8 @@ public class CommittyService(IAzureOpenAIService azureOpenAIService)
 		}
 	}
 
-	public static async Task<string> ReadPatchFromStdinAsync(CancellationToken cancellationToken = default)
+	public static async Task<string> ReadPatchFromStdinAsync(
+		CancellationToken cancellationToken = default)
 	{
 		if (Console.IsInputRedirected)
 		{
@@ -70,7 +71,9 @@ public class CommittyService(IAzureOpenAIService azureOpenAIService)
 		}
 	}
 
-	public static async Task CopyToClipboardAsync(string text, CancellationToken cancellationToken = default)
+	public static async Task CopyToClipboardAsync(
+		string text,
+		CancellationToken cancellationToken = default)
 	{
 		try
 		{
@@ -83,7 +86,8 @@ public class CommittyService(IAzureOpenAIService azureOpenAIService)
 			if (!_clipboardWarningShown)
 			{
 				await Console.Error.WriteLineAsync(
-					"Warning: Clipboard functionality not available on this system. If running Linux, try installing `xsel` package.").ConfigureAwait(false);
+						"Warning: Clipboard functionality not available on this system. If running Linux, try installing `xsel` package.")
+					.ConfigureAwait(false);
 				_clipboardWarningShown = true;
 			}
 		}

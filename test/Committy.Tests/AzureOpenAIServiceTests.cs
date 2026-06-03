@@ -6,10 +6,10 @@ namespace Committy.Tests;
 
 public class AzureOpenAIServiceTests
 {
-	private const string TestPatch = "test patch";
-	private const string TestApiKey = "test-api-key";
-	private const string TestEndpoint = "https://test.openai.azure.com";
-	private const string TestDeployment = "gpt-4";
+	private const string TEST_PATCH = "test patch";
+	private const string TEST_API_KEY = "test-api-key";
+	private const string TEST_ENDPOINT = "https://test.openai.azure.com";
+	private const string TEST_DEPLOYMENT = "gpt-4";
 
 	[Fact]
 	public void AzureOpenAIService_Constructor_CreatesInstance()
@@ -63,7 +63,7 @@ public class AzureOpenAIServiceTests
 
 		// Act
 		List<string> result = await service.GenerateCommitMessageSuggestionsAsync(
-			TestPatch, TestApiKey, TestEndpoint, TestDeployment, titlesOnly: true);
+			TEST_PATCH, TEST_API_KEY, TEST_DEPLOYMENT, titlesOnly: true);
 
 		// Assert
 		Assert.Equal(5, result.Count);
@@ -103,7 +103,7 @@ public class AzureOpenAIServiceTests
 
 		// Act
 		List<string> result = await service.GenerateCommitMessageSuggestionsAsync(
-			TestPatch, TestApiKey, TestEndpoint, TestDeployment, titlesOnly: true);
+			TEST_PATCH, TEST_API_KEY, TEST_DEPLOYMENT, titlesOnly: true);
 
 		// Assert
 		Assert.Equal(5, result.Count);
@@ -139,7 +139,7 @@ public class AzureOpenAIServiceTests
 
 		// Act
 		List<string> result = await service.GenerateCommitMessageSuggestionsAsync(
-			TestPatch, TestApiKey, TestEndpoint, TestDeployment, titlesOnly: true);
+			TEST_PATCH, TEST_API_KEY, TEST_DEPLOYMENT, titlesOnly: true);
 
 		// Assert
 		Assert.Equal(5, result.Count);
@@ -170,10 +170,9 @@ public class AzureOpenAIServiceTests
 		// Act & Assert
 		var exception = await Assert.ThrowsAsync<HttpRequestException>(
 			() => service.GenerateCommitMessageSuggestionsAsync(
-				TestPatch,
+				TEST_PATCH,
 				"invalid-key",
-				TestEndpoint,
-				TestDeployment));
+				TEST_DEPLOYMENT));
 
 		Assert.Contains("Azure OpenAI API request failed: Unauthorized", exception.Message);
 	}
@@ -196,7 +195,7 @@ public class AzureOpenAIServiceTests
 		// Act & Assert - TaskCanceledException is a subclass of OperationCanceledException
 		await Assert.ThrowsAsync<TaskCanceledException>(() =>
 			service.GenerateCommitMessageSuggestionsAsync(
-				TestPatch, TestApiKey, TestEndpoint, TestDeployment, cancellationToken: cts.Token));
+				TEST_PATCH, TEST_API_KEY, TEST_DEPLOYMENT, cancellationToken: cts.Token));
 	}
 
 	[Fact]
@@ -228,13 +227,13 @@ public class AzureOpenAIServiceTests
 
 		// Act
 		await service.GenerateCommitMessageSuggestionsAsync(
-			TestPatch, TestApiKey, TestEndpoint, TestDeployment);
+			TEST_PATCH, TEST_API_KEY, TEST_DEPLOYMENT);
 
 		// Assert
 		await mockHttpService.Received(1).SendAsync(
 			Arg.Is<HttpRequestMessage>(req =>
 				req.Headers.Contains("api-key") &&
-				req.Headers.GetValues("api-key").First() == TestApiKey),
+				req.Headers.GetValues("api-key").First() == TEST_API_KEY),
 			Arg.Any<CancellationToken>());
 	}
 
@@ -266,7 +265,7 @@ public class AzureOpenAIServiceTests
 
 		// Act
 		List<string> result = await service.GenerateCommitMessageSuggestionsAsync(
-			TestPatch, TestApiKey, TestEndpoint, TestDeployment);
+			TEST_PATCH, TEST_API_KEY, TEST_DEPLOYMENT);
 
 		// Assert
 		Assert.Single(result);
@@ -303,7 +302,7 @@ public class AzureOpenAIServiceTests
 
 		// Act
 		List<string> result = await service.GenerateCommitMessageSuggestionsAsync(
-			TestPatch, TestApiKey, TestEndpoint, TestDeployment);
+			TEST_PATCH, TEST_API_KEY, TEST_DEPLOYMENT);
 
 		// Assert
 		Assert.Single(result);
@@ -336,7 +335,7 @@ public class AzureOpenAIServiceTests
 
 		// Act
 		List<string> result = await service.GenerateCommitMessageSuggestionsAsync(
-			TestPatch, TestApiKey, TestEndpoint, TestDeployment);
+			TEST_PATCH, TEST_API_KEY, TEST_DEPLOYMENT);
 
 		// Assert
 		Assert.Single(result);

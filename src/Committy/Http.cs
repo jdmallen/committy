@@ -8,11 +8,16 @@ internal static class Http
 	// Shared handler manages connection pool, DNS refresh, decompression, etc.
 	private static readonly SocketsHttpHandler Handler = new()
 	{
-		AutomaticDecompression = DecompressionMethods.GZip | DecompressionMethods.Deflate | DecompressionMethods.Brotli,
+		AutomaticDecompression = DecompressionMethods.GZip
+			| DecompressionMethods.Deflate
+			| DecompressionMethods.Brotli,
+
 		// Rotate pooled connections periodically so DNS updates are honored.
 		PooledConnectionLifetime = TimeSpan.FromMinutes(5),
+
 		// Cap idle connections and lifetime for load-balanced backends
 		PooledConnectionIdleTimeout = TimeSpan.FromMinutes(2),
+
 		// Reasonable defaults
 		MaxConnectionsPerServer = 64,
 		AllowAutoRedirect = false,
@@ -20,7 +25,9 @@ internal static class Http
 
 	private static HttpClient? _openAIClient;
 
-	public static HttpClient OpenAI => _openAIClient ?? throw new InvalidOperationException($"{nameof(OpenAI)} is not initialized. Http.Initialize() must be called first.");
+	public static HttpClient OpenAI => _openAIClient
+		?? throw new InvalidOperationException(
+			$"{nameof(OpenAI)} is not initialized. Http.Initialize() must be called first.");
 
 	public static void Initialize(string openAIBaseAddress)
 	{
@@ -39,6 +46,7 @@ internal static class Http
 			$"{assy?.Name}/{assy?.Version?.ToString() ?? string.Empty}"
 		);
 		client.DefaultRequestHeaders.Accept.ParseAdd("application/json");
+
 		return client;
 	}
 }

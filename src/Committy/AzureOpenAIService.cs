@@ -5,19 +5,21 @@ namespace Committy;
 
 public class AzureOpenAIService(IHttpService httpService) : IAzureOpenAIService
 {
-	private const string ResourceUrlFormat =
+	private const string RESOURCE_URL_FORMAT =
 		"/openai/deployments/{0}/chat/completions?api-version=2024-10-21";
 
-	private static readonly JsonSerializerOptions JsonOptions = new()	{
+	private static readonly JsonSerializerOptions JsonOptions = new()
+	{
 		PropertyNamingPolicy = JsonNamingPolicy.SnakeCaseLower,
 	};
 
-	public AzureOpenAIService() : this(new HttpService()) { }
+	public AzureOpenAIService() : this(new HttpService())
+	{
+	}
 
 	public async Task<List<string>> GenerateCommitMessageSuggestionsAsync(
 		string patch,
 		string apiKey,
-		string endpoint,
 		string deploymentName,
 		bool titlesOnly = false,
 		CancellationToken cancellationToken = default)
@@ -29,9 +31,13 @@ public class AzureOpenAIService(IHttpService httpService) : IAzureOpenAIService
 				new
 				{
 					role = "system",
-					content = SystemPrompt,
+					content = SYSTEM_PROMPT,
 				},
-				new { role = "user", content = BuildUserPrompt(patch, titlesOnly) },
+				new
+				{
+					role = "user",
+					content = BuildUserPrompt(patch, titlesOnly)
+				},
 			},
 			max_tokens = titlesOnly ? 100 : 500,
 			temperature = 0.1,
@@ -44,22 +50,25 @@ public class AzureOpenAIService(IHttpService httpService) : IAzureOpenAIService
 
 		var content = new StringContent(json, Encoding.UTF8, "application/json");
 
-		string requestUrl = string.Format(ResourceUrlFormat, deploymentName);
+		string requestUrl = string.Format(RESOURCE_URL_FORMAT, deploymentName);
 
 		using var requestMessage = new HttpRequestMessage(HttpMethod.Post, requestUrl);
 		requestMessage.Content = content;
 		requestMessage.Headers.Add("api-key", apiKey);
-		HttpResponseMessage response = await httpService.SendAsync(requestMessage, cancellationToken).ConfigureAwait(false);
+		HttpResponseMessage response = await httpService.SendAsync(requestMessage, cancellationToken)
+			.ConfigureAwait(false);
 
 		if (!response.IsSuccessStatusCode)
 		{
-			string errorContent = await response.Content.ReadAsStringAsync(cancellationToken).ConfigureAwait(false);
+			string errorContent = await response.Content.ReadAsStringAsync(cancellationToken)
+				.ConfigureAwait(false);
 
 			throw new HttpRequestException(
 				$"Azure OpenAI API request failed: {response.StatusCode} - {errorContent}");
 		}
 
-		string responseContent = await response.Content.ReadAsStringAsync(cancellationToken).ConfigureAwait(false);
+		string responseContent
+			= await response.Content.ReadAsStringAsync(cancellationToken).ConfigureAwait(false);
 		var responseObj = JsonSerializer.Deserialize<JsonElement>(responseContent);
 		string? messageContent = responseObj
 			.GetProperty("choices")[0]
@@ -73,14 +82,14 @@ public class AzureOpenAIService(IHttpService httpService) : IAzureOpenAIService
 			: ParseTitleAndBody(trimmed);
 	}
 
-	private const string SystemPrompt =
+	private const string SYSTEM_PROMPT =
 		"""
 		You are a helpful assistant that generates conventional commit messages.You are a git and
 		software engineering expert whose job it is to quickly investigate diffs for staged code just
 		prior to a commit and make suggestions for a git commit message.
 		""";
 
-	private const string TitlesUserPromptTemplate =
+	private const string TITLES_USER_PROMPT_TEMPLATE =
 		"""
 		Generate exactly 5 different commit messages following Conventional Commits v1.0.0 specification.
 
@@ -120,7 +129,7 @@ public class AzureOpenAIService(IHttpService httpService) : IAzureOpenAIService
 		Return exactly 5 commit messages, one per line, with no numbering, quotation marts, nor bullets:
 		""";
 
-	private const string TitleAndBodyUserPromptTemplate =
+	private const string TITLE_AND_BODY_USER_PROMPT_TEMPLATE =
 		"""
 		Generate a single conventional commit message with a title line followed by a body that briefly summarizes the changes.
 
@@ -171,7 +180,9 @@ public class AzureOpenAIService(IHttpService httpService) : IAzureOpenAIService
 		""";
 
 	private static string BuildUserPrompt(string patch, bool titlesOnly) =>
-		string.Format(titlesOnly ? TitlesUserPromptTemplate : TitleAndBodyUserPromptTemplate, patch);
+		string.Format(
+			titlesOnly ? TITLES_USER_PROMPT_TEMPLATE : TITLE_AND_BODY_USER_PROMPT_TEMPLATE,
+			patch);
 
 	private static List<string> ParseTitleSuggestions(string response)
 	{

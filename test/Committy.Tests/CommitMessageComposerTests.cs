@@ -6,27 +6,29 @@ public class CommitMessageComposerTests
 		"\n# Please enter the commit message for your changes.\n# Lines starting with '#' will be ignored.\n";
 
 	[Fact]
-	public void Compose_TitleAndBody_PrefillsMessageAboveExistingContent()
-	{
-		const string message = "feat(auth): add OAuth2\n\nReplace the password flow with OAuth2.";
-
-		string result = CommitMessageComposer.Compose([message], titlesOnly: false, EXISTING);
-
-		// Message comes first, then a blank line, then git's template.
-		Assert.StartsWith("feat(auth): add OAuth2\n\nReplace the password flow with OAuth2.\n\n", result);
-		Assert.Contains("# Please enter the commit message", result);
-		Assert.DoesNotContain("\r", result);
-	}
-
-	[Fact]
 	public void Compose_TitleAndBody_NormalizesCrlf()
 	{
 		const string message = "feat: add thing\r\n\r\nDetail.";
 
-		string result = CommitMessageComposer.Compose([message], titlesOnly: false, EXISTING);
+		string result = CommitMessageComposer.Compose([message], false, EXISTING);
 
 		Assert.DoesNotContain("\r", result);
 		Assert.StartsWith("feat: add thing\n\nDetail.\n", result);
+	}
+
+	[Fact]
+	public void Compose_TitleAndBody_PrefillsMessageAboveExistingContent()
+	{
+		const string message = "feat(auth): add OAuth2\n\nReplace the password flow with OAuth2.";
+
+		string result = CommitMessageComposer.Compose([message], false, EXISTING);
+
+		// Message comes first, then a blank line, then git's template.
+		Assert.StartsWith(
+			"feat(auth): add OAuth2\n\nReplace the password flow with OAuth2.\n\n",
+			result);
+		Assert.Contains("# Please enter the commit message", result);
+		Assert.DoesNotContain("\r", result);
 	}
 
 	[Fact]
@@ -41,7 +43,7 @@ public class CommitMessageComposerTests
 			"chore: bump deps",
 		];
 
-		string result = CommitMessageComposer.Compose(suggestions, titlesOnly: true, EXISTING);
+		string result = CommitMessageComposer.Compose(suggestions, true, EXISTING);
 
 		foreach (string suggestion in suggestions)
 		{
@@ -56,7 +58,7 @@ public class CommitMessageComposerTests
 	[Fact]
 	public void Compose_TitlesOnly_EmptyExisting_DoesNotThrow()
 	{
-		string result = CommitMessageComposer.Compose(["feat: x"], titlesOnly: true, string.Empty);
+		string result = CommitMessageComposer.Compose(["feat: x"], true, string.Empty);
 
 		Assert.Contains("# feat: x", result);
 		Assert.EndsWith("# Or write your own commit message above\n", result);

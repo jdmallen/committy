@@ -23,7 +23,10 @@ public static class CommitMessageComposer
 	/// single title+body message as the first element.
 	/// </param>
 	/// <param name="titlesOnly">Whether titles-only mode is active.</param>
-	/// <param name="existingContent">The current contents of the commit message file (git's template).</param>
+	/// <param name="existingContent">
+	/// The current contents of the commit message file
+	/// (git's template).
+	/// </param>
 	public static string Compose(
 		IReadOnlyList<string> suggestions,
 		bool titlesOnly,

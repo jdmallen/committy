@@ -43,10 +43,14 @@ public static class HookInstaller
 		""";
 
 	/// <summary>
-	/// Installs the hook either globally (as a git template) or into a single repository.
+	/// Installs the hook either globally (as a git template) or into a single
+	/// repository.
 	/// </summary>
 	/// <param name="global">Install as a global template for all future repositories.</param>
-	/// <param name="repoPath">Target repository (defaults to the current directory). Ignored when <paramref name="global"/> is true.</param>
+	/// <param name="repoPath">
+	/// Target repository (defaults to the current directory).
+	/// Ignored when <paramref name="global" /> is true.
+	/// </param>
 	/// <param name="output">Where to write progress messages.</param>
 	/// <param name="cancellationToken">A token to cancel the operation.</param>
 	/// <returns>0 on success; non-zero on failure.</returns>
@@ -148,6 +152,17 @@ public static class HookInstaller
 		File.SetUnixFileMode(path, mode);
 	}
 
+	private static async Task SetGlobalTemplateDirAsync(
+		string templateDir,
+		CancellationToken cancellationToken)
+	{
+		await Cli.Wrap("git")
+			.WithArguments(["config", "--global", "init.templateDir", templateDir])
+			.WithValidation(CommandResultValidation.None)
+			.ExecuteBufferedAsync(cancellationToken)
+			.ConfigureAwait(false);
+	}
+
 	private static async Task<string?> TryGetGitDirAsync(
 		string repo,
 		CancellationToken cancellationToken)
@@ -161,16 +176,5 @@ public static class HookInstaller
 		return result.ExitCode == 0 && !string.IsNullOrWhiteSpace(result.StandardOutput)
 			? result.StandardOutput.Trim()
 			: null;
-	}
-
-	private static async Task SetGlobalTemplateDirAsync(
-		string templateDir,
-		CancellationToken cancellationToken)
-	{
-		await Cli.Wrap("git")
-			.WithArguments(["config", "--global", "init.templateDir", templateDir])
-			.WithValidation(CommandResultValidation.None)
-			.ExecuteBufferedAsync(cancellationToken)
-			.ConfigureAwait(false);
 	}
 }

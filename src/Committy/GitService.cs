@@ -6,6 +6,16 @@ namespace Committy;
 public class GitService
 {
 	/// <summary>
+	/// Gets staged diff for manual execution fallback, throwing when nothing is
+	/// staged.
+	/// In hook usage, diff comes via stdin instead.
+	/// </summary>
+	public static async Task<string> GetStagedDiffAsync(CancellationToken cancellationToken = default)
+		=> await TryGetStagedDiffAsync(cancellationToken).ConfigureAwait(false)
+			?? throw new InvalidOperationException(
+				"No staged changes found. Use 'git add' to stage files for commit.");
+
+	/// <summary>
 	/// Gets the staged diff, or <c>null</c> when nothing is staged.
 	/// </summary>
 	public static async Task<string?> TryGetStagedDiffAsync(
@@ -23,16 +33,5 @@ public class GitService
 		}
 
 		return string.IsNullOrWhiteSpace(result.StandardOutput) ? null : result.StandardOutput;
-	}
-
-	/// <summary>
-	/// Gets staged diff for manual execution fallback, throwing when nothing is staged.
-	/// In hook usage, diff comes via stdin instead.
-	/// </summary>
-	public static async Task<string> GetStagedDiffAsync(CancellationToken cancellationToken = default)
-	{
-		return await TryGetStagedDiffAsync(cancellationToken).ConfigureAwait(false)
-			?? throw new InvalidOperationException(
-				"No staged changes found. Use 'git add' to stage files for commit.");
 	}
 }

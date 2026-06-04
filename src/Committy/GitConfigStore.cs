@@ -11,9 +11,11 @@ namespace Committy;
 /// Writing
 /// targets either <c>--global</c> or <c>--local</c>.
 /// </summary>
-public sealed class GitConfigStore
+public static class GitConfigStore
 {
-	public static async Task<string?> GetAsync(string key, CancellationToken cancellationToken = default)
+	public static async Task<string?> GetAsync(
+		string key,
+		CancellationToken cancellationToken = default)
 	{
 		BufferedCommandResult result = await Cli.Wrap("git")
 			.WithArguments(["config", "--get", key])
@@ -31,7 +33,7 @@ public sealed class GitConfigStore
 		return string.IsNullOrEmpty(value) ? null : value;
 	}
 
-	public async Task SetAsync(
+	public static async Task SetAsync(
 		string key,
 		string value,
 		bool global,

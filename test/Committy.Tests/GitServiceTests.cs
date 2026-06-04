@@ -1,86 +1,151 @@
+using CliWrap;
+using CliWrap.Buffered;
+
 namespace Committy.Tests;
 
+// GitService runs `git diff --cached` in the process working directory, so these tests
+// change it. Isolate the class in a non-parallel collection so that mutation can't race
+// with other tests.
+[CollectionDefinition("git-cwd", DisableParallelization = true)]
+public class GitCwdCollection;
+
+[Collection("git-cwd")]
 public class GitServiceTests
 {
-	// In a real test environment, we might want to:
-	// 1. Create a temporary git repository for testing
-	// 2. Mock the CliWrap calls using NSubstitute (would require interface extraction)
-	// 3. Use a test framework that provides git repository fixtures, if one exists
-
 	/// <summary>
-	/// Helper class for integration tests (if we want to add them later)
+	/// Creates a throwaway git repository, runs <paramref name="body" /> with the
+	/// process
+	/// working directory set to it, then restores the directory and cleans up.
 	/// </summary>
-
-	// ReSharper disable once UnusedType.Global
-	public class GitTestFixture : IDisposable
+	private static async Task InRepoAsync(Func<string, Task> body)
 	{
-		public GitTestFixture()
-		{
-			OriginalDirectory = Directory.GetCurrentDirectory();
-			TempDirectory = Path.Combine(Path.GetTempPath(), Guid.NewGuid().ToString());
-			Directory.CreateDirectory(TempDirectory);
-			Directory.SetCurrentDirectory(TempDirectory);
-		}
+		string original = Directory.GetCurrentDirectory();
+		string repo = Path.Combine(Path.GetTempPath(), "committy-git-" + Path.GetRandomFileName());
+		Directory.CreateDirectory(repo);
 
-		public void Dispose()
-		{
-			Directory.SetCurrentDirectory(OriginalDirectory);
-
-			if (Directory.Exists(TempDirectory))
-			{
-				Directory.Delete(TempDirectory, true);
-			}
-
-			GC.SuppressFinalize(this);
-		}
-
-		// ReSharper disable once UnusedMember.Global
-#pragma warning disable CS1998 // Async method lacks 'await' operators and will run synchronously
-#pragma warning disable CA1822 // Mark members as static
-		public async Task InitializeGitRepositoryAsync()
-		{
-			// Initialize git repository in temp directory
-			// This would use CliWrap to run git init, etc.
-			// We could mock CliWrap using NSubstitute if we extracted an interface
-		}
-#pragma warning restore CS1998 // Async method lacks 'await' operators and will run synchronously
-#pragma warning restore CA1822 // Mark members as static
-
-		// ReSharper disable MemberCanBePrivate.Global
-		public string TempDirectory { get; }
-
-		public string OriginalDirectory { get; }
-
-		// ReSharper restore MemberCanBePrivate.Global
-	}
-
-	[Fact]
-	public async Task GetStagedDiffAsync_BehavesCorrectlyBasedOnStagedChanges()
-	{
 		try
 		{
-			// Act
-			string result = await GitService.GetStagedDiffAsync(CancellationToken.None);
+			// Empty template so a globally-configured hook template doesn't add noise.
+			string emptyTemplate = Path.Combine(repo, ".empty-template");
+			Directory.CreateDirectory(emptyTemplate);
+			await Cli.Wrap("git")
+				.WithArguments(["-C", repo, "init", $"--template={emptyTemplate}"])
+				.ExecuteBufferedAsync();
 
-			// Assert - if we get here, there are staged changes
-			Assert.NotNull(result);
-			Assert.NotEmpty(result);
-			Assert.Contains("diff --git", result);
+			Directory.SetCurrentDirectory(repo);
+			await body(repo);
 		}
-		catch (InvalidOperationException ex)
+		finally
 		{
-			// Assert - if we get here, there are no staged changes
-			Assert.Contains("No staged changes found", ex.Message);
+			Directory.SetCurrentDirectory(original);
+
+			try
+			{
+				Directory.Delete(repo, true);
+			}
+			catch (Exception)
+			{
+				// Best effort cleanup.
+			}
+		}
+	}
+
+	private static async Task StageFileAsync(string repo, string name, string content)
+	{
+		await File.WriteAllTextAsync(Path.Combine(repo, name), content);
+		await Cli.Wrap("git").WithArguments(["-C", repo, "add", name]).ExecuteBufferedAsync();
+	}
+
+	/// <summary>
+	/// Runs <paramref name="body" /> with the process working directory set to a fresh
+	/// temp directory that is not a git repository, then restores it and cleans up.
+	/// </summary>
+	private static async Task OutsideRepoAsync(Func<Task> body)
+	{
+		string original = Directory.GetCurrentDirectory();
+		string dir = Path.Combine(Path.GetTempPath(), "committy-nogit-" + Path.GetRandomFileName());
+		Directory.CreateDirectory(dir);
+
+		try
+		{
+			Directory.SetCurrentDirectory(dir);
+			await body();
+		}
+		finally
+		{
+			Directory.SetCurrentDirectory(original);
+
+			try
+			{
+				Directory.Delete(dir, true);
+			}
+			catch (Exception)
+			{
+				// Best effort cleanup.
+			}
 		}
 	}
 
 	[Fact]
-	public void GitService_Constructor_CreatesInstance()
+	public async Task TryGetStagedDiffAsync_OutsideRepository_ThrowsInvalidOperationException()
 	{
-		// Arrange & Act
-		var service = new GitService();
+		await OutsideRepoAsync(async () =>
+		{
+			var exception = await Assert.ThrowsAsync<InvalidOperationException>(()
+				=> GitService.TryGetStagedDiffAsync(CancellationToken.None));
 
-		// Assert
-		Assert.NotNull(service);
+			Assert.Contains("Not a git repository", exception.Message);
+		});
+	}
+
+	[Fact]
+	public async Task GetStagedDiffAsync_NothingStaged_ThrowsInvalidOperationException()
+	{
+		await InRepoAsync(async _ =>
+		{
+			var exception = await Assert.ThrowsAsync<InvalidOperationException>(()
+				=> GitService.GetStagedDiffAsync(CancellationToken.None));
+
+			Assert.Contains("No staged changes found", exception.Message);
+		});
+	}
+
+	[Fact]
+	public async Task GetStagedDiffAsync_WithStagedChange_ReturnsDiff()
+	{
+		await InRepoAsync(async repo =>
+		{
+			await StageFileAsync(repo, "file.txt", "content\n");
+
+			string diff = await GitService.GetStagedDiffAsync(CancellationToken.None);
+
+			Assert.Contains("diff --git", diff);
+		});
+	}
+
+	[Fact]
+	public async Task TryGetStagedDiffAsync_NothingStaged_ReturnsNull()
+	{
+		await InRepoAsync(async _ =>
+		{
+			string? diff = await GitService.TryGetStagedDiffAsync(CancellationToken.None);
+
+			Assert.Null(diff);
+		});
+	}
+
+	[Fact]
+	public async Task TryGetStagedDiffAsync_WithStagedChange_ReturnsDiff()
+	{
+		await InRepoAsync(async repo =>
+		{
+			await StageFileAsync(repo, "file.txt", "hello world\n");
+
+			string? diff = await GitService.TryGetStagedDiffAsync(CancellationToken.None);
+
+			Assert.NotNull(diff);
+			Assert.Contains("diff --git", diff);
+			Assert.Contains("hello world", diff);
+		});
 	}
 }

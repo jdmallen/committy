@@ -1,5 +1,6 @@
-using System.Text;
-using System.Text.Json;
+using System.Net.Http.Json;
+using System.Text.Json.Serialization;
+using JetBrains.Annotations;
 
 namespace Committy;
 
@@ -13,42 +14,25 @@ namespace Committy;
 public sealed class AzureOpenAIChatClient(IHttpService http, AzureConfig config)
 	: IChatCompletionClient
 {
-	private const string ApiVersion = "2024-10-21";
+	private const string API_VERSION = "2024-10-21";
 
 	public async Task<string> CompleteAsync(
 		CompletionRequest request,
 		CancellationToken cancellationToken = default)
 	{
-		var body = new
-		{
-			messages = new[]
-			{
-				new
-				{
-					role = "system",
-					content = request.SystemPrompt,
-				},
-				new
-				{
-					role = "user",
-					content = request.UserPrompt,
-				},
-			},
-			max_tokens = request.MaxTokens,
-			temperature = request.Temperature,
-			top_p = 1.0,
-			frequency_penalty = 0,
-			presence_penalty = 0,
-		};
+		var body = new RequestBody(
+			[
+				new Message("system", request.SystemPrompt),
+				new Message("user", request.UserPrompt),
+			],
+			request.MaxTokens,
+			request.Temperature);
 
 		var url =
-			$"{config.Endpoint!.TrimEnd('/')}/openai/deployments/{config.Deployment}/chat/completions?api-version={ApiVersion}";
+			$"{config.Endpoint!.TrimEnd('/')}/openai/deployments/{config.Deployment}/chat/completions?api-version={API_VERSION}";
 
 		using var message = new HttpRequestMessage(HttpMethod.Post, url);
-		message.Content = new StringContent(
-			JsonSerializer.Serialize(body),
-			Encoding.UTF8,
-			"application/json");
+		message.Content = JsonContent.Create(body);
 		message.Headers.Add("api-key", config.ApiKey);
 
 		HttpResponseMessage response
@@ -63,15 +47,48 @@ public sealed class AzureOpenAIChatClient(IHttpService http, AzureConfig config)
 				$"Azure OpenAI API request failed: {response.StatusCode} - {error}");
 		}
 
-		string content
-			= await response.Content.ReadAsStringAsync(cancellationToken).ConfigureAwait(false);
-		var json = JsonSerializer.Deserialize<JsonElement>(content);
+		ResponseBody? result = await response.Content
+			.ReadFromJsonAsync<ResponseBody>(cancellationToken)
+			.ConfigureAwait(false);
 
-		return json
-				.GetProperty("choices")[0]
-				.GetProperty("message")
-				.GetProperty("content")
-				.GetString()
-			?? string.Empty;
+		return result?.Choices?.FirstOrDefault()?.Message?.Content ?? string.Empty;
 	}
+
+	// Serialized to the request body by the JSON serializer; never read in code.
+	[UsedImplicitly(ImplicitUseTargetFlags.WithMembers)]
+	private sealed record RequestBody(
+		[property: JsonPropertyName("messages")]
+		IReadOnlyList<Message> Messages,
+		[property: JsonPropertyName("max_tokens")]
+		int MaxTokens,
+		[property: JsonPropertyName("temperature")]
+		double Temperature)
+	{
+		[JsonPropertyName("frequency_penalty")]
+		public int FrequencyPenalty { get; init; }
+
+		[JsonPropertyName("presence_penalty")]
+		public int PresencePenalty { get; init; }
+
+		[JsonPropertyName("top_p")]
+		public double TopP { get; init; } = 1.0;
+	}
+
+	[UsedImplicitly(ImplicitUseTargetFlags.WithMembers)]
+	private sealed record Message(
+		[property: JsonPropertyName("role")] string Role,
+		[property: JsonPropertyName("content")]
+		string Content);
+
+	private sealed record ResponseBody(
+		[property: JsonPropertyName("choices")]
+		IReadOnlyList<Choice>? Choices);
+
+	private sealed record Choice(
+		[property: JsonPropertyName("message")]
+		ChoiceMessage? Message);
+
+	private sealed record ChoiceMessage(
+		[property: JsonPropertyName("content")]
+		string? Content);
 }

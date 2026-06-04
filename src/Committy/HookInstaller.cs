@@ -42,6 +42,9 @@ public static class HookInstaller
 		exit 0
 		""";
 
+	/// <summary>The current trampoline text, with normalized newlines.</summary>
+	public static string Trampoline => TRAMPOLINE_SCRIPT.Replace("\r\n", "\n");
+
 	/// <summary>
 	/// Installs the hook either globally (as a git template) or into a single
 	/// repository.
@@ -103,16 +106,10 @@ public static class HookInstaller
 			Directory.CreateDirectory(hooksDir);
 		}
 
-		string hookPath = Path.Combine(hooksDir, HookName);
+		await WriteTrampolineAsync(hooksDir, cancellationToken).ConfigureAwait(false);
 
-		await File.WriteAllTextAsync(
-				hookPath,
-				TRAMPOLINE_SCRIPT.Replace("\r\n", "\n"),
-				cancellationToken)
+		await output.WriteLineAsync($"✓ Hook installed: {Path.Combine(hooksDir, HookName)}")
 			.ConfigureAwait(false);
-		MakeExecutable(hookPath);
-
-		await output.WriteLineAsync($"✓ Hook installed: {hookPath}").ConfigureAwait(false);
 
 		if (global)
 		{
@@ -132,6 +129,29 @@ public static class HookInstaller
 
 		return 0;
 	}
+
+	/// <summary>
+	/// True when the content looks like a committy-managed hook of any version. Used
+	/// to
+	/// decide whether <c>repair-hooks</c> may safely overwrite it; foreign hooks (no
+	/// committy signature) are always left alone.
+	/// </summary>
+	public static bool IsCommittyManaged(string content)
+	{
+		string lower = content.ToLowerInvariant();
+
+		return lower.Contains("committy")
+			&& (lower.Contains("prepare-commit-msg")
+				|| lower.Contains("--no-git")
+				|| lower.Contains("ai-powered commit message hook"));
+	}
+
+	/// <summary>
+	/// True when the content is exactly the current trampoline (no repair
+	/// needed).
+	/// </summary>
+	public static bool IsCurrentTrampoline(string content) =>
+		content.Replace("\r\n", "\n").Trim() == Trampoline.Trim();
 
 	private static void MakeExecutable(string path)
 	{
@@ -176,5 +196,50 @@ public static class HookInstaller
 		return result.ExitCode == 0 && !string.IsNullOrWhiteSpace(result.StandardOutput)
 			? result.StandardOutput.Trim()
 			: null;
+	}
+
+	/// <summary>
+	/// Resolves the absolute hooks directory for a repository, or null if not
+	/// a repo.
+	/// </summary>
+	public static async Task<string?> TryGetHooksDirAsync(
+		string repo,
+		CancellationToken cancellationToken = default)
+	{
+		BufferedCommandResult result = await Cli.Wrap("git")
+			.WithArguments(["-C", repo, "rev-parse", "--git-path", "hooks"])
+			.WithValidation(CommandResultValidation.None)
+			.ExecuteBufferedAsync(cancellationToken)
+			.ConfigureAwait(false);
+
+		if (result.ExitCode != 0)
+		{
+			return null;
+		}
+
+		string path = result.StandardOutput.Trim();
+
+		if (string.IsNullOrEmpty(path))
+		{
+			return null;
+		}
+
+		return Path.IsPathRooted(path) ? path : Path.GetFullPath(Path.Combine(repo, path));
+	}
+
+	/// <summary>
+	/// Writes the trampoline into <paramref name="hooksDir" /> and marks it
+	/// executable.
+	/// </summary>
+	public static async Task WriteTrampolineAsync(
+		string hooksDir,
+		CancellationToken cancellationToken = default)
+	{
+		Directory.CreateDirectory(hooksDir);
+
+		string hookPath = Path.Combine(hooksDir, HookName);
+
+		await File.WriteAllTextAsync(hookPath, Trampoline, cancellationToken).ConfigureAwait(false);
+		MakeExecutable(hookPath);
 	}
 }

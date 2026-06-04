@@ -17,7 +17,7 @@ public sealed record ConfigOverrides(
 /// the legacy <c>AZURE_OPENAI_*</c> environment variables remain supported as
 /// overrides.
 /// </summary>
-public sealed class CommittyConfigResolver(GitConfigStore gitConfig)
+public sealed class CommittyConfigResolver
 {
 	public const string DefaultDeployment = "gpt-4.1-mini";
 	public const string DefaultAnthropicModel = "claude-haiku-4-5-20251001";
@@ -69,7 +69,8 @@ public sealed class CommittyConfigResolver(GitConfigStore gitConfig)
 
 		bool titlesOnly =
 			IsTruthy(Environment.GetEnvironmentVariable(TITLES_ONLY_ENV))
-			|| IsTruthy(await GitConfigStore.GetAsync(TitlesOnlyKey, cancellationToken).ConfigureAwait(false));
+			|| IsTruthy(
+				await GitConfigStore.GetAsync(TitlesOnlyKey, cancellationToken).ConfigureAwait(false));
 
 		return provider switch
 		{
@@ -85,7 +86,8 @@ public sealed class CommittyConfigResolver(GitConfigStore gitConfig)
 							.ConfigureAwait(false),
 					Model = overrides.Model
 						?? Environment.GetEnvironmentVariable(ANTHROPIC_MODEL_ENV)
-						?? await GitConfigStore.GetAsync(AnthropicModelKey, cancellationToken).ConfigureAwait(false)
+						?? await GitConfigStore.GetAsync(AnthropicModelKey, cancellationToken)
+							.ConfigureAwait(false)
 						?? DefaultAnthropicModel,
 				},
 			},
@@ -97,13 +99,16 @@ public sealed class CommittyConfigResolver(GitConfigStore gitConfig)
 				{
 					ApiKey = overrides.ApiKey
 						?? Environment.GetEnvironmentVariable(AZURE_API_KEY_ENV)
-						?? await GitConfigStore.GetAsync(AzureApiKeyKey, cancellationToken).ConfigureAwait(false),
+						?? await GitConfigStore.GetAsync(AzureApiKeyKey, cancellationToken)
+							.ConfigureAwait(false),
 					Endpoint = overrides.Endpoint
 						?? Environment.GetEnvironmentVariable(AZURE_ENDPOINT_ENV)
-						?? await GitConfigStore.GetAsync(AzureEndpointKey, cancellationToken).ConfigureAwait(false),
+						?? await GitConfigStore.GetAsync(AzureEndpointKey, cancellationToken)
+							.ConfigureAwait(false),
 					Deployment = overrides.Deployment
 						?? Environment.GetEnvironmentVariable(AZURE_DEPLOYMENT_ENV)
-						?? await GitConfigStore.GetAsync(AzureDeploymentKey, cancellationToken).ConfigureAwait(false)
+						?? await GitConfigStore.GetAsync(AzureDeploymentKey, cancellationToken)
+							.ConfigureAwait(false)
 						?? DefaultDeployment,
 				},
 			},

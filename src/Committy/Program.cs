@@ -20,32 +20,32 @@ internal class Program
 	/// </summary>
 	private static Command BuildConfigCommand()
 	{
-		var providerOption = new Option<string?>("--provider", ["-p"])
+		var providerOption = new Option<string?>("--provider", "-p")
 		{
 			Description = "Provider to configure: azure or anthropic",
 			HelpName = "provider",
 		};
-		var apiKeyOption = new Option<string?>("--api-key", ["-k"])
+		var apiKeyOption = new Option<string?>("--api-key", "-k")
 		{
 			Description = "API key for the provider",
 			HelpName = "API key",
 		};
-		var endpointOption = new Option<string?>("--endpoint", ["-e"])
+		var endpointOption = new Option<string?>("--endpoint", "-e")
 		{
 			Description = "Azure OpenAI endpoint host URL",
 			HelpName = "endpoint URL",
 		};
-		var deploymentOption = new Option<string?>("--deployment", ["-d"])
+		var deploymentOption = new Option<string?>("--deployment", "-d")
 		{
 			Description = "Azure OpenAI deployment name",
 			HelpName = "deployment name",
 		};
-		var modelOption = new Option<string?>("--model", ["-m"])
+		var modelOption = new Option<string?>("--model", "-m")
 		{
 			Description = "Anthropic model name",
 			HelpName = "model",
 		};
-		var titlesOnlyOption = new Option<bool>("--titles-only", ["-t"])
+		var titlesOnlyOption = new Option<bool>("--titles-only", "-t")
 		{
 			Description = "Make titles-only mode the default",
 		};
@@ -69,7 +69,6 @@ internal class Program
 		command.SetAction(async (parseResult, cancellationToken) =>
 		{
 			bool global = !parseResult.GetValue(localOption);
-			var store = new GitConfigStore();
 
 			try
 			{
@@ -80,7 +79,6 @@ internal class Program
 				var written = new List<(string Key, string Display)>();
 
 				await SetAsync(
-					store,
 					written,
 					CommittyConfigResolver.ProviderKey,
 					provider == Provider.Anthropic ? "anthropic" : "azure",
@@ -88,94 +86,60 @@ internal class Program
 					false,
 					cancellationToken);
 
-				if (provider == Provider.Anthropic)
-				{
-					string? apiKey = Prompt(
-						"Anthropic API key",
-						parseResult.GetValue(apiKeyOption),
-						await GitConfigStore.GetAsync(
+				ConfigField[] fields = provider == Provider.Anthropic
+					?
+					[
+						new ConfigField(
+							"Anthropic API key",
 							CommittyConfigResolver.AnthropicApiKeyKey,
-							cancellationToken),
-						true);
-					string? model = Prompt(
-						"Anthropic model",
-						parseResult.GetValue(modelOption),
-						await GitConfigStore.GetAsync(
+							parseResult.GetValue(apiKeyOption),
+							Secret: true),
+						new ConfigField(
+							"Anthropic model",
 							CommittyConfigResolver.AnthropicModelKey,
-							cancellationToken)
-						?? CommittyConfigResolver.DefaultAnthropicModel,
-						false);
-
-					await SetAsync(
-						store,
-						written,
-						CommittyConfigResolver.AnthropicApiKeyKey,
-						apiKey,
-						global,
-						true,
-						cancellationToken);
-					await SetAsync(
-						store,
-						written,
-						CommittyConfigResolver.AnthropicModelKey,
-						model,
-						global,
-						false,
-						cancellationToken);
-				}
-				else
-				{
-					string? apiKey = Prompt(
-						"Azure OpenAI API key",
-						parseResult.GetValue(apiKeyOption),
-						await GitConfigStore.GetAsync(CommittyConfigResolver.AzureApiKeyKey, cancellationToken),
-						true);
-					string? endpoint = Prompt(
-						"Azure OpenAI endpoint",
-						parseResult.GetValue(endpointOption),
-						await GitConfigStore.GetAsync(
+							parseResult.GetValue(modelOption),
+							CommittyConfigResolver.DefaultAnthropicModel),
+					]
+					:
+					[
+						new ConfigField(
+							"Azure OpenAI API key",
+							CommittyConfigResolver.AzureApiKeyKey,
+							parseResult.GetValue(apiKeyOption),
+							Secret: true),
+						new ConfigField(
+							"Azure OpenAI endpoint",
 							CommittyConfigResolver.AzureEndpointKey,
-							cancellationToken),
-						false);
-					string? deployment = Prompt(
-						"Azure OpenAI deployment",
-						parseResult.GetValue(deploymentOption),
-						await GitConfigStore.GetAsync(
+							parseResult.GetValue(endpointOption)),
+						new ConfigField(
+							"Azure OpenAI deployment",
 							CommittyConfigResolver.AzureDeploymentKey,
-							cancellationToken)
-						?? CommittyConfigResolver.DefaultDeployment,
-						false);
+							parseResult.GetValue(deploymentOption),
+							CommittyConfigResolver.DefaultDeployment),
+					];
+
+				foreach (ConfigField field in fields)
+				{
+					string? current =
+						await GitConfigStore.GetAsync(field.Key, cancellationToken) ?? field.Default;
+					string? value = Prompt(
+						field.Label,
+						field.FlagValue,
+						current,
+						field.Secret);
 
 					await SetAsync(
-						store,
 						written,
-						CommittyConfigResolver.AzureApiKeyKey,
-						apiKey,
+						field.Key,
+						value,
 						global,
-						true,
-						cancellationToken);
-					await SetAsync(
-						store,
-						written,
-						CommittyConfigResolver.AzureEndpointKey,
-						endpoint,
-						global,
-						false,
-						cancellationToken);
-					await SetAsync(
-						store,
-						written,
-						CommittyConfigResolver.AzureDeploymentKey,
-						deployment,
-						global,
-						false,
+						field.Secret,
 						cancellationToken);
 				}
 
 				if (parseResult.GetValue(titlesOnlyOption))
 				{
 					await SetAsync(
-						store,
 						written,
 						CommittyConfigResolver.TitlesOnlyKey,
 						"true",
@@ -205,7 +169,7 @@ internal class Program
 	{
 		var globalOption = new Option<bool>(
 			"--global",
-			["-g"])
+			"-g")
 		{
 			Description = "Install as a global hook template for all future repositories",
 		};
@@ -327,6 +291,88 @@ internal class Program
 		return command;
 	}
 
+	/// <summary>
+	/// Replaces stale committy hooks with the current trampoline. By default it
+	/// repairs
+	/// only the current repository; <c>--scan &lt;dir&gt;</c> recursively sweeps a
+	/// tree, and
+	/// <c>--global</c> also re-stamps the global template. Only committy-managed hooks
+	/// are
+	/// touched; foreign hooks are reported and left alone.
+	/// </summary>
+	private static Command BuildRepairHooksCommand()
+	{
+		var globalOption = new Option<bool>("--global", "-g")
+		{
+			Description = "Also re-stamp the global hook template",
+		};
+		var scanOption = new Option<string[]>("--scan")
+		{
+			Description
+				= "Directory to recursively scan for repositories (repeatable); default is the current repo only",
+			Arity = ArgumentArity.ZeroOrMore,
+			AllowMultipleArgumentsPerToken = true,
+			HelpName = "dir",
+		};
+		var dryRunOption = new Option<bool>("--dry-run")
+		{
+			Description = "Report what would change without modifying anything",
+		};
+		var backupOption = new Option<bool>("--backup")
+		{
+			Description = "Save the previous hook as prepare-commit-msg.bak before replacing it",
+		};
+
+		var command = new Command(
+			"repair-hooks",
+			"Replace stale committy hooks with the current trampoline (current repo by default; --scan to sweep)")
+		{
+			globalOption,
+			scanOption,
+			dryRunOption,
+			backupOption,
+		};
+
+		command.SetAction(async (parseResult, cancellationToken) =>
+		{
+			bool global = parseResult.GetValue(globalOption);
+			string[] scan = parseResult.GetValue(scanOption) ?? [];
+			bool dryRun = parseResult.GetValue(dryRunOption);
+			bool backup = parseResult.GetValue(backupOption);
+
+			if (global)
+			{
+				if (dryRun)
+				{
+					await Console.Out.WriteLineAsync("[dry-run] would re-stamp the global hook template");
+				}
+				else
+				{
+					await HookInstaller.InstallAsync(
+						true,
+						null,
+						Console.Out,
+						cancellationToken);
+				}
+			}
+
+			int exitCode = await HookRepairer.RunAsync(
+				scan,
+				dryRun,
+				backup,
+				!global,
+				Console.Out,
+				cancellationToken);
+
+			if (exitCode != 0)
+			{
+				Environment.Exit(exitCode);
+			}
+		});
+
+		return command;
+	}
+
 	private static async Task<List<string>> GenerateAsync(
 		IHttpService http,
 		CommittyConfig config,
@@ -347,35 +393,35 @@ internal class Program
 
 		var providerOption = new Option<string?>(
 			"--provider",
-			["-p"])
+			"-p")
 		{
 			Description = "LLM provider to use: azure or anthropic (overrides config)",
 			HelpName = "provider",
 		};
 		var apiKeyOption = new Option<string?>(
 			"--api-key",
-			["-k"])
+			"-k")
 		{
 			Description = "API key for the selected provider (overrides config and environment)",
 			HelpName = "API key",
 		};
 		var endpointOption = new Option<string?>(
 			"--endpoint",
-			["-e"])
+			"-e")
 		{
 			Description = "Azure OpenAI endpoint host URL; omit everything after the domain",
 			HelpName = "endpoint URL",
 		};
 		var deploymentOption = new Option<string?>(
 			"--deployment",
-			["-d"])
+			"-d")
 		{
 			Description = "Azure OpenAI deployment name",
 			HelpName = "deployment name",
 		};
 		var modelOption = new Option<string?>(
 			"--model",
-			["-m"])
+			"-m")
 		{
 			Description = "Anthropic model name",
 			HelpName = "model",
@@ -387,10 +433,10 @@ internal class Program
 		};
 		var clipboardOption = new Option<bool>(
 			"--clipboard",
-			["-c"]) { Description = "Copy first suggestion to clipboard" };
+			"-c") { Description = "Copy first suggestion to clipboard" };
 		var titlesOnlyOption = new Option<bool>(
 			"--titles-only",
-			["-t"])
+			"-t")
 		{
 			Description = "Generate 5 title-only suggestions instead of a single title+body message",
 		};
@@ -480,6 +526,7 @@ internal class Program
 
 		rootCommand.Subcommands.Add(BuildPrepareCommitMsgCommand(http));
 		rootCommand.Subcommands.Add(BuildInstallHookCommand());
+		rootCommand.Subcommands.Add(BuildRepairHooksCommand());
 		rootCommand.Subcommands.Add(BuildConfigCommand());
 
 		return await rootCommand.Parse(args).InvokeAsync();
@@ -579,7 +626,7 @@ internal class Program
 		ConfigOverrides? overrides,
 		CancellationToken cancellationToken)
 	{
-		var resolver = new CommittyConfigResolver(new GitConfigStore());
+		var resolver = new CommittyConfigResolver();
 
 		return await resolver.ResolveAsync(overrides, cancellationToken);
 	}
@@ -617,7 +664,6 @@ internal class Program
 	}
 
 	private static async Task SetAsync(
-		GitConfigStore store,
 		List<(string Key, string Display)> written,
 		string key,
 		string? value,
@@ -630,11 +676,23 @@ internal class Program
 			return;
 		}
 
-		await store.SetAsync(
+		await GitConfigStore.SetAsync(
 			key,
 			value,
 			global,
 			cancellationToken);
 		written.Add((key, secret ? Mask(value) : value));
 	}
+
+	/// <summary>
+	/// One persisted <c>committy config</c> field: a label for prompting, the git
+	/// config key it maps to, the flag value (if any), an optional default shown when
+	/// nothing is stored, and whether the value should be masked.
+	/// </summary>
+	private sealed record ConfigField(
+		string Label,
+		string Key,
+		string? FlagValue,
+		string? Default = null,
+		bool Secret = false);
 }

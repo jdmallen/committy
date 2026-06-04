@@ -1,5 +1,7 @@
+using System.Net.Http.Json;
 using System.Text;
-using System.Text.Json;
+using System.Text.Json.Serialization;
+using JetBrains.Annotations;
 
 namespace Committy;
 
@@ -20,27 +22,15 @@ public sealed class AnthropicChatClient(IHttpService http, AnthropicConfig confi
 		CompletionRequest request,
 		CancellationToken cancellationToken = default)
 	{
-		var body = new
-		{
-			model = config.Model,
-			max_tokens = request.MaxTokens,
-			temperature = request.Temperature,
-			system = request.SystemPrompt,
-			messages = new[]
-			{
-				new
-				{
-					role = "user",
-					content = request.UserPrompt,
-				},
-			},
-		};
+		var body = new RequestBody(
+			config.Model,
+			request.MaxTokens,
+			request.Temperature,
+			request.SystemPrompt,
+			[new Message("user", request.UserPrompt)]);
 
 		using var message = new HttpRequestMessage(HttpMethod.Post, URL);
-		message.Content = new StringContent(
-			JsonSerializer.Serialize(body),
-			Encoding.UTF8,
-			"application/json");
+		message.Content = JsonContent.Create(body);
 		message.Headers.Add("x-api-key", config.ApiKey);
 		message.Headers.Add("anthropic-version", ANTHROPIC_VERSION);
 
@@ -56,21 +46,44 @@ public sealed class AnthropicChatClient(IHttpService http, AnthropicConfig confi
 				$"Anthropic API request failed: {response.StatusCode} - {error}");
 		}
 
-		string content
-			= await response.Content.ReadAsStringAsync(cancellationToken).ConfigureAwait(false);
-		var json = JsonSerializer.Deserialize<JsonElement>(content);
+		ResponseBody? result = await response.Content
+			.ReadFromJsonAsync<ResponseBody>(cancellationToken)
+			.ConfigureAwait(false);
 
 		// The Messages API returns an array of content blocks; concatenate the text ones.
 		var sb = new StringBuilder();
 
-		foreach (JsonElement block in json.GetProperty("content").EnumerateArray())
+		foreach (Block block in (result?.Content ?? []).Where(block => block.Type == "text"))
 		{
-			if (block.TryGetProperty("type", out JsonElement type) && type.GetString() == "text")
-			{
-				sb.Append(block.GetProperty("text").GetString());
-			}
+			sb.Append(block.Text);
 		}
 
 		return sb.ToString();
 	}
+
+	// Serialized to the request body by the JSON serializer; never read in code.
+	[UsedImplicitly(ImplicitUseTargetFlags.WithMembers)]
+	private sealed record RequestBody(
+		[property: JsonPropertyName("model")] string Model,
+		[property: JsonPropertyName("max_tokens")]
+		int MaxTokens,
+		[property: JsonPropertyName("temperature")]
+		double Temperature,
+		[property: JsonPropertyName("system")] string System,
+		[property: JsonPropertyName("messages")]
+		IReadOnlyList<Message> Messages);
+
+	[UsedImplicitly(ImplicitUseTargetFlags.WithMembers)]
+	private sealed record Message(
+		[property: JsonPropertyName("role")] string Role,
+		[property: JsonPropertyName("content")]
+		string Content);
+
+	private sealed record ResponseBody(
+		[property: JsonPropertyName("content")]
+		IReadOnlyList<Block>? Content);
+
+	private sealed record Block(
+		[property: JsonPropertyName("type")] string? Type,
+		[property: JsonPropertyName("text")] string? Text);
 }

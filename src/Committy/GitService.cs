@@ -3,7 +3,7 @@ using CliWrap.Buffered;
 
 namespace Committy;
 
-public class GitService
+public static class GitService
 {
 	/// <summary>
 	/// Gets staged diff for manual execution fallback, throwing when nothing is
@@ -21,6 +21,8 @@ public class GitService
 	public static async Task<string?> TryGetStagedDiffAsync(
 		CancellationToken cancellationToken = default)
 	{
+		await EnsureInsideWorkTreeAsync(cancellationToken).ConfigureAwait(false);
+
 		BufferedCommandResult result = await Cli.Wrap("git")
 			.WithArguments(["diff", "--cached"])
 			.WithValidation(CommandResultValidation.None)
@@ -33,5 +35,25 @@ public class GitService
 		}
 
 		return string.IsNullOrWhiteSpace(result.StandardOutput) ? null : result.StandardOutput;
+	}
+
+	/// <summary>
+	/// Throws a clear error when the working directory isn't inside a git work tree,
+	/// so callers get an actionable message instead of git's raw <c>diff</c> usage output.
+	/// </summary>
+	private static async Task EnsureInsideWorkTreeAsync(CancellationToken cancellationToken)
+	{
+		BufferedCommandResult result = await Cli.Wrap("git")
+			.WithArguments(["rev-parse", "--is-inside-work-tree"])
+			.WithValidation(CommandResultValidation.None)
+			.ExecuteBufferedAsync(cancellationToken)
+			.ConfigureAwait(false);
+
+		if (result.ExitCode != 0
+			|| !result.StandardOutput.Trim().Equals("true", StringComparison.OrdinalIgnoreCase))
+		{
+			throw new InvalidOperationException(
+				"Not a git repository. Run committy from inside a git repository.");
+		}
 	}
 }

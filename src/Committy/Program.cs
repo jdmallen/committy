@@ -213,7 +213,7 @@ internal class Program
 	/// rest of committy does, generates, and writes the file. Never returns a non-zero
 	/// exit code: a hook failure must not block a commit.
 	/// </summary>
-	private static Command BuildPrepareCommitMsgCommand(IHttpService http)
+	private static Command BuildPrepareCommitMsgCommand(HttpClient http)
 	{
 		var commitMsgFileArgument = new Argument<string>("commit-msg-file")
 		{
@@ -374,7 +374,7 @@ internal class Program
 	}
 
 	private static async Task<List<string>> GenerateAsync(
-		IHttpService http,
+		HttpClient http,
 		CommittyConfig config,
 		string patch,
 		bool titlesOnly,
@@ -389,7 +389,7 @@ internal class Program
 	private static async Task<int> Main(string[] args)
 	{
 		// Transport is shared across commands and backed by IHttpClientFactory.
-		IHttpService http = HttpService.Create();
+		HttpClient http = HttpClientProvider.Create();
 
 		var providerOption = new Option<string?>(
 			"--provider",
@@ -561,7 +561,7 @@ internal class Program
 		}
 
 		Console.WriteLine(
-			"\nCommitty reads these at commit time. Environment variables (e.g. ANTHROPIC_API_KEY,");
+			"\nCommitty reads these at commit time. Environment variables (e.g. ANTHROPIC_API_KEY_COMMITTY,");
 		Console.WriteLine("AZURE_OPENAI_API_KEY) override them for a single invocation.");
 	}
 

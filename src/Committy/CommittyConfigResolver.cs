@@ -37,7 +37,7 @@ public sealed class CommittyConfigResolver
 	private const string AZURE_API_KEY_ENV = "AZURE_OPENAI_API_KEY";
 	private const string AZURE_ENDPOINT_ENV = "AZURE_OPENAI_ENDPOINT_HOST";
 	private const string AZURE_DEPLOYMENT_ENV = "AZURE_OPENAI_DEPLOYMENT";
-	private const string ANTHROPIC_API_KEY_ENV = "ANTHROPIC_API_KEY";
+	private const string ANTHROPIC_API_KEY_ENV = "ANTHROPIC_API_KEY_COMMITTY";
 	private const string ANTHROPIC_MODEL_ENV = "ANTHROPIC_MODEL";
 
 	private static bool IsTruthy(string? value) =>

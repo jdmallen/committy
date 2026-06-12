@@ -19,6 +19,12 @@
         <PackageReference Include="TextCopy" Version="6.2.1"/>
         <PackageReference Include="Microsoft.Extensions.Http" Version="10.0.1"/>
         <PackageReference Include="CliWrap" Version="3.10.0"/>
+        <PackageReference Include="JDMallen.Toolbox.AI" Version="3.0.0"/>
+    </ItemGroup>
+
+    <ItemGroup>
+        <!-- Chat client types (IChatCompletionClient et al.) used throughout. -->
+        <Using Include="JDMallen.Toolbox.AI"/>
     </ItemGroup>
 
 </Project>

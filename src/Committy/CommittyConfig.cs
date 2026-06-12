@@ -35,7 +35,7 @@ public sealed class AnthropicConfig
 
 	public string? Validate() =>
 		string.IsNullOrWhiteSpace(ApiKey)
-			? "Anthropic API key is required (run `committy config` or set ANTHROPIC_API_KEY)."
+			? "Anthropic API key is required (run `committy config` or set ANTHROPIC_API_KEY_COMMITTY)."
 			: null;
 }
 

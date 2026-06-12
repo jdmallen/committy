@@ -291,7 +291,7 @@ committy --provider azure \
 | Option          | Alias | Environment variable                         | Default                     | Description                                                                    |
 |-----------------|-------|----------------------------------------------|-----------------------------|--------------------------------------------------------------------------------|
 | `--provider`    | `-p`  | `COMMITTY_PROVIDER`                          | `azure`                     | LLM provider: `azure` or `anthropic`.                                          |
-| `--api-key`     | `-k`  | `AZURE_OPENAI_API_KEY` / `ANTHROPIC_API_KEY` | —                           | API key for the selected provider.                                             |
+| `--api-key`     | `-k`  | `AZURE_OPENAI_API_KEY` / `ANTHROPIC_API_KEY_COMMITTY` | —                   | API key for the selected provider.                                             |
 | `--endpoint`    | `-e`  | `AZURE_OPENAI_ENDPOINT_HOST`                 | —                           | Azure OpenAI endpoint host URL (domain only — omit everything after it).       |
 | `--deployment`  | `-d`  | `AZURE_OPENAI_DEPLOYMENT`                    | `gpt-4.1-mini`              | Azure OpenAI deployment name.                                                  |
 | `--model`       | `-m`  | `ANTHROPIC_MODEL`                            | `claude-haiku-4-5-20251001` | Anthropic model name.                                                          |

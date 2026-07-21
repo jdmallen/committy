@@ -14,7 +14,10 @@ public class HookInstallerTests
 	}
 
 	private static async Task GitInitAsync(string repo) =>
-		await Cli.Wrap("git").WithArguments(["-C", repo, "init"]).ExecuteBufferedAsync();
+		// "--template=" (empty) opts out of any global init.templateDir, so a developer
+		// machine with its own committy template installed doesn't pollute these repos
+		// with a pre-existing hook before HookInstaller ever runs.
+		await Cli.Wrap("git").WithArguments(["-C", repo, "init", "--template="]).ExecuteBufferedAsync();
 
 	[Fact]
 	public async Task InstallAsync_LocalRepo_WritesTrampolineHook()
@@ -45,6 +48,41 @@ public class HookInstallerTests
 				UnixFileMode mode = File.GetUnixFileMode(hookPath);
 				Assert.True(mode.HasFlag(UnixFileMode.UserExecute));
 			}
+		}
+		finally
+		{
+			Directory.Delete(repo, true);
+		}
+	}
+
+	[Fact]
+	public async Task InstallAsync_CustomHooksPath_WritesToConfiguredDirectory()
+	{
+		string repo = CreateTempDir();
+		try
+		{
+			await GitInitAsync(repo);
+
+			string customHooksDir = Path.Combine(repo, ".githooks");
+			Directory.CreateDirectory(customHooksDir);
+
+			await Cli.Wrap("git")
+				.WithArguments(["-C", repo, "config", "core.hooksPath", ".githooks"])
+				.ExecuteBufferedAsync();
+
+			var output = new StringWriter();
+
+			int code = await HookInstaller.InstallAsync(false, repo, output);
+
+			Assert.Equal(0, code);
+
+			string hookPath = Path.Combine(customHooksDir, HookInstaller.HookName);
+			Assert.True(File.Exists(hookPath));
+
+			string defaultHookPath = Path.Combine(repo, ".git", "hooks", HookInstaller.HookName);
+			Assert.False(File.Exists(defaultHookPath));
+
+			Assert.Contains("custom core.hooksPath", output.ToString());
 		}
 		finally
 		{

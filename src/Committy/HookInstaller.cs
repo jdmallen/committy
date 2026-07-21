@@ -102,8 +102,24 @@ public static class HookInstaller
 				gitDir = Path.GetFullPath(Path.Combine(repo, gitDir));
 			}
 
-			hooksDir = Path.Combine(gitDir, "hooks");
+			string defaultHooksDir = Path.Combine(gitDir, "hooks");
+
+			// Respect a custom core.hooksPath (e.g. a repo-tracked ".githooks" dir); git
+			// never looks in <gitdir>/hooks once that's set, so writing there would
+			// silently install a hook that never runs.
+			hooksDir = await TryGetHooksDirAsync(repo, cancellationToken).ConfigureAwait(false)
+				?? defaultHooksDir;
+
 			Directory.CreateDirectory(hooksDir);
+
+			if (!PathsEqual(hooksDir, defaultHooksDir))
+			{
+				await output.WriteLineAsync(
+						$"Note: {repo} uses a custom core.hooksPath ({hooksDir}). "
+						+ "If that directory is tracked by git, this hook will be visible to "
+						+ "other contributors too.")
+					.ConfigureAwait(false);
+			}
 		}
 
 		await WriteTrampolineAsync(hooksDir, cancellationToken).ConfigureAwait(false);
@@ -152,6 +168,12 @@ public static class HookInstaller
 	/// </summary>
 	public static bool IsCurrentTrampoline(string content) =>
 		content.Replace("\r\n", "\n").Trim() == Trampoline.Trim();
+
+	private static bool PathsEqual(string a, string b) =>
+		string.Equals(
+			Path.TrimEndingDirectorySeparator(Path.GetFullPath(a)),
+			Path.TrimEndingDirectorySeparator(Path.GetFullPath(b)),
+			OperatingSystem.IsWindows() ? StringComparison.OrdinalIgnoreCase : StringComparison.Ordinal);
 
 	private static void MakeExecutable(string path)
 	{

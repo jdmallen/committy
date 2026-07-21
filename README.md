@@ -84,7 +84,14 @@ from PowerShell, Command Prompt, and Git Bash.
 > committy repair-hooks --global                 # re-stamp the global template
 > committy repair-hooks --scan ~/code            # sweep every repo under a directory
 > committy repair-hooks --scan ~/code --dry-run  # preview without changing anything
+> committy repair-hooks --git-dir ~/.cfg         # a headless repo (e.g. dotfiles)
 > ```
+>
+> Headless repositories — a separate git directory with no in-tree `.git`, such as
+> a `~/.cfg` dotfiles repo driven by `git --git-dir=~/.cfg --work-tree=~` — are
+> intentionally skipped by `--scan`. Point committy straight at the git directory
+> with `--git-dir <dir>` (repeatable) to install (`committy install-hook ~/.cfg`)
+> or repair their hooks.
 >
 > Only hooks it recognizes as committy-managed are touched; hooks you wrote
 > yourself are reported and left untouched. Add `--backup` to keep the previous
@@ -199,7 +206,7 @@ committy --provider azure \
 | `committy prepare-commit-msg <file>`    | Git hook entry point; writes suggestions into the given commit message file. (Normally invoked by the hook, not by hand.)                      |
 | `committy install-hook [repo]`          | Install the hook into a repository (defaults to the current directory).                                                                        |
 | `committy install-hook --global`        | Install the hook as a global template for all future repositories.                                                                             |
-| `committy repair-hooks [--scan <dir>]…` | Replace stale committy hooks with the current trampoline (current repo by default; `--scan` sweeps a tree; `--global` re-stamps the template). |
+| `committy repair-hooks [--scan <dir>]…` | Replace stale committy hooks with the current trampoline (current repo by default; `--scan` sweeps a tree; `--git-dir` targets a headless repo; `--global` re-stamps the template). |
 
 ## Options
 
@@ -216,6 +223,7 @@ committy --provider azure \
 | `--local`       | —     | —                                                     | off                         | (`config` only) Write to the current repo's git config instead of global.       |
 | `--global`      | `-g`  | —                                                     | off                         | (`install-hook` / `repair-hooks`) Target the global hook template.              |
 | `--scan <dir>`  | —     | —                                                     | current repo                | (`repair-hooks` only) Recursively sweep a directory for repos; repeatable.      |
+| `--git-dir <dir>` | —   | —                                                     | current repo                | (`repair-hooks` only) Target a headless git directory directly (e.g. `~/.cfg`); repeatable. |
 | `--dry-run`     | —     | —                                                     | off                         | (`repair-hooks` only) Report what would change without modifying anything.      |
 | `--backup`      | —     | —                                                     | off                         | (`repair-hooks` only) Save the previous hook as `prepare-commit-msg.bak`.       |
 

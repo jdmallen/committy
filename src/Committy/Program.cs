@@ -176,7 +176,7 @@ internal class Program
 		var repoArgument = new Argument<string?>("repo")
 		{
 			Description
-				= "Repository to install into (defaults to the current directory); ignored with --global",
+				= "Repository to install into (defaults to the current directory); may be a headless git directory such as ~/.cfg; ignored with --global",
 			Arity = ArgumentArity.ZeroOrOne,
 		};
 
@@ -314,6 +314,14 @@ internal class Program
 			AllowMultipleArgumentsPerToken = true,
 			HelpName = "dir",
 		};
+		var gitDirOption = new Option<string[]>("--git-dir")
+		{
+			Description
+				= "Git directory to repair directly (repeatable); use for headless repos such as a ~/.cfg dotfiles setup that recursive scanning skips",
+			Arity = ArgumentArity.ZeroOrMore,
+			AllowMultipleArgumentsPerToken = true,
+			HelpName = "dir",
+		};
 		var dryRunOption = new Option<bool>("--dry-run")
 		{
 			Description = "Report what would change without modifying anything",
@@ -329,6 +337,7 @@ internal class Program
 		{
 			globalOption,
 			scanOption,
+			gitDirOption,
 			dryRunOption,
 			backupOption,
 		};
@@ -337,6 +346,7 @@ internal class Program
 		{
 			bool global = parseResult.GetValue(globalOption);
 			string[] scan = parseResult.GetValue(scanOption) ?? [];
+			string[] gitDirs = parseResult.GetValue(gitDirOption) ?? [];
 			bool dryRun = parseResult.GetValue(dryRunOption);
 			bool backup = parseResult.GetValue(backupOption);
 
@@ -358,6 +368,7 @@ internal class Program
 
 			int exitCode = await HookRepairer.RunAsync(
 				scan,
+				gitDirs,
 				dryRun,
 				backup,
 				!global,

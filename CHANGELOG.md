@@ -5,6 +5,29 @@ All notable changes to this project are documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [1.2.0]
+
+### Added
+
+- **`--git-dir <dir>` option for `committy repair-hooks`** (repeatable). Targets a
+  headless repository directly—a separate git directory with no in-tree `.git`,
+  such as a `~/.cfg` dotfiles repo driven by `git --git-dir=~/.cfg
+  --work-tree=~`—which `--scan` intentionally skips during a recursive sweep.
+  `committy install-hook` already accepted such a directory as its `repo`
+  argument; the description now calls that out explicitly.
+
+### Fixed
+
+- **`committy install-hook` ignored a repository's `core.hooksPath`.** It always
+  wrote the `prepare-commit-msg` trampoline to `<gitdir>/hooks`, so in a
+  repository configured with a custom hooks directory (e.g. a repo-tracked
+  `.githooks` folder) the hook was installed somewhere git never looks and
+  silently never ran—even though `committy repair-hooks` already handled this
+  case correctly. Installation now resolves the hooks directory the same way
+  git does (respecting `core.hooksPath`) and prints a note when that directory
+  differs from the default, since a custom hooks path may be tracked by git and
+  shared with other contributors.
+
 ## [1.1.0]
 
 A feature release. It rearchitects committy's chat generation onto the

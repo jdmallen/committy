@@ -35,6 +35,27 @@ public class HookRepairerTests
 		return dir;
 	}
 
+	/// <summary>
+	/// Creates a "headless" repository — a separate git directory with no in-tree
+	/// <c>.git</c> entry, mirroring a ~/.cfg dotfiles setup — and returns that git dir.
+	/// </summary>
+	private static async Task<string> NewHeadlessGitDirAsync()
+	{
+		string root = Path.Combine(Path.GetTempPath(), "committy-headless-" + Path.GetRandomFileName());
+		string workTree = Path.Combine(root, "work");
+		string gitDir = Path.Combine(root, "gitdir");
+		Directory.CreateDirectory(workTree);
+
+		string emptyTemplate = Path.Combine(root, ".empty-template");
+		Directory.CreateDirectory(emptyTemplate);
+		await Cli.Wrap("git")
+			.WithArguments(
+				["-C", workTree, "init", $"--separate-git-dir={gitDir}", $"--template={emptyTemplate}"])
+			.ExecuteBufferedAsync();
+
+		return gitDir;
+	}
+
 	private static string WriteHook(string repo, string content)
 	{
 		string hookPath = Path.Combine(
@@ -143,6 +164,81 @@ public class HookRepairerTests
 		finally
 		{
 			Directory.Delete(repo, true);
+		}
+	}
+
+	[Fact]
+	public async Task RepairRepoAsync_HeadlessGitDir_StaleHookIsReplaced()
+	{
+		string gitDir = await NewHeadlessGitDirAsync();
+		try
+		{
+			string hookPath = Path.Combine(gitDir, "hooks", "prepare-commit-msg");
+			Directory.CreateDirectory(Path.GetDirectoryName(hookPath)!);
+			await File.WriteAllTextAsync(hookPath, OLD_HOOK);
+
+			HookRepairResult result = await HookRepairer.RepairRepoAsync(gitDir, false, false);
+
+			Assert.Equal(HookRepairOutcome.Updated, result.Outcome);
+			Assert.Equal(HookInstaller.Trampoline.Trim(), (await File.ReadAllTextAsync(hookPath)).Trim());
+		}
+		finally
+		{
+			Directory.Delete(Path.GetDirectoryName(gitDir)!, true);
+		}
+	}
+
+	[Fact]
+	public async Task RunAsync_GitDirTarget_RepairsHeadlessRepo()
+	{
+		string gitDir = await NewHeadlessGitDirAsync();
+		try
+		{
+			string hookPath = Path.Combine(gitDir, "hooks", "prepare-commit-msg");
+			Directory.CreateDirectory(Path.GetDirectoryName(hookPath)!);
+			await File.WriteAllTextAsync(hookPath, OLD_HOOK);
+			var output = new StringWriter();
+
+			int code = await HookRepairer.RunAsync(
+				[],
+				[gitDir],
+				false,
+				false,
+				true,
+				output);
+
+			Assert.Equal(0, code);
+			Assert.Equal(HookInstaller.Trampoline.Trim(), (await File.ReadAllTextAsync(hookPath)).Trim());
+		}
+		finally
+		{
+			Directory.Delete(Path.GetDirectoryName(gitDir)!, true);
+		}
+	}
+
+	[Fact]
+	public async Task RunAsync_NonGitDirTarget_IsSkippedWithMessage()
+	{
+		string dir = Path.Combine(Path.GetTempPath(), "committy-notrepo-" + Path.GetRandomFileName());
+		Directory.CreateDirectory(dir);
+		try
+		{
+			var output = new StringWriter();
+
+			int code = await HookRepairer.RunAsync(
+				[],
+				[dir],
+				false,
+				false,
+				true,
+				output);
+
+			Assert.Equal(0, code);
+			Assert.Contains("not a git directory", output.ToString());
+		}
+		finally
+		{
+			Directory.Delete(dir, true);
 		}
 	}
 

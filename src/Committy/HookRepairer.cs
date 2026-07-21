@@ -42,12 +42,14 @@ public static class HookRepairer
 {
 	private static async Task<List<string>> CollectReposAsync(
 		IReadOnlyList<string> scanRoots,
+		IReadOnlyList<string> gitDirs,
 		TextWriter output,
 		CancellationToken cancellationToken)
 	{
 		var repos = new List<string>();
 
-		if (scanRoots.Count == 0)
+		// With no explicit targets, fall back to the repository the user is standing in.
+		if (scanRoots.Count == 0 && gitDirs.Count == 0)
 		{
 			string? top = await GetTopLevelAsync(Directory.GetCurrentDirectory(), cancellationToken)
 				.ConfigureAwait(false);
@@ -73,7 +75,48 @@ public static class HookRepairer
 			repos.AddRange(FindRepos(full));
 		}
 
+		// --git-dir points committy straight at a git directory, including "headless"
+		// layouts (a separate git dir without an in-tree .git, e.g. a ~/.cfg dotfiles
+		// repo) that recursive scanning intentionally skips. git's -C resolution treats
+		// such a directory as the repository, so the rest of the pipeline is unchanged.
+		foreach (string full in gitDirs.Select(Path.GetFullPath))
+		{
+			if (!Directory.Exists(full))
+			{
+				await output.WriteLineAsync($"Skipping {full}: directory does not exist.")
+					.ConfigureAwait(false);
+
+				continue;
+			}
+
+			if (!await IsGitDirAsync(full, cancellationToken).ConfigureAwait(false))
+			{
+				await output.WriteLineAsync($"Skipping {full}: not a git directory.")
+					.ConfigureAwait(false);
+
+				continue;
+			}
+
+			repos.Add(full);
+		}
+
 		return repos.Distinct().ToList();
+	}
+
+	/// <summary>
+	/// True when <paramref name="path" /> is (or resolves to) a git directory. Used to
+	/// validate explicit <c>--git-dir</c> targets, which may be headless dotfiles-style
+	/// repositories that have no in-tree <c>.git</c> entry.
+	/// </summary>
+	private static async Task<bool> IsGitDirAsync(string path, CancellationToken cancellationToken)
+	{
+		BufferedCommandResult result = await Cli.Wrap("git")
+			.WithArguments(["-C", path, "rev-parse", "--git-dir"])
+			.WithValidation(CommandResultValidation.None)
+			.ExecuteBufferedAsync(cancellationToken)
+			.ConfigureAwait(false);
+
+		return result.ExitCode == 0;
 	}
 
 	private static IEnumerable<string> FindRepos(string root)
@@ -249,21 +292,22 @@ public static class HookRepairer
 
 	public static async Task<int> RunAsync(
 		IReadOnlyList<string> scanRoots,
+		IReadOnlyList<string> gitDirs,
 		bool dryRun,
 		bool backup,
 		bool currentRepoRequired,
 		TextWriter output,
 		CancellationToken cancellationToken = default)
 	{
-		List<string> repos = await CollectReposAsync(scanRoots, output, cancellationToken)
+		List<string> repos = await CollectReposAsync(scanRoots, gitDirs, output, cancellationToken)
 			.ConfigureAwait(false);
 
 		if (repos.Count == 0)
 		{
-			if (scanRoots.Count == 0 && currentRepoRequired)
+			if (scanRoots.Count == 0 && gitDirs.Count == 0 && currentRepoRequired)
 			{
 				await output.WriteLineAsync(
-						"Error: not inside a git repository. Run from a repo, or pass --scan <dir> to sweep, or --global.")
+						"Error: not inside a git repository. Run from a repo, or pass --scan <dir> to sweep, --git-dir <dir> for a headless repo, or --global.")
 					.ConfigureAwait(false);
 
 				return 1;

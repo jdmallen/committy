@@ -22,6 +22,12 @@ public sealed class ChatCompletionClientFactory(HttpClient httpClient)
 				new AnthropicClientOptions(
 					config.Anthropic!.ApiKey!,
 					config.Anthropic.Model)),
+			Provider.OpenAI => new OpenAICompatibleChatClient(
+				httpClient,
+				new OpenAICompatibleClientOptions(
+					config.OpenAI!.BaseUrl!,
+					config.OpenAI.Model,
+					config.OpenAI.ApiKey)),
 			_ => throw new InvalidOperationException($"Unsupported provider: {config.Provider}"),
 		};
 }

@@ -6,7 +6,15 @@ namespace Committy;
 /// result.
 /// The provider is injected, so this class never changes when a new LLM is added.
 /// </summary>
-public sealed class CommitMessageGenerator(IChatCompletionClient client)
+/// <param name="client">The configured chat client to ask.</param>
+/// <param name="maxTokensOverride">
+/// Replaces the prompt's per-mode token budget when set. Reasoning models need
+/// it: the thinking block comes out of the same budget and is discarded before
+/// parsing.
+/// </param>
+public sealed class CommitMessageGenerator(
+	IChatCompletionClient client,
+	int? maxTokensOverride = null)
 {
 	public async Task<List<string>> GenerateAsync(
 		string patch,
@@ -20,7 +28,10 @@ public sealed class CommitMessageGenerator(IChatCompletionClient client)
 
 		try
 		{
-			CompletionRequest request = CommitMessagePrompt.Build(patch, titlesOnly);
+			CompletionRequest request = CommitMessagePrompt.Build(
+				patch,
+				titlesOnly,
+				maxTokensOverride);
 			string raw = await client.CompleteAsync(request, cancellationToken).ConfigureAwait(false);
 
 			return CommitMessageParser.Parse(raw, titlesOnly);

@@ -27,8 +27,11 @@ run
 - .NET 10 Runtime or SDK
 - Git
 - Access to one supported LLM provider:
-  - **Azure OpenAI** — endpoint, API key, and a deployment name, or
-  - **Anthropic (Claude)** — an API key
+  - **Azure OpenAI** — endpoint, API key, and a deployment name,
+  - **Anthropic (Claude)** — an API key, or
+  - **OpenAI-compatible** — a base URL and model name; covers openai.com and
+    self-hosted runners (llama.cpp, llama-swap, Ollama, vLLM, LM Studio). An API
+    key is optional, since self-hosted servers usually accept anonymous requests.
 
 **1. Build the executable**
 
@@ -36,7 +39,7 @@ Publish a self-contained binary for your platform (output lands in
 `dist/<runtime>/`):
 
 ```bash
-./publish.sh          # builds linux-x64, win-x64, osx-x64, osx-arm64
+./scripts/publish.sh          # builds linux-x64, win-x64, osx-x64, osx-arm64
 ```
 
 Or build a single runtime directly:
@@ -115,6 +118,11 @@ committy config --provider azure \
 
 # Anthropic (Claude), non-interactive
 committy config --provider anthropic --api-key "sk-ant-..."
+
+# Local / OpenAI-compatible, non-interactive (--endpoint is the base URL)
+committy config --provider openai \
+  --endpoint "http://10.10.0.20:8080/v1" \
+  --model "thinkingcap-27b-q4km"
 ```
 
 By default this writes to your **global** git config (`~/.gitconfig`); add
@@ -190,6 +198,12 @@ with a flag or environment variable:
 # Override the configured provider for one run
 committy --provider anthropic --api-key "sk-ant-..."
 
+# Use a local model for one run, without touching git config
+COMMITTY_PROVIDER=openai \
+OPENAI_BASE_URL=http://10.10.0.20:8080/v1 \
+OPENAI_MODEL=thinkingcap-27b-q4km \
+  committy
+
 # Override Azure settings explicitly
 committy --provider azure \
          --api-key "your_key" \
@@ -212,11 +226,11 @@ committy --provider azure \
 
 | Option          | Alias | Environment variable                                  | Default                     | Description                                                                     |
 |-----------------|-------|-------------------------------------------------------|-----------------------------|---------------------------------------------------------------------------------|
-| `--provider`    | `-p`  | `COMMITTY_PROVIDER`                                   | `azure`                     | LLM provider: `azure` or `anthropic`.                                           |
-| `--api-key`     | `-k`  | `AZURE_OPENAI_API_KEY` / `ANTHROPIC_API_KEY_COMMITTY` | —                           | API key for the selected provider.                                              |
-| `--endpoint`    | `-e`  | `AZURE_OPENAI_ENDPOINT_HOST`                          | —                           | Azure OpenAI endpoint host URL (domain only — omit everything after it).        |
+| `--provider`    | `-p`  | `COMMITTY_PROVIDER`                                   | `azure`                     | LLM provider: `azure`, `anthropic`, or `openai` (alias `local`).                |
+| `--api-key`     | `-k`  | `AZURE_OPENAI_API_KEY` / `ANTHROPIC_API_KEY_COMMITTY` / `OPENAI_API_KEY_COMMITTY` | —       | API key for the selected provider; optional for `openai`.                       |
+| `--endpoint`    | `-e`  | `AZURE_OPENAI_ENDPOINT_HOST` / `OPENAI_BASE_URL`      | —                           | Azure endpoint host URL (domain only), or the `openai` base URL including `/v1`. |
 | `--deployment`  | `-d`  | `AZURE_OPENAI_DEPLOYMENT`                             | `gpt-4.1-mini`              | Azure OpenAI deployment name.                                                   |
-| `--model`       | `-m`  | `ANTHROPIC_MODEL`                                     | `claude-haiku-4-5-20251001` | Anthropic model name.                                                           |
+| `--model`       | `-m`  | `ANTHROPIC_MODEL` / `OPENAI_MODEL`                    | `claude-haiku-4-5-20251001` | Anthropic or `openai` model name.                                               |
 | `--titles-only` | `-t`  | `COMMITTY_TITLES_ONLY`                                | off                         | Generate five title-only suggestions instead of a single title + body message. |
 | `--clipboard`   | `-c`  | —                                                     | off                         | Copy the first suggestion to the clipboard.                                     |
 | `--no-git`      | —     | —                                                     | off                         | Rely solely on stdin; never call `git diff --cached` as a fallback.             |
@@ -248,19 +262,44 @@ global (`~/.gitconfig`).
 
 | git config key              | Provider  | Purpose                               |
 |-----------------------------|-----------|---------------------------------------|
-| `committy.provider`         | —         | `azure` or `anthropic`                |
-| `committy.titlesonly`       | —         | `true` to default to titles-only mode |
-| `committy.azure.apikey`     | Azure     | API key                               |
-| `committy.azure.endpoint`   | Azure     | Endpoint host URL                     |
-| `committy.azure.deployment` | Azure     | Deployment name                       |
-| `committy.anthropic.apikey` | Anthropic | API key                               |
-| `committy.anthropic.model`  | Anthropic | Model name                            |
+| `committy.provider`             | —         | `azure`, `anthropic`, or `openai`         |
+| `committy.titlesonly`           | —         | `true` to default to titles-only mode     |
+| `committy.azure.apikey`         | Azure     | API key                                   |
+| `committy.azure.endpoint`       | Azure     | Endpoint host URL                         |
+| `committy.azure.deployment`     | Azure     | Deployment name                           |
+| `committy.anthropic.apikey`     | Anthropic | API key                                   |
+| `committy.anthropic.model`      | Anthropic | Model name                                |
+| `committy.openai.baseurl`       | OpenAI    | Base URL including `/v1`                  |
+| `committy.openai.model`         | OpenAI    | Model name                                |
+| `committy.openai.apikey`        | OpenAI    | API key (optional)                        |
+| `committy.openai.timeoutseconds`| OpenAI    | Request timeout; default `300`            |
+| `committy.openai.maxtokens`     | OpenAI    | Generation budget; default `2048`         |
 
 These are plain `git config` keys, so you can also set them by hand — e.g.
 `git config --global committy.provider anthropic`. Environment variables (the
 names in the
 Options table) override git config for a single invocation, which is handy in
 CI.
+
+### Local and other OpenAI-compatible models
+
+The `openai` provider (alias `local`) works with anything that speaks the OpenAI
+`/v1/chat/completions` API. Two defaults differ from the hosted providers, both
+because of how self-hosted models behave:
+
+- **`timeoutseconds` defaults to `300`**, not 30. A cold model loads its weights
+  from disk before generating a single token, which can take minutes.
+- **`maxtokens` defaults to `2048`**, replacing the built-in 100 (titles) and 500
+  (title + body) budgets. A reasoning model spends most of its output on a
+  thinking block that committy discards, so a small budget truncates the thought
+  and leaves no message behind.
+
+Reasoning models are supported: the thinking block is stripped whether the server
+splits it into `reasoning_content` or inlines it as `<think>…</think>`.
+
+> **Quality note:** output quality tracks the model you point at. A small
+> quantized model generally follows the prompt less reliably than the hosted
+> providers, so review the message before committing.
 
 > **Note:** API keys are stored in plaintext in your git config file (
 `~/.gitconfig` or the

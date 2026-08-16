@@ -100,7 +100,7 @@ public static class HookRepairer
 			repos.Add(full);
 		}
 
-		return repos.Distinct().ToList();
+		return [.. repos.Distinct()];
 	}
 
 	/// <summary>
@@ -276,6 +276,13 @@ public static class HookRepairer
 						.ConfigureAwait(false);
 
 					break;
+				case HookRepairOutcome.AlreadyCurrent:
+				case HookRepairOutcome.NoHook:
+					break;
+				default:
+#pragma warning disable CA2208
+					throw new ArgumentOutOfRangeException(nameof(result.Outcome), result.Outcome, "Unexpected outcome");
+#pragma warning restore CA2208
 			}
 		}
 

@@ -14,6 +14,7 @@ public class HookInstallerTests
 	}
 
 	private static async Task GitInitAsync(string repo) =>
+
 		// "--template=" (empty) opts out of any global init.templateDir, so a developer
 		// machine with its own committy template installed doesn't pollute these repos
 		// with a pre-existing hook before HookInstaller ever runs.
@@ -79,7 +80,11 @@ public class HookInstallerTests
 			string hookPath = Path.Combine(customHooksDir, HookInstaller.HookName);
 			Assert.True(File.Exists(hookPath));
 
-			string defaultHookPath = Path.Combine(repo, ".git", "hooks", HookInstaller.HookName);
+			string defaultHookPath = Path.Combine(
+				repo,
+				".git",
+				"hooks",
+				HookInstaller.HookName);
 			Assert.False(File.Exists(defaultHookPath));
 
 			Assert.Contains("custom core.hooksPath", output.ToString());

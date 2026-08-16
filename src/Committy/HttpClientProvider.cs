@@ -13,7 +13,12 @@ public static class HttpClientProvider
 {
 	private const string CLIENT_NAME = "committy";
 
-	public static HttpClient Create()
+	/// <param name="timeoutSeconds">
+	/// Request timeout. Hosted providers answer well within the default; a
+	/// self-hosted model may need minutes, most of it spent loading weights from
+	/// disk before the first token.
+	/// </param>
+	public static HttpClient Create(int timeoutSeconds = CommittyConfig.DefaultTimeoutSeconds)
 	{
 		var services = new ServiceCollection();
 
@@ -21,7 +26,7 @@ public static class HttpClientProvider
 			CLIENT_NAME,
 			client =>
 			{
-				client.Timeout = TimeSpan.FromSeconds(30);
+				client.Timeout = TimeSpan.FromSeconds(timeoutSeconds);
 				client.DefaultRequestHeaders.Accept.ParseAdd("application/json");
 
 				AssemblyName? assembly = Assembly.GetAssembly(typeof(HttpClientProvider))?.GetName();

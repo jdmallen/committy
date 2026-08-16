@@ -37,14 +37,15 @@ public static class CommittyService
 	public static async Task<string> ReadPatchFromStdinAsync(
 		CancellationToken cancellationToken = default)
 	{
-		if (Console.IsInputRedirected)
+		if (!Console.IsInputRedirected)
 		{
-			using var reader = new StreamReader(Console.OpenStandardInput(), Console.InputEncoding);
-
-			return await reader.ReadToEndAsync(cancellationToken).ConfigureAwait(false);
+			throw new InvalidOperationException(
+				"No input data available. Please pipe git patch data to stdin.");
 		}
 
-		throw new InvalidOperationException(
-			"No input data available. Please pipe git patch data to stdin.");
+		using var reader = new StreamReader(Console.OpenStandardInput(), Console.InputEncoding);
+
+		return await reader.ReadToEndAsync(cancellationToken).ConfigureAwait(false);
+
 	}
 }

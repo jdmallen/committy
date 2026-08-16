@@ -1,6 +1,6 @@
 # Releases a new version whenever a commit lands on main (e.g. a merged PR)
 # with a <Version> in Directory.Build.props that hasn't been tagged yet:
-#   1. builds the release archives with publish.sh (default runtimes),
+#   1. builds the release archives with scripts/publish.sh (default runtimes),
 #   2. tags the pushed commit with the raw semver (no 'v' prefix), and
 #   3. creates a GitHub release whose notes are that version's CHANGELOG.md
 #      section, with the archives and a SHA256SUMS.txt attached.
@@ -58,7 +58,7 @@ jobs:
 
       - name: Publish release binaries
         if: steps.tag_check.outputs.exists == 'false'
-        run: ./publish.sh
+        run: ./scripts/publish.sh
 
       - name: Generate checksums
         if: steps.tag_check.outputs.exists == 'false'

@@ -109,11 +109,21 @@ public static class CommitMessagePrompt
 		Return only the commit message text. Do not wrap it in quotation marks or code fences, and do not add any commentary before or after.
 		""";
 
-	public static CompletionRequest Build(string patch, bool titlesOnly) =>
+	/// <param name="patch">The staged diff to summarize.</param>
+	/// <param name="titlesOnly">Whether to ask for five titles or one title+body.</param>
+	/// <param name="maxTokensOverride">
+	/// Replaces the per-mode default budget. Reasoning models need it: their
+	/// thinking block is spent from the same budget and then discarded, so the
+	/// 100-token titles budget leaves nothing for an actual answer.
+	/// </param>
+	public static CompletionRequest Build(
+		string patch,
+		bool titlesOnly,
+		int? maxTokensOverride = null) =>
 		new(
 			SYSTEM_PROMPT,
 			string.Format(
 				titlesOnly ? TITLES_USER_PROMPT_TEMPLATE : TITLE_AND_BODY_USER_PROMPT_TEMPLATE,
 				patch),
-			titlesOnly ? TITLES_MAX_TOKENS : TITLE_AND_BODY_MAX_TOKENS);
+			maxTokensOverride ?? (titlesOnly ? TITLES_MAX_TOKENS : TITLE_AND_BODY_MAX_TOKENS));
 }

@@ -22,17 +22,17 @@ internal class Program
 	{
 		var providerOption = new Option<string?>("--provider", "-p")
 		{
-			Description = "Provider to configure: azure or anthropic",
+			Description = "Provider to configure: azure, anthropic, or openai",
 			HelpName = "provider",
 		};
 		var apiKeyOption = new Option<string?>("--api-key", "-k")
 		{
-			Description = "API key for the provider",
+			Description = "API key for the provider (optional for openai)",
 			HelpName = "API key",
 		};
 		var endpointOption = new Option<string?>("--endpoint", "-e")
 		{
-			Description = "Azure OpenAI endpoint host URL",
+			Description = "Azure OpenAI endpoint host URL, or the openai base URL",
 			HelpName = "endpoint URL",
 		};
 		var deploymentOption = new Option<string?>("--deployment", "-d")
@@ -42,7 +42,7 @@ internal class Program
 		};
 		var modelOption = new Option<string?>("--model", "-m")
 		{
-			Description = "Anthropic model name",
+			Description = "Anthropic or openai model name",
 			HelpName = "model",
 		};
 		var titlesOnlyOption = new Option<bool>("--titles-only", "-t")
@@ -81,13 +81,14 @@ internal class Program
 				await SetAsync(
 					written,
 					CommittyConfigResolver.ProviderKey,
-					provider == Provider.Anthropic ? "anthropic" : "azure",
+					CommittyConfigResolver.ProviderName(provider),
 					global,
 					false,
 					cancellationToken);
 
-				ConfigField[] fields = provider == Provider.Anthropic
-					?
+				ConfigField[] fields = provider switch
+				{
+					Provider.Anthropic =>
 					[
 						new ConfigField(
 							"Anthropic API key",
@@ -99,8 +100,36 @@ internal class Program
 							CommittyConfigResolver.AnthropicModelKey,
 							parseResult.GetValue(modelOption),
 							CommittyConfigResolver.DefaultAnthropicModel),
-					]
-					:
+					],
+					Provider.OpenAI =>
+					[
+						new ConfigField(
+							"OpenAI base URL (e.g. http://10.10.0.20:8080/v1)",
+							CommittyConfigResolver.OpenAIBaseUrlKey,
+							parseResult.GetValue(endpointOption)),
+						new ConfigField(
+							"OpenAI model",
+							CommittyConfigResolver.OpenAIModelKey,
+							parseResult.GetValue(modelOption)),
+						// Blank is a valid answer: SetAsync skips empty values, and
+						// self-hosted runners generally do not authenticate.
+						new ConfigField(
+							"OpenAI API key (blank if the server needs none)",
+							CommittyConfigResolver.OpenAIApiKeyKey,
+							parseResult.GetValue(apiKeyOption),
+							Secret: true),
+						new ConfigField(
+							"OpenAI timeout in seconds",
+							CommittyConfigResolver.OpenAITimeoutKey,
+							null,
+							CommittyConfigResolver.DefaultOpenAITimeoutSeconds.ToString()),
+						new ConfigField(
+							"OpenAI max tokens",
+							CommittyConfigResolver.OpenAIMaxTokensKey,
+							null,
+							CommittyConfigResolver.DefaultOpenAIMaxTokens.ToString()),
+					],
+					_ =>
 					[
 						new ConfigField(
 							"Azure OpenAI API key",
@@ -116,7 +145,8 @@ internal class Program
 							CommittyConfigResolver.AzureDeploymentKey,
 							parseResult.GetValue(deploymentOption),
 							CommittyConfigResolver.DefaultDeployment),
-					];
+					],
+				};
 
 				foreach (ConfigField field in fields)
 				{
@@ -213,7 +243,7 @@ internal class Program
 	/// rest of committy does, generates, and writes the file. Never returns a non-zero
 	/// exit code: a hook failure must not block a commit.
 	/// </summary>
-	private static Command BuildPrepareCommitMsgCommand(HttpClient http)
+	private static Command BuildPrepareCommitMsgCommand()
 	{
 		var commitMsgFileArgument = new Argument<string>("commit-msg-file")
 		{
@@ -258,7 +288,6 @@ internal class Program
 
 				List<string> suggestions =
 					await GenerateAsync(
-						http,
 						config,
 						patch,
 						config.TitlesOnly,
@@ -384,29 +413,33 @@ internal class Program
 		return command;
 	}
 
+	/// <summary>
+	/// Builds the transport, client, and generator for the resolved config and
+	/// runs one generation. The transport is built here rather than once at
+	/// startup because its timeout is provider-dependent: a self-hosted model may
+	/// need minutes where a hosted one needs seconds, and a single invocation
+	/// makes exactly one completion call.
+	/// </summary>
 	private static async Task<List<string>> GenerateAsync(
-		HttpClient http,
 		CommittyConfig config,
 		string patch,
 		bool titlesOnly,
 		CancellationToken cancellationToken)
 	{
+		HttpClient http = HttpClientProvider.Create(config.TimeoutSeconds);
 		IChatCompletionClient client = new ChatCompletionClientFactory(http).Create(config);
-		var generator = new CommitMessageGenerator(client);
+		var generator = new CommitMessageGenerator(client, config.MaxTokensOverride);
 
 		return await generator.GenerateAsync(patch, titlesOnly, cancellationToken);
 	}
 
 	private static async Task<int> Main(string[] args)
 	{
-		// Transport is shared across commands and backed by IHttpClientFactory.
-		HttpClient http = HttpClientProvider.Create();
-
 		var providerOption = new Option<string?>(
 			"--provider",
 			"-p")
 		{
-			Description = "LLM provider to use: azure or anthropic (overrides config)",
+			Description = "LLM provider to use: azure, anthropic, or openai (overrides config)",
 			HelpName = "provider",
 		};
 		var apiKeyOption = new Option<string?>(
@@ -508,7 +541,6 @@ internal class Program
 
 				List<string> suggestions =
 					await GenerateAsync(
-						http,
 						config,
 						patch,
 						titlesOnly,
@@ -535,7 +567,7 @@ internal class Program
 			}
 		});
 
-		rootCommand.Subcommands.Add(BuildPrepareCommitMsgCommand(http));
+		rootCommand.Subcommands.Add(BuildPrepareCommitMsgCommand());
 		rootCommand.Subcommands.Add(BuildInstallHookCommand());
 		rootCommand.Subcommands.Add(BuildRepairHooksCommand());
 		rootCommand.Subcommands.Add(BuildConfigCommand());
@@ -573,7 +605,8 @@ internal class Program
 
 		Console.WriteLine(
 			"\nCommitty reads these at commit time. Environment variables (e.g. ANTHROPIC_API_KEY_COMMITTY,");
-		Console.WriteLine("AZURE_OPENAI_API_KEY) override them for a single invocation.");
+		Console.WriteLine(
+			"AZURE_OPENAI_API_KEY, OPENAI_BASE_URL) override them for a single invocation.");
 	}
 
 	private static string? Prompt(string label, string? flagValue, string? current, bool secret)
@@ -623,11 +656,13 @@ internal class Program
 				continue;
 			}
 
-			if (!char.IsControl(key.KeyChar))
+			if (char.IsControl(key.KeyChar))
 			{
-				chars.Add(key.KeyChar);
-				Console.Write('*');
+				continue;
 			}
+
+			chars.Add(key.KeyChar);
+			Console.Write('*');
 		}
 
 		return new string(chars.ToArray());
@@ -636,11 +671,7 @@ internal class Program
 	private static async Task<CommittyConfig> ResolveConfigAsync(
 		ConfigOverrides? overrides,
 		CancellationToken cancellationToken)
-	{
-		var resolver = new CommittyConfigResolver();
-
-		return await resolver.ResolveAsync(overrides, cancellationToken);
-	}
+		=> await CommittyConfigResolver.ResolveAsync(overrides, cancellationToken);
 
 	private static async Task<Provider> ResolveProviderForConfigAsync(
 		string? flag,
@@ -663,15 +694,24 @@ internal class Program
 		Console.WriteLine("Select a provider:");
 		Console.WriteLine("  1) azure     (Azure OpenAI)");
 		Console.WriteLine("  2) anthropic (Claude)");
-		string defaultChoice = CommittyConfigResolver.ParseProvider(current) == Provider.Anthropic
-			? "2"
-			: "1";
+		Console.WriteLine("  3) openai    (openai.com or a self-hosted OpenAI-compatible server)");
+		string defaultChoice = CommittyConfigResolver.ParseProvider(current) switch
+		{
+			Provider.Anthropic => "2",
+			Provider.OpenAI    => "3",
+			_                  => "1",
+		};
 		Console.Write($"Choice [{defaultChoice}]: ");
 
 		string? choice = Console.ReadLine()?.Trim();
 		choice = string.IsNullOrEmpty(choice) ? defaultChoice : choice;
 
-		return choice is "2" or "anthropic" or "claude" ? Provider.Anthropic : Provider.Azure;
+		return choice switch
+		{
+			"2" or "anthropic" or "claude" => Provider.Anthropic,
+			"3" or "openai" or "local"     => Provider.OpenAI,
+			_                              => Provider.Azure,
+		};
 	}
 
 	private static async Task SetAsync(

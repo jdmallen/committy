@@ -5,6 +5,76 @@ All notable changes to this project are documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [1.3.0]
+
+Adds a third provider: any endpoint speaking the OpenAI
+`/v1/chat/completions` API, which covers openai.com and — the motivating case —
+models you host yourself via llama.cpp, llama-swap, Ollama, vLLM, or LM Studio.
+The Azure and Anthropic paths are unchanged.
+
+### Added
+
+- **`openai` provider (alias `local`).** Select it with
+  `committy config --provider openai`, `--provider openai` on a single run, or
+  `COMMITTY_PROVIDER=openai`. It needs a base URL and a model name; `--endpoint`
+  doubles as the base URL and `--model` as the model, so no new flags were added.
+  New git config keys: `committy.openai.baseurl`, `committy.openai.model`,
+  `committy.openai.apikey`, `committy.openai.timeoutseconds`, and
+  `committy.openai.maxtokens`; new environment overrides: `OPENAI_BASE_URL`,
+  `OPENAI_MODEL`, and `OPENAI_API_KEY_COMMITTY`.
+- **Optional API key.** Unlike the other providers, a missing key is valid rather
+  than a misconfiguration — self-hosted runners generally accept anonymous
+  requests, and no `Authorization` header is sent when none is set.
+- **Reasoning-model support.** Thinking blocks are stripped before parsing,
+  whether the server splits them into `reasoning_content` or inlines them as
+  `<think>…</think>`.
+- **`committy config` prompts for the OpenAI fields** and offers the provider as
+  choice 3 in the interactive picker.
+
+### Changed
+
+- **The HTTP timeout is now per-provider,** and the transport is built after the
+  config resolves rather than once at startup. Azure and Anthropic keep the
+  previous 30 seconds; `openai` defaults to 300, because a self-hosted model may
+  spend minutes loading weights before its first token.
+- **The token budget is now overridable.** `CommitMessagePrompt.Build` takes an
+  optional budget, and the `openai` provider defaults it to 2048 in place of the
+  built-in 100 (titles) and 500 (title + body). A reasoning model spends most of
+  its output on a thinking block that is then discarded, so the 100-token titles
+  budget would leave nothing behind.
+- **`JDMallen.Toolbox.AI`** upgraded from 3.0.0 to **3.1.0**, which supplies the
+  underlying `OpenAICompatibleChatClient`.
+- **`publish.sh` moved to `scripts/publish.sh`,** next to the engine it sources,
+  which is also where the vendored `publish-dotnet.sh` header documents the
+  wrapper as living. Build it with `./scripts/publish.sh`; arguments are
+  unchanged. The wrapper resolves `repo_root` one directory up and still `cd`s
+  there, so relative paths (`src/Committy/Committy.csproj`, `dist/`) mean the
+  same thing regardless of where you invoke it from.
+
+### Internal
+
+No behavioral change for users; recorded so the diff between 1.2.0 and 1.3.0
+reads cleanly.
+
+- **The `HookRepairOutcome` switch in `HookRepairer` is now exhaustive.**
+  `AlreadyCurrent` and `NoHook` are listed explicitly as no-ops, and an
+  unrecognized outcome throws `ArgumentOutOfRangeException` instead of falling
+  through silently — so adding a case to the enum surfaces as a failure rather
+  than a skipped repo.
+- **`CommittyConfigResolver.ResolveAsync` is now static.** It held no state;
+  `Program.ResolveConfigAsync` calls it directly instead of constructing a
+  resolver per invocation.
+- **Guard clauses inverted** in `CommittyService.ReadPatchFromStdinAsync` (the
+  stdin-missing throw comes first) and in the masked-password reader in
+  `Program.cs` (control characters `continue` early). Same behavior, less
+  nesting; `HookRepairer.DiscoverRepos` returns a collection expression in place
+  of `.ToList()`.
+- **`Directory.Build.props` and `Committy.slnx` reindented** with spaces and
+  spaced self-closing tags, matching what the IDE emits; `CHANGELOG.md` joins
+  the solution's Solution Items folder.
+- **Test tidy.** The OpenAI provider test constants are `BASE_URL` and `MODEL`,
+  and a few long expressions wrap one argument per line.
+
 ## [1.2.0]
 
 ### Added

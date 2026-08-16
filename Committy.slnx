@@ -1,10 +1,13 @@
 <Solution>
     <Folder Name="/Solution Items/">
-        <File Path=".gitignore"/>
-        <File Path="README.md"/>
-        <File Path="publish.sh"/>
-        <File Path="hooks/prepare-commit-msg"/>
+        <File Path=".gitignore" />
+        <File Path="README.md" />
+        <File Path="scripts/publish.sh" />
+        <File Path="CHANGELOG.md" />
+        <File Path="hooks/prepare-commit-msg" />
+        <File Path="scripts\publish-dotnet.sh" />
+        <File Path="scripts\publish.sh" />
     </Folder>
-    <Project Path="src/Committy/Committy.csproj"/>
-    <Project Path="test/Committy.Tests/Committy.Tests.csproj"/>
+    <Project Path="src/Committy/Committy.csproj" />
+    <Project Path="test/Committy.Tests/Committy.Tests.csproj" />
 </Solution>

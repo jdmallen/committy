@@ -12,10 +12,11 @@ public class CommittyConfigTests
 	[InlineData("local", Provider.OpenAI)]
 	[InlineData(null, Provider.Azure)]
 	[InlineData("nonsense", Provider.Azure)]
-	public void ParseProvider_MapsNamesCaseInsensitively(string? name, Provider expected)
-	{
-		Assert.Equal(expected, CommittyConfigResolver.ParseProvider(name));
-	}
+	public void ParseProvider_MapsNamesCaseInsensitively(
+		string? name,
+		Provider expected) => Assert.Equal(
+		expected,
+		CommittyConfigResolver.ParseProvider(name));
 
 	[Fact]
 	public void Validate_Anthropic_Complete_ReturnsNull()

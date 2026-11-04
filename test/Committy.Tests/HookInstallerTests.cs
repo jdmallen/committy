@@ -7,7 +7,9 @@ public class HookInstallerTests
 {
 	private static string CreateTempDir()
 	{
-		string dir = Path.Combine(Path.GetTempPath(), "committy-test-" + Path.GetRandomFileName());
+		string dir = Path.Combine(
+			Path.GetTempPath(),
+			"committy-test-" + Path.GetRandomFileName());
 		Directory.CreateDirectory(dir);
 
 		return dir;
@@ -18,7 +20,9 @@ public class HookInstallerTests
 		// "--template=" (empty) opts out of any global init.templateDir, so a developer
 		// machine with its own committy template installed doesn't pollute these repos
 		// with a pre-existing hook before HookInstaller ever runs.
-		await Cli.Wrap("git").WithArguments(["-C", repo, "init", "--template="]).ExecuteBufferedAsync();
+		await Cli.Wrap("git")
+			.WithArguments(["-C", repo, "init", "--template="])
+			.ExecuteBufferedAsync();
 
 	[Fact]
 	public async Task InstallAsync_LocalRepo_WritesTrampolineHook()
@@ -37,7 +41,7 @@ public class HookInstallerTests
 				repo,
 				".git",
 				"hooks",
-				HookInstaller.HookName);
+				HookInstaller.HOOK_NAME);
 			Assert.True(File.Exists(hookPath));
 
 			string contents = await File.ReadAllTextAsync(hookPath);
@@ -68,7 +72,8 @@ public class HookInstallerTests
 			Directory.CreateDirectory(customHooksDir);
 
 			await Cli.Wrap("git")
-				.WithArguments(["-C", repo, "config", "core.hooksPath", ".githooks"])
+				.WithArguments(
+					["-C", repo, "config", "core.hooksPath", ".githooks"])
 				.ExecuteBufferedAsync();
 
 			var output = new StringWriter();
@@ -77,14 +82,16 @@ public class HookInstallerTests
 
 			Assert.Equal(0, code);
 
-			string hookPath = Path.Combine(customHooksDir, HookInstaller.HookName);
+			string hookPath = Path.Combine(
+				customHooksDir,
+				HookInstaller.HOOK_NAME);
 			Assert.True(File.Exists(hookPath));
 
 			string defaultHookPath = Path.Combine(
 				repo,
 				".git",
 				"hooks",
-				HookInstaller.HookName);
+				HookInstaller.HOOK_NAME);
 			Assert.False(File.Exists(defaultHookPath));
 
 			Assert.Contains("custom core.hooksPath", output.ToString());
@@ -99,7 +106,9 @@ public class HookInstallerTests
 	public async Task InstallAsync_NonexistentPath_ReturnsError()
 	{
 		var output = new StringWriter();
-		string missing = Path.Combine(Path.GetTempPath(), Path.GetRandomFileName());
+		string missing = Path.Combine(
+			Path.GetTempPath(),
+			Path.GetRandomFileName());
 
 		int code = await HookInstaller.InstallAsync(false, missing, output);
 

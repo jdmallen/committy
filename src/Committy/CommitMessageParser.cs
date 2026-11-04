@@ -16,7 +16,8 @@ public static class CommitMessageParser
 		string trimmed = (raw ?? string.Empty).Trim();
 
 		return titlesOnly
-			? ParseTitleSuggestions(string.IsNullOrEmpty(trimmed) ? FALLBACK : trimmed)
+			? ParseTitleSuggestions(
+				string.IsNullOrEmpty(trimmed) ? FALLBACK : trimmed)
 			: ParseTitleAndBody(trimmed);
 	}
 
@@ -32,7 +33,9 @@ public static class CommitMessageParser
 	private static List<string> ParseTitleSuggestions(string response)
 	{
 		var suggestions = new List<string>(5);
-		string[] lines = response.Split(['\r', '\n'], StringSplitOptions.RemoveEmptyEntries);
+		string[] lines = response.Split(
+			['\r', '\n'],
+			StringSplitOptions.RemoveEmptyEntries);
 
 		suggestions.AddRange(
 			lines

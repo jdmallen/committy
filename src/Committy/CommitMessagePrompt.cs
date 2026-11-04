@@ -1,3 +1,5 @@
+using System.Globalization;
+
 namespace Committy;
 
 /// <summary>
@@ -123,7 +125,11 @@ public static class CommitMessagePrompt
 		new(
 			SYSTEM_PROMPT,
 			string.Format(
-				titlesOnly ? TITLES_USER_PROMPT_TEMPLATE : TITLE_AND_BODY_USER_PROMPT_TEMPLATE,
+				CultureInfo.CurrentCulture,
+				titlesOnly
+					? TITLES_USER_PROMPT_TEMPLATE
+					: TITLE_AND_BODY_USER_PROMPT_TEMPLATE,
 				patch),
-			maxTokensOverride ?? (titlesOnly ? TITLES_MAX_TOKENS : TITLE_AND_BODY_MAX_TOKENS));
+			maxTokensOverride
+			?? (titlesOnly ? TITLES_MAX_TOKENS : TITLE_AND_BODY_MAX_TOKENS));
 }

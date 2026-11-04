@@ -14,11 +14,12 @@ public class CommittyConfigResolverTests
 	[Fact]
 	public async Task Settings_GitConfigBeatsEnvironment()
 	{
-		_gitConfig[CommittyConfigResolver.ProviderKey] = "azure";
+		_gitConfig[CommittyConfigResolver.PROVIDER_KEY] = "azure";
 		_environment["COMMITTY_PROVIDER"] = "anthropic";
-		_gitConfig[CommittyConfigResolver.AzureEndpointKey] = "https://config";
+		_gitConfig[CommittyConfigResolver.AZURE_ENDPOINT_KEY] =
+			"https://config";
 		_environment["AZURE_OPENAI_ENDPOINT_HOST"] = "https://env";
-		_gitConfig[CommittyConfigResolver.AzureDeploymentKey] = "gpt-6-luna";
+		_gitConfig[CommittyConfigResolver.AZURE_DEPLOYMENT_KEY] = "gpt-6-luna";
 		_environment["AZURE_OPENAI_DEPLOYMENT"] = "gpt-4.1-mini";
 
 		CommittyConfig config = await Resolve();
@@ -45,10 +46,11 @@ public class CommittyConfigResolverTests
 	[Fact]
 	public async Task Settings_FlagBeatsGitConfig()
 	{
-		_gitConfig[CommittyConfigResolver.ProviderKey] = "anthropic";
-		_gitConfig[CommittyConfigResolver.AnthropicModelKey] = "config-model";
+		_gitConfig[CommittyConfigResolver.PROVIDER_KEY] = "anthropic";
+		_gitConfig[CommittyConfigResolver.ANTHROPIC_MODEL_KEY] = "config-model";
 
-		CommittyConfig config = await Resolve(new ConfigOverrides(Model: "flag-model"));
+		CommittyConfig config =
+			await Resolve(new ConfigOverrides(Model: "flag-model"));
 
 		Assert.Equal("flag-model", config.Anthropic!.Model);
 	}
@@ -56,8 +58,8 @@ public class CommittyConfigResolverTests
 	[Fact]
 	public async Task Settings_BlankGitConfigFallsThrough()
 	{
-		_gitConfig[CommittyConfigResolver.ProviderKey] = "anthropic";
-		_gitConfig[CommittyConfigResolver.AnthropicModelKey] = "  ";
+		_gitConfig[CommittyConfigResolver.PROVIDER_KEY] = "anthropic";
+		_gitConfig[CommittyConfigResolver.ANTHROPIC_MODEL_KEY] = "  ";
 		_environment["ANTHROPIC_MODEL"] = "env-model";
 
 		CommittyConfig config = await Resolve();
@@ -67,27 +69,31 @@ public class CommittyConfigResolverTests
 
 	[Theory]
 	[InlineData("azure", "AZURE_OPENAI_API_KEY", "committy.azure.apikey")]
-	[InlineData("anthropic", "ANTHROPIC_API_KEY_COMMITTY", "committy.anthropic.apikey")]
+	[InlineData(
+		"anthropic",
+		"ANTHROPIC_API_KEY_COMMITTY",
+		"committy.anthropic.apikey")]
 	[InlineData("openai", "OPENAI_API_KEY_COMMITTY", "committy.openai.apikey")]
 	public async Task ApiKeys_EnvironmentBeatsGitConfig(
 		string provider,
 		string environmentVariable,
 		string gitKey)
 	{
-		_gitConfig[CommittyConfigResolver.ProviderKey] = provider;
+		_gitConfig[CommittyConfigResolver.PROVIDER_KEY] = provider;
 		_gitConfig[gitKey] = "config-key";
 		_environment[environmentVariable] = "env-key";
 
 		CommittyConfig config = await Resolve();
 
-		string? apiKey = config.Azure?.ApiKey ?? config.Anthropic?.ApiKey ?? config.OpenAI?.ApiKey;
+		string? apiKey = config.Azure?.ApiKey
+			?? config.Anthropic?.ApiKey ?? config.OpenAI?.ApiKey;
 		Assert.Equal("env-key", apiKey);
 	}
 
 	[Fact]
 	public async Task ApiKeys_GitConfigIsTheFallback()
 	{
-		_gitConfig[CommittyConfigResolver.AzureApiKeyKey] = "config-key";
+		_gitConfig[CommittyConfigResolver.AZURE_API_KEY_KEY] = "config-key";
 
 		CommittyConfig config = await Resolve();
 
@@ -99,7 +105,8 @@ public class CommittyConfigResolverTests
 	{
 		_environment["AZURE_OPENAI_API_KEY"] = "env-key";
 
-		CommittyConfig config = await Resolve(new ConfigOverrides(ApiKey: "flag-key"));
+		CommittyConfig config =
+			await Resolve(new ConfigOverrides(ApiKey: "flag-key"));
 
 		Assert.Equal("flag-key", config.Azure!.ApiKey);
 	}
@@ -116,7 +123,7 @@ public class CommittyConfigResolverTests
 	{
 		if (gitValue is not null)
 		{
-			_gitConfig[CommittyConfigResolver.TitlesOnlyKey] = gitValue;
+			_gitConfig[CommittyConfigResolver.TITLES_ONLY_KEY] = gitValue;
 		}
 
 		if (environmentValue is not null)
@@ -130,8 +137,8 @@ public class CommittyConfigResolverTests
 	[Fact]
 	public async Task Azure_ReasoningSettingsComeFromGitConfig()
 	{
-		_gitConfig[CommittyConfigResolver.AzureReasoningModelKey] = "y";
-		_gitConfig[CommittyConfigResolver.AzureMaxTokensKey] = "4096";
+		_gitConfig[CommittyConfigResolver.AZURE_REASONING_MODEL_KEY] = "y";
+		_gitConfig[CommittyConfigResolver.AZURE_MAX_TOKENS_KEY] = "4096";
 
 		CommittyConfig config = await Resolve();
 

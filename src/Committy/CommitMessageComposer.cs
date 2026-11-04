@@ -13,7 +13,8 @@ public static class CommitMessageComposer
 	private const string TITLES_MARKER =
 		"# 🡅 Suggested commit messages from Committy (uncomment and edit as needed)🡅:";
 
-	private const string TITLES_FOOTER = "# Or write your own commit message above";
+	private const string TITLES_FOOTER =
+		"# Or write your own commit message above";
 
 	/// <summary>
 	/// Produces the new commit-message file contents.
@@ -42,7 +43,7 @@ public static class CommitMessageComposer
 			sb.Append('\n');
 
 			foreach (string line in suggestions.SelectMany(suggestion
-				         => NormalizeNewlines(suggestion).Split('\n')))
+						 => NormalizeNewlines(suggestion).Split('\n')))
 			{
 				sb.Append("# ").Append(line).Append('\n');
 			}
@@ -57,7 +58,8 @@ public static class CommitMessageComposer
 		{
 			// Pre-fill the single title+body message above git's template so the
 			// user can edit or accept it.
-			string message = suggestions.Count > 0 ? suggestions[0] : string.Empty;
+			string message =
+				suggestions.Count > 0 ? suggestions[0] : string.Empty;
 
 			sb.Append(NormalizeNewlines(message).TrimEnd('\n')).Append('\n');
 			sb.Append('\n');

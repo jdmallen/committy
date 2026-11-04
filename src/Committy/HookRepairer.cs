@@ -51,7 +51,9 @@ public static class HookRepairer
 		// With no explicit targets, fall back to the repository the user is standing in.
 		if (scanRoots.Count == 0 && gitDirs.Count == 0)
 		{
-			string? top = await GetTopLevelAsync(Directory.GetCurrentDirectory(), cancellationToken)
+			string? top = await GetTopLevelAsync(
+					Directory.GetCurrentDirectory(),
+					cancellationToken)
 				.ConfigureAwait(false);
 
 			if (top is not null)
@@ -66,7 +68,8 @@ public static class HookRepairer
 		{
 			if (!Directory.Exists(full))
 			{
-				await output.WriteLineAsync($"Skipping {full}: directory does not exist.")
+				await output.WriteLineAsync(
+						$"Skipping {full}: directory does not exist.")
 					.ConfigureAwait(false);
 
 				continue;
@@ -83,15 +86,18 @@ public static class HookRepairer
 		{
 			if (!Directory.Exists(full))
 			{
-				await output.WriteLineAsync($"Skipping {full}: directory does not exist.")
+				await output.WriteLineAsync(
+						$"Skipping {full}: directory does not exist.")
 					.ConfigureAwait(false);
 
 				continue;
 			}
 
-			if (!await IsGitDirAsync(full, cancellationToken).ConfigureAwait(false))
+			if (!await IsGitDirAsync(full, cancellationToken)
+					.ConfigureAwait(false))
 			{
-				await output.WriteLineAsync($"Skipping {full}: not a git directory.")
+				await output
+					.WriteLineAsync($"Skipping {full}: not a git directory.")
 					.ConfigureAwait(false);
 
 				continue;
@@ -108,7 +114,9 @@ public static class HookRepairer
 	/// validate explicit <c>--git-dir</c> targets, which may be headless dotfiles-style
 	/// repositories that have no in-tree <c>.git</c> entry.
 	/// </summary>
-	private static async Task<bool> IsGitDirAsync(string path, CancellationToken cancellationToken)
+	private static async Task<bool> IsGitDirAsync(
+		string path,
+		CancellationToken cancellationToken)
 	{
 		BufferedCommandResult result = await Cli.Wrap("git")
 			.WithArguments(["-C", path, "rev-parse", "--git-dir"])
@@ -128,7 +136,8 @@ public static class HookRepairer
 		{
 			string dir = stack.Pop();
 
-			if (Directory.Exists(Path.Combine(dir, ".git")) || File.Exists(Path.Combine(dir, ".git")))
+			if (Directory.Exists(Path.Combine(dir, ".git"))
+				|| File.Exists(Path.Combine(dir, ".git")))
 			{
 				yield return dir;
 			}
@@ -145,7 +154,8 @@ public static class HookRepairer
 				continue;
 			}
 
-			foreach (string sub in subdirs.Where(sub => Path.GetFileName(sub) is not ".git"))
+			foreach (string sub in subdirs.Where(sub
+						 => Path.GetFileName(sub) is not ".git"))
 			{
 				stack.Push(sub);
 			}
@@ -165,7 +175,9 @@ public static class HookRepairer
 
 		string value = result.StandardOutput.Trim();
 
-		return result.ExitCode == 0 && !string.IsNullOrEmpty(value) ? value : null;
+		return result.ExitCode == 0 && !string.IsNullOrEmpty(value)
+			? value
+			: null;
 	}
 
 	private static async Task<string?> GetTopLevelAsync(
@@ -178,9 +190,10 @@ public static class HookRepairer
 			.ExecuteBufferedAsync(cancellationToken)
 			.ConfigureAwait(false);
 
-		return result.ExitCode == 0 && !string.IsNullOrWhiteSpace(result.StandardOutput)
-			? result.StandardOutput.Trim()
-			: null;
+		return result.ExitCode == 0
+			&& !string.IsNullOrWhiteSpace(result.StandardOutput)
+				? result.StandardOutput.Trim()
+				: null;
 	}
 
 	public static async Task<HookRepairResult> RepairRepoAsync(
@@ -189,7 +202,10 @@ public static class HookRepairer
 		bool backup,
 		CancellationToken cancellationToken = default)
 	{
-		string? customHooksPath = await GetConfigAsync(repo, "core.hooksPath", cancellationToken)
+		string? customHooksPath = await GetConfigAsync(
+				repo,
+				"core.hooksPath",
+				cancellationToken)
 			.ConfigureAwait(false);
 
 		if (!string.IsNullOrEmpty(customHooksPath))
@@ -201,7 +217,8 @@ public static class HookRepairer
 				"custom core.hooksPath in use");
 		}
 
-		string? hooksDir = await HookInstaller.TryGetHooksDirAsync(repo, cancellationToken)
+		string? hooksDir = await HookInstaller
+			.TryGetHooksDirAsync(repo, cancellationToken)
 			.ConfigureAwait(false);
 
 		if (hooksDir is null)
@@ -213,18 +230,26 @@ public static class HookRepairer
 				"could not resolve hooks directory");
 		}
 
-		string hookPath = Path.Combine(hooksDir, HookInstaller.HookName);
+		string hookPath = Path.Combine(hooksDir, HookInstaller.HOOK_NAME);
 
 		if (!File.Exists(hookPath))
 		{
-			return new HookRepairResult(repo, hookPath, HookRepairOutcome.NoHook);
+			return new HookRepairResult(
+				repo,
+				hookPath,
+				HookRepairOutcome.NoHook);
 		}
 
-		string content = await File.ReadAllTextAsync(hookPath, cancellationToken).ConfigureAwait(false);
+		string content = await File
+			.ReadAllTextAsync(hookPath, cancellationToken)
+			.ConfigureAwait(false);
 
 		if (HookInstaller.IsCurrentTrampoline(content))
 		{
-			return new HookRepairResult(repo, hookPath, HookRepairOutcome.AlreadyCurrent);
+			return new HookRepairResult(
+				repo,
+				hookPath,
+				HookRepairOutcome.AlreadyCurrent);
 		}
 
 		if (!HookInstaller.IsCommittyManaged(content))
@@ -238,7 +263,10 @@ public static class HookRepairer
 
 		if (dryRun)
 		{
-			return new HookRepairResult(repo, hookPath, HookRepairOutcome.Updated);
+			return new HookRepairResult(
+				repo,
+				hookPath,
+				HookRepairOutcome.Updated);
 		}
 
 		if (backup)
@@ -246,7 +274,8 @@ public static class HookRepairer
 			File.Copy(hookPath, hookPath + ".bak", true);
 		}
 
-		await HookInstaller.WriteTrampolineAsync(hooksDir, cancellationToken).ConfigureAwait(false);
+		await HookInstaller.WriteTrampolineAsync(hooksDir, cancellationToken)
+			.ConfigureAwait(false);
 
 		return new HookRepairResult(repo, hookPath, HookRepairOutcome.Updated);
 	}
@@ -263,16 +292,19 @@ public static class HookRepairer
 			switch (result.Outcome)
 			{
 				case HookRepairOutcome.Updated:
-					await output.WriteLineAsync($"  ✓ {verb}: {result.Repo}").ConfigureAwait(false);
+					await output.WriteLineAsync($"  ✓ {verb}: {result.Repo}")
+						.ConfigureAwait(false);
 
 					break;
 				case HookRepairOutcome.SkippedForeign:
-					await output.WriteLineAsync($"  — skipped (foreign): {result.Repo} [{result.Detail}]")
+					await output.WriteLineAsync(
+							$"  — skipped (foreign): {result.Repo} [{result.Detail}]")
 						.ConfigureAwait(false);
 
 					break;
 				case HookRepairOutcome.Error:
-					await output.WriteLineAsync($"  ! error: {result.Repo} [{result.Detail}]")
+					await output.WriteLineAsync(
+							$"  ! error: {result.Repo} [{result.Detail}]")
 						.ConfigureAwait(false);
 
 					break;
@@ -281,14 +313,20 @@ public static class HookRepairer
 					break;
 				default:
 #pragma warning disable CA2208
-					throw new ArgumentOutOfRangeException(nameof(result.Outcome), result.Outcome, "Unexpected outcome");
+					throw new ArgumentOutOfRangeException(
+						nameof(result.Outcome),
+						result.Outcome,
+						"Unexpected outcome");
 #pragma warning restore CA2208
 			}
 		}
 
-		int updated = results.Count(r => r.Outcome == HookRepairOutcome.Updated);
-		int current = results.Count(r => r.Outcome == HookRepairOutcome.AlreadyCurrent);
-		int foreign = results.Count(r => r.Outcome == HookRepairOutcome.SkippedForeign);
+		int updated =
+			results.Count(r => r.Outcome == HookRepairOutcome.Updated);
+		int current =
+			results.Count(r => r.Outcome == HookRepairOutcome.AlreadyCurrent);
+		int foreign =
+			results.Count(r => r.Outcome == HookRepairOutcome.SkippedForeign);
 		int none = results.Count(r => r.Outcome == HookRepairOutcome.NoHook);
 		int errors = results.Count(r => r.Outcome == HookRepairOutcome.Error);
 
@@ -306,12 +344,18 @@ public static class HookRepairer
 		TextWriter output,
 		CancellationToken cancellationToken = default)
 	{
-		List<string> repos = await CollectReposAsync(scanRoots, gitDirs, output, cancellationToken)
+		List<string> repos = await CollectReposAsync(
+				scanRoots,
+				gitDirs,
+				output,
+				cancellationToken)
 			.ConfigureAwait(false);
 
 		if (repos.Count == 0)
 		{
-			if (scanRoots.Count == 0 && gitDirs.Count == 0 && currentRepoRequired)
+			if (scanRoots.Count == 0
+				&& gitDirs.Count == 0
+				&& currentRepoRequired)
 			{
 				await output.WriteLineAsync(
 						"Error: not inside a git repository. Run from a repo, or pass --scan <dir> to sweep, --git-dir <dir> for a headless repo, or --global.")
@@ -320,7 +364,8 @@ public static class HookRepairer
 				return 1;
 			}
 
-			await output.WriteLineAsync("No repositories to repair.").ConfigureAwait(false);
+			await output.WriteLineAsync("No repositories to repair.")
+				.ConfigureAwait(false);
 
 			return 0;
 		}

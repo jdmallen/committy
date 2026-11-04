@@ -31,6 +31,7 @@ public sealed class ChatCompletionClientFactory(HttpClient httpClient)
 					config.OpenAI!.BaseUrl!,
 					config.OpenAI.Model,
 					config.OpenAI.ApiKey)),
-			_ => throw new InvalidOperationException($"Unsupported provider: {config.Provider}"),
+			_ => throw new InvalidOperationException(
+				$"Unsupported provider: {config.Provider}"),
 		};
 }

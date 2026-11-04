@@ -10,7 +10,7 @@ namespace Committy;
 /// </summary>
 public static class CommittyService
 {
-	private static bool _clipboardWarningShown;
+	private static bool s_clipboardWarningShown;
 
 	public static async Task CopyToClipboardAsync(
 		string text,
@@ -18,18 +18,19 @@ public static class CommittyService
 	{
 		try
 		{
-			await ClipboardService.SetTextAsync(text, cancellationToken).ConfigureAwait(false);
+			await ClipboardService.SetTextAsync(text, cancellationToken)
+				.ConfigureAwait(false);
 		}
 		catch (Exception)
 		{
 			// Don't fail the entire operation if clipboard fails
 			// Only show warning once to avoid spam
-			if (!_clipboardWarningShown)
+			if (!s_clipboardWarningShown)
 			{
 				await Console.Error.WriteLineAsync(
 						"Warning: Clipboard functionality not available on this system. If running Linux, try installing `xsel` package.")
 					.ConfigureAwait(false);
-				_clipboardWarningShown = true;
+				s_clipboardWarningShown = true;
 			}
 		}
 	}
@@ -43,9 +44,11 @@ public static class CommittyService
 				"No input data available. Please pipe git patch data to stdin.");
 		}
 
-		using var reader = new StreamReader(Console.OpenStandardInput(), Console.InputEncoding);
+		using var reader = new StreamReader(
+			Console.OpenStandardInput(),
+			Console.InputEncoding);
 
-		return await reader.ReadToEndAsync(cancellationToken).ConfigureAwait(false);
-
+		return await reader.ReadToEndAsync(cancellationToken)
+			.ConfigureAwait(false);
 	}
 }

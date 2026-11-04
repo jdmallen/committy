@@ -14,14 +14,17 @@ public class HookRepairerTests
 	[Theory]
 	[InlineData(OLD_HOOK, true)]
 	[InlineData(FOREIGN_HOOK, false)]
-	public void IsCommittyManaged_DetectsCommittyHooks(string content, bool expected)
-	{
-		Assert.Equal(expected, HookInstaller.IsCommittyManaged(content));
-	}
+	public void IsCommittyManaged_DetectsCommittyHooks(
+		string content,
+		bool expected) => Assert.Equal(
+		expected,
+		HookInstaller.IsCommittyManaged(content));
 
 	private static async Task<string> NewRepoAsync()
 	{
-		string dir = Path.Combine(Path.GetTempPath(), "committy-repair-" + Path.GetRandomFileName());
+		string dir = Path.Combine(
+			Path.GetTempPath(),
+			"committy-repair-" + Path.GetRandomFileName());
 		Directory.CreateDirectory(dir);
 
 		// Init with an empty template so a globally-configured hook template doesn't
@@ -41,7 +44,9 @@ public class HookRepairerTests
 	/// </summary>
 	private static async Task<string> NewHeadlessGitDirAsync()
 	{
-		string root = Path.Combine(Path.GetTempPath(), "committy-headless-" + Path.GetRandomFileName());
+		string root = Path.Combine(
+			Path.GetTempPath(),
+			"committy-headless-" + Path.GetRandomFileName());
 		string workTree = Path.Combine(root, "work");
 		string gitDir = Path.Combine(root, "gitdir");
 		Directory.CreateDirectory(workTree);
@@ -50,7 +55,10 @@ public class HookRepairerTests
 		Directory.CreateDirectory(emptyTemplate);
 		await Cli.Wrap("git")
 			.WithArguments(
-				["-C", workTree, "init", $"--separate-git-dir={gitDir}", $"--template={emptyTemplate}"])
+			[
+				"-C", workTree, "init", $"--separate-git-dir={gitDir}",
+				$"--template={emptyTemplate}",
+			])
 			.ExecuteBufferedAsync();
 
 		return gitDir;
@@ -73,7 +81,8 @@ public class HookRepairerTests
 	public void IsCommittyManaged_DetectsCurrentTrampoline()
 	{
 		Assert.True(HookInstaller.IsCommittyManaged(HookInstaller.Trampoline));
-		Assert.True(HookInstaller.IsCurrentTrampoline(HookInstaller.Trampoline));
+		Assert.True(
+			HookInstaller.IsCurrentTrampoline(HookInstaller.Trampoline));
 	}
 
 	[Fact]
@@ -84,7 +93,8 @@ public class HookRepairerTests
 		{
 			WriteHook(repo, HookInstaller.Trampoline);
 
-			HookRepairResult result = await HookRepairer.RepairRepoAsync(repo, false, false);
+			HookRepairResult result =
+				await HookRepairer.RepairRepoAsync(repo, false, false);
 
 			Assert.Equal(HookRepairOutcome.AlreadyCurrent, result.Outcome);
 		}
@@ -104,8 +114,12 @@ public class HookRepairerTests
 
 			await HookRepairer.RepairRepoAsync(repo, false, true);
 
-			Assert.Equal(OLD_HOOK, await File.ReadAllTextAsync(hookPath + ".bak"));
-			Assert.Equal(HookInstaller.Trampoline.Trim(), (await File.ReadAllTextAsync(hookPath)).Trim());
+			Assert.Equal(
+				OLD_HOOK,
+				await File.ReadAllTextAsync(hookPath + ".bak"));
+			Assert.Equal(
+				HookInstaller.Trampoline.Trim(),
+				(await File.ReadAllTextAsync(hookPath)).Trim());
 		}
 		finally
 		{
@@ -121,7 +135,8 @@ public class HookRepairerTests
 		{
 			string hookPath = WriteHook(repo, OLD_HOOK);
 
-			HookRepairResult result = await HookRepairer.RepairRepoAsync(repo, true, false);
+			HookRepairResult result =
+				await HookRepairer.RepairRepoAsync(repo, true, false);
 
 			Assert.Equal(HookRepairOutcome.Updated, result.Outcome);
 			Assert.Equal(OLD_HOOK, await File.ReadAllTextAsync(hookPath));
@@ -140,7 +155,8 @@ public class HookRepairerTests
 		{
 			string hookPath = WriteHook(repo, FOREIGN_HOOK);
 
-			HookRepairResult result = await HookRepairer.RepairRepoAsync(repo, false, false);
+			HookRepairResult result =
+				await HookRepairer.RepairRepoAsync(repo, false, false);
 
 			Assert.Equal(HookRepairOutcome.SkippedForeign, result.Outcome);
 			Assert.Equal(FOREIGN_HOOK, await File.ReadAllTextAsync(hookPath));
@@ -157,7 +173,8 @@ public class HookRepairerTests
 		string repo = await NewRepoAsync();
 		try
 		{
-			HookRepairResult result = await HookRepairer.RepairRepoAsync(repo, false, false);
+			HookRepairResult result =
+				await HookRepairer.RepairRepoAsync(repo, false, false);
 
 			Assert.Equal(HookRepairOutcome.NoHook, result.Outcome);
 		}
@@ -173,14 +190,20 @@ public class HookRepairerTests
 		string gitDir = await NewHeadlessGitDirAsync();
 		try
 		{
-			string hookPath = Path.Combine(gitDir, "hooks", "prepare-commit-msg");
+			string hookPath = Path.Combine(
+				gitDir,
+				"hooks",
+				"prepare-commit-msg");
 			Directory.CreateDirectory(Path.GetDirectoryName(hookPath)!);
 			await File.WriteAllTextAsync(hookPath, OLD_HOOK);
 
-			HookRepairResult result = await HookRepairer.RepairRepoAsync(gitDir, false, false);
+			HookRepairResult result =
+				await HookRepairer.RepairRepoAsync(gitDir, false, false);
 
 			Assert.Equal(HookRepairOutcome.Updated, result.Outcome);
-			Assert.Equal(HookInstaller.Trampoline.Trim(), (await File.ReadAllTextAsync(hookPath)).Trim());
+			Assert.Equal(
+				HookInstaller.Trampoline.Trim(),
+				(await File.ReadAllTextAsync(hookPath)).Trim());
 		}
 		finally
 		{
@@ -194,7 +217,10 @@ public class HookRepairerTests
 		string gitDir = await NewHeadlessGitDirAsync();
 		try
 		{
-			string hookPath = Path.Combine(gitDir, "hooks", "prepare-commit-msg");
+			string hookPath = Path.Combine(
+				gitDir,
+				"hooks",
+				"prepare-commit-msg");
 			Directory.CreateDirectory(Path.GetDirectoryName(hookPath)!);
 			await File.WriteAllTextAsync(hookPath, OLD_HOOK);
 			var output = new StringWriter();
@@ -208,7 +234,9 @@ public class HookRepairerTests
 				output);
 
 			Assert.Equal(0, code);
-			Assert.Equal(HookInstaller.Trampoline.Trim(), (await File.ReadAllTextAsync(hookPath)).Trim());
+			Assert.Equal(
+				HookInstaller.Trampoline.Trim(),
+				(await File.ReadAllTextAsync(hookPath)).Trim());
 		}
 		finally
 		{
@@ -219,7 +247,9 @@ public class HookRepairerTests
 	[Fact]
 	public async Task RunAsync_NonGitDirTarget_IsSkippedWithMessage()
 	{
-		string dir = Path.Combine(Path.GetTempPath(), "committy-notrepo-" + Path.GetRandomFileName());
+		string dir = Path.Combine(
+			Path.GetTempPath(),
+			"committy-notrepo-" + Path.GetRandomFileName());
 		Directory.CreateDirectory(dir);
 		try
 		{
@@ -243,17 +273,21 @@ public class HookRepairerTests
 	}
 
 	[Fact]
-	public async Task RepairRepoAsync_StaleCommittyHook_IsReplacedWithTrampoline()
+	public async Task
+		RepairRepoAsync_StaleCommittyHook_IsReplacedWithTrampoline()
 	{
 		string repo = await NewRepoAsync();
 		try
 		{
 			string hookPath = WriteHook(repo, OLD_HOOK);
 
-			HookRepairResult result = await HookRepairer.RepairRepoAsync(repo, false, false);
+			HookRepairResult result =
+				await HookRepairer.RepairRepoAsync(repo, false, false);
 
 			Assert.Equal(HookRepairOutcome.Updated, result.Outcome);
-			Assert.Equal(HookInstaller.Trampoline.Trim(), (await File.ReadAllTextAsync(hookPath)).Trim());
+			Assert.Equal(
+				HookInstaller.Trampoline.Trim(),
+				(await File.ReadAllTextAsync(hookPath)).Trim());
 		}
 		finally
 		{

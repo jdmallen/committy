@@ -13,7 +13,7 @@ public interface IUserEnvironment
 	/// </summary>
 	bool CanPersist { get; }
 
-	string? Get(string name);
+	string? GetVariable(string name);
 
 	/// <summary>
 	/// Saves the variable for the user and sets it for this process, so it
@@ -26,7 +26,7 @@ public sealed class SystemUserEnvironment : IUserEnvironment
 {
 	public bool CanPersist => OperatingSystem.IsWindows();
 
-	public string? Get(string name) => Environment.GetEnvironmentVariable(name);
+	public string? GetVariable(string name) => Environment.GetEnvironmentVariable(name);
 
 	public void SetPersistent(string name, string value)
 	{
@@ -35,7 +35,10 @@ public sealed class SystemUserEnvironment : IUserEnvironment
 			throw new PlatformNotSupportedException();
 		}
 
-		Environment.SetEnvironmentVariable(name, value, EnvironmentVariableTarget.User);
+		Environment.SetEnvironmentVariable(
+			name,
+			value,
+			EnvironmentVariableTarget.User);
 		Environment.SetEnvironmentVariable(name, value);
 	}
 }
@@ -63,9 +66,10 @@ public sealed class ApiKeySetup(
 	string? shellPath,
 	bool isLinux = false)
 {
-	public const string ENVIRONMENT_D_FILE = "~/.config/environment.d/committy.conf";
+	public const string ENVIRONMENT_D_FILE =
+		"~/.config/environment.d/committy.conf";
 
-	internal const string KEY_PLACEHOLDER = "<your-key>";
+	private const string KEY_PLACEHOLDER = "<your-key>";
 
 	/// <summary>
 	/// Reports on <paramref name="variable" /> and collects a key to persist.
@@ -88,14 +92,15 @@ public sealed class ApiKeySetup(
 		string? storedGitKey,
 		bool interactive)
 	{
-		bool isSet = !string.IsNullOrEmpty(environment.Get(variable));
+		bool isSet = !string.IsNullOrEmpty(environment.GetVariable(variable));
 		output.WriteLine();
 		output.WriteLine("API key:");
 		output.WriteLine($"  {variable} is {(isSet ? "set" : "not set")}.");
 
 		if (optional)
 		{
-			output.WriteLine("  Optional: most self-hosted servers don't check a key.");
+			output.WriteLine(
+				"  Optional: most self-hosted servers don't check a key.");
 		}
 
 		if (storedGitKey is not null)
@@ -118,7 +123,9 @@ public sealed class ApiKeySetup(
 				return flagKey.Trim();
 			}
 
-			return interactive ? AskForKeyToPersist(variable, !isSet && !optional) : null;
+			return interactive
+				? AskForKeyToPersist(variable, !isSet && !optional)
+				: null;
 		}
 
 		if (!string.IsNullOrWhiteSpace(flagKey))
@@ -153,14 +160,15 @@ public sealed class ApiKeySetup(
 		string hint = defaultYes ? "[Y/n]" : "[y/N]";
 		while (true)
 		{
-			output.Write($"  Save {variable} as a Windows user environment variable now? {hint} ");
+			output.Write(
+				$"  Save {variable} as a Windows user environment variable now? {hint} ");
 			string? answer = readLine()?.Trim().ToLowerInvariant();
 			bool? save = answer switch
 			{
-				null or ""   => defaultYes,
+				null or "" => defaultYes,
 				"y" or "yes" => true,
-				"n" or "no"  => false,
-				_            => null,
+				"n" or "no" => false,
+				_ => null,
 			};
 
 			if (save is false)
@@ -190,7 +198,9 @@ public sealed class ApiKeySetup(
 
 	private void WriteStartupInstructions(string variable)
 	{
-		(string line, string? startupFile) = StartupLine(ShellName(shellPath), variable);
+		(string line, string? startupFile) = StartupLine(
+			ShellName(shellPath),
+			variable);
 		output.WriteLine(
 			startupFile is null
 				? $"  Run this once, replacing {KEY_PLACEHOLDER} with your key. Fish remembers it across sessions, so no startup file is needed:"
@@ -208,7 +218,8 @@ public sealed class ApiKeySetup(
 		output.WriteLine();
 		output.WriteLine(
 			"  Commits from desktop apps (git GUIs, some IDEs) may not see that file. In a");
-		output.WriteLine("  systemd desktop session such as GNOME, also add this line to");
+		output.WriteLine(
+			"  systemd desktop session such as GNOME, also add this line to");
 		output.WriteLine(
 			$"  {ENVIRONMENT_D_FILE}, chmod 600 it, and log out and back");
 		output.WriteLine("  in. committy must be on that session's PATH too:");
@@ -229,7 +240,8 @@ public sealed class ApiKeySetup(
 		}
 
 		string trimmedPath = shellPath.Trim();
-		string fileName = trimmedPath[(trimmedPath.LastIndexOfAny(['/', '\\']) + 1)..];
+		string fileName =
+			trimmedPath[(trimmedPath.LastIndexOfAny(['/', '\\']) + 1)..];
 
 		return Path.GetFileNameWithoutExtension(fileName).ToLowerInvariant();
 	}
@@ -239,20 +251,24 @@ public sealed class ApiKeySetup(
 	/// startup file it belongs in; a null file means the line is run once
 	/// instead (fish's universal variables persist on their own).
 	/// </summary>
-	public static (string Line, string? StartupFile) StartupLine(string shellName, string variable)
+	public static (string Line, string? StartupFile) StartupLine(
+		string shellName,
+		string variable)
 	{
 		const string value = $"'{KEY_PLACEHOLDER}'";
 
 		return shellName switch
 		{
-			"fish"                 => ($"set -Ux {variable} {value}", null),
-			"zsh"                  => ($"export {variable}={value}", "~/.zshrc"),
-			"bash"                 => ($"export {variable}={value}", "~/.bashrc"),
-			"tcsh"                 => ($"setenv {variable} {value}", "~/.tcshrc"),
-			"csh"                  => ($"setenv {variable} {value}", "~/.cshrc"),
-			"pwsh" or "powershell" => ($"$env:{variable} = {value}", "$PROFILE"),
-			"nu"                   => ($"$env.{variable} = {value}", "$nu.env-path"),
-			"elvish"               => ($"set E:{variable} = {value}", "~/.config/elvish/rc.elv"),
+			"fish" => ($"set -Ux {variable} {value}", null),
+			"zsh" => ($"export {variable}={value}", "~/.zshrc"),
+			"bash" => ($"export {variable}={value}", "~/.bashrc"),
+			"tcsh" => ($"setenv {variable} {value}", "~/.tcshrc"),
+			"csh" => ($"setenv {variable} {value}", "~/.cshrc"),
+			"pwsh" or "powershell" => ($"$env:{variable} = {value}",
+				"$PROFILE"),
+			"nu" => ($"$env.{variable} = {value}", "$nu.env-path"),
+			"elvish" => ($"set E:{variable} = {value}",
+				"~/.config/elvish/rc.elv"),
 			"ksh" or "ksh93" or "mksh" or "lksh" or "oksh" or "pdksh"
 				=> ($"export {variable}={value}", "~/.kshrc"),
 			"sh" or "dash" or "ash" or "posh" or "yash"

@@ -10,7 +10,8 @@ public class CommitMessageComposerTests
 	{
 		const string message = "feat: add thing\r\n\r\nDetail.";
 
-		string result = CommitMessageComposer.Compose([message], false, EXISTING);
+		string result =
+			CommitMessageComposer.Compose([message], false, EXISTING);
 
 		Assert.DoesNotContain("\r", result);
 		Assert.StartsWith("feat: add thing\n\nDetail.\n", result);
@@ -19,9 +20,11 @@ public class CommitMessageComposerTests
 	[Fact]
 	public void Compose_TitleAndBody_PrefillsMessageAboveExistingContent()
 	{
-		const string message = "feat(auth): add OAuth2\n\nReplace the password flow with OAuth2.";
+		const string message =
+			"feat(auth): add OAuth2\n\nReplace the password flow with OAuth2.";
 
-		string result = CommitMessageComposer.Compose([message], false, EXISTING);
+		string result =
+			CommitMessageComposer.Compose([message], false, EXISTING);
 
 		// Message comes first, then a blank line, then git's template.
 		Assert.StartsWith(
@@ -43,7 +46,8 @@ public class CommitMessageComposerTests
 			"chore: bump deps",
 		];
 
-		string result = CommitMessageComposer.Compose(suggestions, true, EXISTING);
+		string result =
+			CommitMessageComposer.Compose(suggestions, true, EXISTING);
 
 		foreach (string suggestion in suggestions)
 		{
@@ -58,7 +62,10 @@ public class CommitMessageComposerTests
 	[Fact]
 	public void Compose_TitlesOnly_EmptyExisting_DoesNotThrow()
 	{
-		string result = CommitMessageComposer.Compose(["feat: x"], true, string.Empty);
+		string result = CommitMessageComposer.Compose(
+			["feat: x"],
+			true,
+			string.Empty);
 
 		Assert.Contains("# feat: x", result);
 		Assert.EndsWith("# Or write your own commit message above\n", result);

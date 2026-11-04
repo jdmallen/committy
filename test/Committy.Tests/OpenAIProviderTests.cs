@@ -12,8 +12,9 @@ public class OpenAIProviderTests
 	private static OpenAIConfig Config(
 		string? baseUrl = BASE_URL,
 		string model = MODEL,
-		int timeoutSeconds = CommittyConfigResolver.DefaultOpenAITimeoutSeconds,
-		int maxTokens = CommittyConfigResolver.DefaultOpenAIMaxTokens,
+		int timeoutSeconds =
+			CommittyConfigResolver.DEFAULT_OPEN_AI_TIMEOUT_SECONDS,
+		int maxTokens = CommittyConfigResolver.DEFAULT_OPEN_AI_MAX_TOKENS,
 		string? apiKey = null) =>
 		new()
 		{
@@ -33,9 +34,7 @@ public class OpenAIProviderTests
 
 	[Fact]
 	public void Validate_Complete_ReturnsNull()
-	{
-		Assert.Null(Wrap(Config()).Validate());
-	}
+		=> Assert.Null(Wrap(Config()).Validate());
 
 	[Fact]
 	public void Validate_MissingApiKey_IsAllowed()
@@ -53,35 +52,28 @@ public class OpenAIProviderTests
 	[InlineData("")]
 	[InlineData("   ")]
 	public void Validate_MissingBaseUrl_ReturnsError(string? baseUrl)
-	{
-		Assert.Contains("base URL is required", Config(baseUrl: baseUrl).Validate());
-	}
+		=> Assert.Contains("base URL is required", Config(baseUrl).Validate());
 
 	[Fact]
-	public void Validate_MissingModel_ReturnsError()
-	{
-		Assert.Contains("model is required", Config(model: "").Validate());
-	}
+	public void Validate_MissingModel_ReturnsError() => Assert.Contains(
+		"model is required",
+		Config(model: "").Validate());
 
 	[Theory]
 	[InlineData(0)]
 	[InlineData(-5)]
 	public void Validate_NonPositiveTimeout_ReturnsError(int timeoutSeconds)
-	{
-		Assert.Contains(
+		=> Assert.Contains(
 			"timeout must be greater than 0",
 			Config(timeoutSeconds: timeoutSeconds).Validate());
-	}
 
 	[Theory]
 	[InlineData(0)]
 	[InlineData(-5)]
 	public void Validate_NonPositiveMaxTokens_ReturnsError(int maxTokens)
-	{
-		Assert.Contains(
+		=> Assert.Contains(
 			"max tokens must be greater than 0",
 			Config(maxTokens: maxTokens).Validate());
-	}
 
 	[Fact]
 	public void Validate_MissingOpenAISection_ReturnsError()
@@ -92,26 +84,27 @@ public class OpenAIProviderTests
 	}
 
 	[Fact]
-	public void TimeoutSeconds_OpenAI_ComesFromConfig()
-	{
-		Assert.Equal(120, Wrap(Config(timeoutSeconds: 120)).TimeoutSeconds);
-	}
+	public void TimeoutSeconds_OpenAI_ComesFromConfig() => Assert.Equal(
+		120,
+		Wrap(Config(timeoutSeconds: 120)).TimeoutSeconds);
 
 	[Theory]
 	[InlineData(Provider.Azure)]
 	[InlineData(Provider.Anthropic)]
-	public void TimeoutSeconds_HostedProviders_KeepTheShortDefault(Provider provider)
+	public void TimeoutSeconds_HostedProviders_KeepTheShortDefault(
+		Provider provider)
 	{
 		var config = new CommittyConfig { Provider = provider };
 
-		Assert.Equal(CommittyConfig.DefaultTimeoutSeconds, config.TimeoutSeconds);
+		Assert.Equal(
+			CommittyConfig.DEFAULT_TIMEOUT_SECONDS,
+			config.TimeoutSeconds);
 	}
 
 	[Fact]
-	public void MaxTokensOverride_OpenAI_ComesFromConfig()
-	{
-		Assert.Equal(4096, Wrap(Config(maxTokens: 4096)).MaxTokensOverride);
-	}
+	public void MaxTokensOverride_OpenAI_ComesFromConfig() => Assert.Equal(
+		4096,
+		Wrap(Config(maxTokens: 4096)).MaxTokensOverride);
 
 	[Fact]
 	public void MaxTokensOverride_Anthropic_IsNull()
@@ -125,7 +118,9 @@ public class OpenAIProviderTests
 	[InlineData(Provider.Azure, "azure")]
 	[InlineData(Provider.Anthropic, "anthropic")]
 	[InlineData(Provider.OpenAI, "openai")]
-	public void ProviderName_RoundTripsThroughParseProvider(Provider provider, string expected)
+	public void ProviderName_RoundTripsThroughParseProvider(
+		Provider provider,
+		string expected)
 	{
 		string name = CommittyConfigResolver.ProviderName(provider);
 
@@ -150,9 +145,12 @@ public class CommitMessagePromptTests
 	[Theory]
 	[InlineData(true, 100)]
 	[InlineData(false, 500)]
-	public void Build_NoOverride_UsesThePerModeDefault(bool titlesOnly, int expected)
+	public void Build_NoOverride_UsesThePerModeDefault(
+		bool titlesOnly,
+		int expected)
 	{
-		CompletionRequest request = CommitMessagePrompt.Build("diff", titlesOnly);
+		CompletionRequest request =
+			CommitMessagePrompt.Build("diff", titlesOnly);
 
 		Assert.Equal(expected, request.MaxTokens);
 	}
@@ -164,7 +162,8 @@ public class CommitMessagePromptTests
 	{
 		// A reasoning model spends the budget on a discarded thinking block, so
 		// the 100-token titles default has to be overridable.
-		CompletionRequest request = CommitMessagePrompt.Build("diff", titlesOnly, 2048);
+		CompletionRequest request =
+			CommitMessagePrompt.Build("diff", titlesOnly, 2048);
 
 		Assert.Equal(2048, request.MaxTokens);
 	}

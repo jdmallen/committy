@@ -24,25 +24,18 @@ public class AzureProviderTests
 
 	[Fact]
 	public void MaxTokensOverride_NotReasoning_KeepsThePromptDefault()
-	{
-		Assert.Null(Wrap().MaxTokensOverride);
-	}
+		=> Assert.Null(Wrap().MaxTokensOverride);
 
 	[Fact]
-	public void MaxTokensOverride_Reasoning_DefaultsHigher()
-	{
-		Assert.Equal(
-			CommittyConfigResolver.DefaultAzureReasoningMaxTokens,
-			Wrap(reasoningModel: true).MaxTokensOverride);
-	}
+	public void MaxTokensOverride_Reasoning_DefaultsHigher() => Assert.Equal(
+		CommittyConfigResolver.DEFAULT_AZURE_REASONING_MAX_TOKENS,
+		Wrap(true).MaxTokensOverride);
 
 	[Theory]
 	[InlineData(false)]
 	[InlineData(true)]
 	public void MaxTokensOverride_Configured_Wins(bool reasoningModel)
-	{
-		Assert.Equal(4096, Wrap(reasoningModel, 4096).MaxTokensOverride);
-	}
+		=> Assert.Equal(4096, Wrap(reasoningModel, 4096).MaxTokensOverride);
 
 	[Theory]
 	[InlineData("y", "true")]
@@ -53,10 +46,11 @@ public class AzureProviderTests
 	[InlineData("false", "false")]
 	[InlineData("maybe", null)]
 	[InlineData(null, null)]
-	public void NormalizeBool_AcceptsYesNoCaseInsensitively(string? input, string? expected)
-	{
-		Assert.Equal(expected, CommittyConfigResolver.NormalizeBool(input));
-	}
+	public void NormalizeBool_AcceptsYesNoCaseInsensitively(
+		string? input,
+		string? expected) => Assert.Equal(
+		expected,
+		CommittyConfigResolver.NormalizeBool(input));
 
 	[Theory]
 	[InlineData("2048", 2048)]
@@ -64,26 +58,29 @@ public class AzureProviderTests
 	[InlineData("0", null)]
 	[InlineData("abc", null)]
 	[InlineData(null, null)]
-	public void ParseOptionalPositiveInt_UnsetOrInvalidIsNull(string? input, int? expected)
-	{
-		Assert.Equal(expected, CommittyConfigResolver.ParseOptionalPositiveInt(input));
-	}
+	public void ParseOptionalPositiveInt_UnsetOrInvalidIsNull(
+		string? input,
+		int? expected) => Assert.Equal(
+		expected,
+		CommittyConfigResolver.ParseOptionalPositiveInt(input));
 
 	[Fact]
-	public async Task Factory_Reasoning_SendsCompletionTokensWithoutTemperature()
+	public async Task
+		Factory_Reasoning_SendsCompletionTokensWithoutTemperature()
 	{
 		var handler = new CapturingHandler();
 		using var http = new HttpClient(handler);
-		CommittyConfig config = Wrap(reasoningModel: true);
-		IChatCompletionClient client = new ChatCompletionClientFactory(http).Create(config);
+		CommittyConfig config = Wrap(true);
+		IChatCompletionClient client =
+			new ChatCompletionClientFactory(http).Create(config);
 
 		await new CommitMessageGenerator(client, config.MaxTokensOverride)
-			.GenerateAsync("diff --git a/x b/x", titlesOnly: true);
+			.GenerateAsync("diff --git a/x b/x", true);
 
 		using JsonDocument body = JsonDocument.Parse(handler.RequestBody!);
 		JsonElement root = body.RootElement;
 		Assert.Equal(
-			CommittyConfigResolver.DefaultAzureReasoningMaxTokens,
+			CommittyConfigResolver.DEFAULT_AZURE_REASONING_MAX_TOKENS,
 			root.GetProperty("max_completion_tokens").GetInt32());
 		Assert.False(root.TryGetProperty("max_tokens", out _));
 		Assert.False(root.TryGetProperty("temperature", out _));
@@ -95,10 +92,11 @@ public class AzureProviderTests
 		var handler = new CapturingHandler();
 		using var http = new HttpClient(handler);
 		CommittyConfig config = Wrap();
-		IChatCompletionClient client = new ChatCompletionClientFactory(http).Create(config);
+		IChatCompletionClient client =
+			new ChatCompletionClientFactory(http).Create(config);
 
 		await new CommitMessageGenerator(client, config.MaxTokensOverride)
-			.GenerateAsync("diff --git a/x b/x", titlesOnly: false);
+			.GenerateAsync("diff --git a/x b/x", false);
 
 		using JsonDocument body = JsonDocument.Parse(handler.RequestBody!);
 		Assert.True(body.RootElement.TryGetProperty("temperature", out _));

@@ -9,7 +9,9 @@ public class ApiKeySetupTests
 	private readonly Queue<string?> _lines = new();
 	private readonly Queue<string?> _secrets = new();
 
-	private ApiKeySetup NewSetup(string? shellPath = "/usr/bin/zsh", bool isLinux = false) =>
+	private ApiKeySetup NewSetup(
+		string? shellPath = "/usr/bin/zsh",
+		bool isLinux = false) =>
 		new(
 			_environment,
 			_output,
@@ -23,9 +25,15 @@ public class ApiKeySetupTests
 	{
 		_environment.Variables[VARIABLE] = "super-secret";
 
-		NewSetup().Run(VARIABLE, false, null, null, true);
+		NewSetup()
+		.Run(
+			VARIABLE,
+			false,
+			null,
+			null,
+			true);
 
-		string output = _output.ToString();
+		var output = _output.ToString();
 		Assert.Contains($"{VARIABLE} is set.", output);
 		Assert.DoesNotContain("super-secret", output);
 	}
@@ -35,7 +43,12 @@ public class ApiKeySetupTests
 	{
 		ApiKeySetup setup = NewSetup();
 
-		string? pending = setup.Run(VARIABLE, false, null, null, true);
+		string? pending = setup.Run(
+			VARIABLE,
+			false,
+			null,
+			null,
+			true);
 		setup.Apply(VARIABLE, pending);
 
 		Assert.Null(pending);
@@ -49,7 +62,13 @@ public class ApiKeySetupTests
 	{
 		_environment.Variables[VARIABLE] = "k";
 
-		NewSetup().Run(VARIABLE, false, null, null, true);
+		NewSetup()
+		.Run(
+			VARIABLE,
+			false,
+			null,
+			null,
+			true);
 
 		Assert.DoesNotContain("export", _output.ToString());
 	}
@@ -59,7 +78,13 @@ public class ApiKeySetupTests
 	{
 		_environment.Variables[VARIABLE] = "k";
 
-		string? pending = NewSetup().Run(VARIABLE, false, "flag-key", null, true);
+		string? pending = NewSetup()
+		.Run(
+			VARIABLE,
+			false,
+			"flag-key",
+			null,
+			true);
 
 		Assert.Null(pending);
 		Assert.Contains("only saved on Windows", _output.ToString());
@@ -74,7 +99,12 @@ public class ApiKeySetupTests
 		_secrets.Enqueue("  typed-key  ");
 		ApiKeySetup setup = NewSetup();
 
-		string? pending = setup.Run(VARIABLE, false, null, null, true);
+		string? pending = setup.Run(
+			VARIABLE,
+			false,
+			null,
+			null,
+			true);
 
 		Assert.Equal("typed-key", pending);
 		Assert.Empty(_environment.Persisted);
@@ -92,7 +122,14 @@ public class ApiKeySetupTests
 		_environment.CanPersist = true;
 		_lines.Enqueue(answer);
 
-		Assert.Null(NewSetup().Run(VARIABLE, false, null, null, true));
+		Assert.Null(
+			NewSetup()
+			.Run(
+				VARIABLE,
+				false,
+				null,
+				null,
+				true));
 		Assert.Empty(_secrets);
 	}
 
@@ -104,7 +141,15 @@ public class ApiKeySetupTests
 		_lines.Enqueue("Y");
 		_secrets.Enqueue("k");
 
-		Assert.Equal("k", NewSetup().Run(VARIABLE, false, null, null, true));
+		Assert.Equal(
+			"k",
+			NewSetup()
+			.Run(
+				VARIABLE,
+				false,
+				null,
+				null,
+				true));
 		Assert.Contains("Please answer y or n.", _output.ToString());
 	}
 
@@ -115,7 +160,14 @@ public class ApiKeySetupTests
 		_environment.Variables[VARIABLE] = "k";
 		_lines.Enqueue("");
 
-		Assert.Null(NewSetup().Run(VARIABLE, false, null, null, true));
+		Assert.Null(
+			NewSetup()
+			.Run(
+				VARIABLE,
+				false,
+				null,
+				null,
+				true));
 		Assert.Contains("[y/N]", _output.ToString());
 	}
 
@@ -124,7 +176,15 @@ public class ApiKeySetupTests
 	{
 		_environment.CanPersist = true;
 
-		Assert.Equal("flag-key", NewSetup().Run(VARIABLE, false, "flag-key", null, false));
+		Assert.Equal(
+			"flag-key",
+			NewSetup()
+			.Run(
+				VARIABLE,
+				false,
+				"flag-key",
+				null,
+				false));
 		Assert.DoesNotContain("Save ", _output.ToString());
 	}
 
@@ -133,27 +193,48 @@ public class ApiKeySetupTests
 	{
 		_environment.CanPersist = true;
 
-		Assert.Null(NewSetup().Run(VARIABLE, false, null, null, false));
+		Assert.Null(
+			NewSetup()
+			.Run(
+				VARIABLE,
+				false,
+				null,
+				null,
+				false));
 		Assert.DoesNotContain("Save ", _output.ToString());
 	}
 
 	[Fact]
 	public void Run_StoredGitKey_OffersRemovalOnlyForTerminalOnlyUse()
 	{
-		NewSetup().Run(VARIABLE, false, null, "committy.azure.apikey", true);
+		NewSetup()
+		.Run(
+			VARIABLE,
+			false,
+			null,
+			"committy.azure.apikey",
+			true);
 
-		string output = _output.ToString();
+		var output = _output.ToString();
 		Assert.Contains("If you only", output);
 		Assert.Contains("desktop", output);
-		Assert.Contains("git config --global --unset committy.azure.apikey", output);
+		Assert.Contains(
+			"git config --global --unset committy.azure.apikey",
+			output);
 	}
 
 	[Fact]
 	public void Run_Linux_Unset_AlsoPointsAtEnvironmentD()
 	{
-		NewSetup(isLinux: true).Run(VARIABLE, false, null, null, true);
+		NewSetup(isLinux: true)
+		.Run(
+			VARIABLE,
+			false,
+			null,
+			null,
+			true);
 
-		string output = _output.ToString();
+		var output = _output.ToString();
 		Assert.Contains(ApiKeySetup.ENVIRONMENT_D_FILE, output);
 		Assert.Contains($"    {VARIABLE}=<your-key>", output);
 	}
@@ -161,7 +242,13 @@ public class ApiKeySetupTests
 	[Fact]
 	public void Run_NotLinux_Unset_DoesNotMentionEnvironmentD()
 	{
-		NewSetup(isLinux: false).Run(VARIABLE, false, null, null, true);
+		NewSetup(isLinux: false)
+		.Run(
+			VARIABLE,
+			false,
+			null,
+			null,
+			true);
 
 		Assert.DoesNotContain("environment.d", _output.ToString());
 	}
@@ -169,7 +256,13 @@ public class ApiKeySetupTests
 	[Fact]
 	public void Run_Optional_SaysSo()
 	{
-		NewSetup().Run("OPENAI_API_KEY_COMMITTY", true, null, null, true);
+		NewSetup()
+		.Run(
+			"OPENAI_API_KEY_COMMITTY",
+			true,
+			null,
+			null,
+			true);
 
 		Assert.Contains("Optional", _output.ToString());
 	}
@@ -177,15 +270,18 @@ public class ApiKeySetupTests
 	[Theory]
 	[InlineData("/usr/bin/fish", "set -Ux V '<your-key>'", null)]
 	[InlineData("/bin/bash", "export V='<your-key>'", "~/.bashrc")]
-	[InlineData("C:\\Program Files\\PowerShell\\7\\pwsh.exe", "$env:V = '<your-key>'", "$PROFILE")]
+	[InlineData(
+		@"C:\Program Files\PowerShell\7\pwsh.exe",
+		"$env:V = '<your-key>'",
+		"$PROFILE")]
 	[InlineData("/usr/bin/nu", "$env.V = '<your-key>'", "$nu.env-path")]
 	[InlineData(null, "export V='<your-key>'", "your shell's startup file")]
-	public void StartupLine_MatchesTheShell(string? shellPath, string line, string? startupFile)
-	{
-		Assert.Equal(
-			(line, startupFile),
-			ApiKeySetup.StartupLine(ApiKeySetup.ShellName(shellPath), "V"));
-	}
+	public void StartupLine_MatchesTheShell(
+		string? shellPath,
+		string line,
+		string? startupFile) => Assert.Equal(
+		(line, startupFile),
+		ApiKeySetup.StartupLine(ApiKeySetup.ShellName(shellPath), "V"));
 
 	private sealed class FakeUserEnvironment : IUserEnvironment
 	{
@@ -195,7 +291,7 @@ public class ApiKeySetupTests
 
 		public bool CanPersist { get; set; }
 
-		public string? Get(string name) => Variables.GetValueOrDefault(name);
+		public string? GetVariable(string name) => Variables.GetValueOrDefault(name);
 
 		public void SetPersistent(string name, string value)
 		{

@@ -1,4 +1,6 @@
 using System.CommandLine;
+using System.Globalization;
+
 using JetBrains.Annotations;
 
 namespace Committy;
@@ -6,10 +8,11 @@ namespace Committy;
 [UsedImplicitly]
 internal class Program
 {
-	private static async Task AppendLinesAsync(string file, IEnumerable<string> lines)
-	{
-		await File.AppendAllTextAsync(file, string.Join('\n', lines) + "\n");
-	}
+	private static async Task AppendLinesAsync(
+		string file,
+		IEnumerable<string> lines) => await File.AppendAllTextAsync(
+		file,
+		string.Join('\n', lines) + "\n");
 
 	/// <summary>
 	/// Persists provider + credentials to git config (global by default, or
@@ -33,7 +36,8 @@ internal class Program
 		};
 		var endpointOption = new Option<string?>("--endpoint", "-e")
 		{
-			Description = "Azure OpenAI endpoint host URL, or the openai base URL",
+			Description =
+				"Azure OpenAI endpoint host URL, or the openai base URL",
 			HelpName = "endpoint URL",
 		};
 		var deploymentOption = new Option<string?>("--deployment", "-d")
@@ -52,7 +56,8 @@ internal class Program
 		};
 		var localOption = new Option<bool>("--local")
 		{
-			Description = "Write to the current repository's git config instead of the global config",
+			Description =
+				"Write to the current repository's git config instead of the global config",
 		};
 
 		var command
@@ -83,7 +88,7 @@ internal class Program
 
 				await SetAsync(
 					written,
-					CommittyConfigResolver.ProviderKey,
+					CommittyConfigResolver.PROVIDER_KEY,
 					CommittyConfigResolver.ProviderName(provider),
 					global,
 					false,
@@ -95,53 +100,57 @@ internal class Program
 					[
 						new ConfigField(
 							"Anthropic model",
-							CommittyConfigResolver.AnthropicModelKey,
+							CommittyConfigResolver.ANTHROPIC_MODEL_KEY,
 							parseResult.GetValue(modelOption),
-							CommittyConfigResolver.DefaultAnthropicModel),
+							CommittyConfigResolver.DEFAULT_ANTHROPIC_MODEL),
 					],
 					Provider.OpenAI =>
 					[
 						new ConfigField(
 							"OpenAI base URL (e.g. http://10.10.0.20:8080/v1)",
-							CommittyConfigResolver.OpenAIBaseUrlKey,
+							CommittyConfigResolver.OPEN_AI_BASE_URL_KEY,
 							parseResult.GetValue(endpointOption)),
 						new ConfigField(
 							"OpenAI model",
-							CommittyConfigResolver.OpenAIModelKey,
+							CommittyConfigResolver.OPEN_AI_MODEL_KEY,
 							parseResult.GetValue(modelOption)),
 						new ConfigField(
 							"OpenAI timeout in seconds",
-							CommittyConfigResolver.OpenAITimeoutKey,
+							CommittyConfigResolver.OPEN_AI_TIMEOUT_KEY,
 							null,
-							CommittyConfigResolver.DefaultOpenAITimeoutSeconds.ToString()),
+							CommittyConfigResolver
+								.DEFAULT_OPEN_AI_TIMEOUT_SECONDS.ToString(
+									CultureInfo.CurrentCulture)),
 						new ConfigField(
 							"OpenAI max tokens",
-							CommittyConfigResolver.OpenAIMaxTokensKey,
+							CommittyConfigResolver.OPEN_AI_MAX_TOKENS_KEY,
 							null,
-							CommittyConfigResolver.DefaultOpenAIMaxTokens.ToString()),
+							CommittyConfigResolver.DEFAULT_OPEN_AI_MAX_TOKENS
+								.ToString(CultureInfo.CurrentCulture)),
 					],
 					_ =>
 					[
 						new ConfigField(
 							"Azure OpenAI endpoint",
-							CommittyConfigResolver.AzureEndpointKey,
+							CommittyConfigResolver.AZURE_ENDPOINT_KEY,
 							parseResult.GetValue(endpointOption)),
 						new ConfigField(
 							"Azure OpenAI deployment",
-							CommittyConfigResolver.AzureDeploymentKey,
+							CommittyConfigResolver.AZURE_DEPLOYMENT_KEY,
 							parseResult.GetValue(deploymentOption),
-							CommittyConfigResolver.DefaultDeployment),
+							CommittyConfigResolver.DEFAULT_DEPLOYMENT),
 						new ConfigField(
 							"Azure reasoning model, e.g. o-series or gpt-5 (y/n)",
-							CommittyConfigResolver.AzureReasoningModelKey,
+							CommittyConfigResolver.AZURE_REASONING_MODEL_KEY,
 							null,
 							"false",
 							Boolean: true),
+
 						// Blank keeps the prompt's own budget, or 2048 for a
 						// reasoning deployment.
 						new ConfigField(
-							$"Azure max tokens (blank for the default; {CommittyConfigResolver.DefaultAzureReasoningMaxTokens} for reasoning models)",
-							CommittyConfigResolver.AzureMaxTokensKey,
+							$"Azure max tokens (blank for the default; {CommittyConfigResolver.DEFAULT_AZURE_REASONING_MAX_TOKENS} for reasoning models)",
+							CommittyConfigResolver.AZURE_MAX_TOKENS_KEY,
 							null),
 					],
 				};
@@ -149,7 +158,10 @@ internal class Program
 				foreach (ConfigField field in fields)
 				{
 					string? current =
-						await GitConfigStore.GetAsync(field.Key, cancellationToken) ?? field.Default;
+						await GitConfigStore.GetAsync(
+							field.Key,
+							cancellationToken)
+						?? field.Default;
 					string? value = Prompt(
 						field.Label,
 						field.FlagValue,
@@ -158,15 +170,21 @@ internal class Program
 
 					if (field.Boolean)
 					{
-						string? normalized = CommittyConfigResolver.NormalizeBool(value);
+						string? normalized =
+							CommittyConfigResolver.NormalizeBool(value);
 						while (normalized is null && !Console.IsInputRedirected)
 						{
 							Console.WriteLine("  Please answer y or n.");
 							normalized = CommittyConfigResolver.NormalizeBool(
-								Prompt(field.Label, null, current, false));
+								Prompt(
+									field.Label,
+									null,
+									current,
+									false));
 						}
 
-						value = normalized ?? CommittyConfigResolver.NormalizeBool(current);
+						value = normalized
+							?? CommittyConfigResolver.NormalizeBool(current);
 					}
 
 					await SetAsync(
@@ -182,7 +200,7 @@ internal class Program
 				{
 					await SetAsync(
 						written,
-						CommittyConfigResolver.TitlesOnlyKey,
+						CommittyConfigResolver.TITLES_ONLY_KEY,
 						"true",
 						global,
 						false,
@@ -195,15 +213,19 @@ internal class Program
 				// on Windows is saved last, once the git config is written.
 				(string apiKeyVariable, string apiKeyGitKey) = provider switch
 				{
-					Provider.Anthropic => (CommittyConfigResolver.ANTHROPIC_API_KEY_ENV,
-						CommittyConfigResolver.AnthropicApiKeyKey),
-					Provider.OpenAI => (CommittyConfigResolver.OPENAI_API_KEY_ENV,
-						CommittyConfigResolver.OpenAIApiKeyKey),
+					Provider.Anthropic => (
+						CommittyConfigResolver.ANTHROPIC_API_KEY_ENV,
+						CommittyConfigResolver.ANTHROPIC_API_KEY_KEY),
+					Provider.OpenAI => (
+						CommittyConfigResolver.OPENAI_API_KEY_ENV,
+						CommittyConfigResolver.OPEN_AI_API_KEY_KEY),
 					_ => (CommittyConfigResolver.AZURE_API_KEY_ENV,
-						CommittyConfigResolver.AzureApiKeyKey),
+						CommittyConfigResolver.AZURE_API_KEY_KEY),
 				};
 				string? storedGitKey =
-					await GitConfigStore.GetAsync(apiKeyGitKey, cancellationToken) is null
+					await GitConfigStore.GetAsync(
+						apiKeyGitKey,
+						cancellationToken) is null
 						? null
 						: apiKeyGitKey;
 				var apiKeySetup = new ApiKeySetup(
@@ -242,7 +264,8 @@ internal class Program
 			"--global",
 			"-g")
 		{
-			Description = "Install as a global hook template for all future repositories",
+			Description =
+				"Install as a global hook template for all future repositories",
 		};
 		var repoArgument = new Argument<string?>("repo")
 		{
@@ -251,7 +274,9 @@ internal class Program
 			Arity = ArgumentArity.ZeroOrOne,
 		};
 
-		var command = new Command("install-hook", "Install the committy git hook (local or global)")
+		var command = new Command(
+			"install-hook",
+			"Install the committy git hook (local or global)")
 		{
 			globalOption,
 			repoArgument,
@@ -305,14 +330,16 @@ internal class Program
 			try
 			{
 				// Nothing staged → no-op, so an empty commit message stays clean.
-				string? patch = await GitService.TryGetStagedDiffAsync(cancellationToken);
+				string? patch =
+					await GitService.TryGetStagedDiffAsync(cancellationToken);
 
 				if (string.IsNullOrWhiteSpace(patch))
 				{
 					return;
 				}
 
-				CommittyConfig config = await ResolveConfigAsync(null, cancellationToken);
+				CommittyConfig config =
+					await ResolveConfigAsync(null, cancellationToken);
 				string? error = config.Validate();
 
 				if (error is not null)
@@ -335,12 +362,20 @@ internal class Program
 						cancellationToken);
 
 				string existing = File.Exists(commitMsgFile)
-					? await File.ReadAllTextAsync(commitMsgFile, cancellationToken)
+					? await File.ReadAllTextAsync(
+						commitMsgFile,
+						cancellationToken)
 					: string.Empty;
 
-				string composed = CommitMessageComposer.Compose(suggestions, config.TitlesOnly, existing);
+				string composed = CommitMessageComposer.Compose(
+					suggestions,
+					config.TitlesOnly,
+					existing);
 
-				await File.WriteAllTextAsync(commitMsgFile, composed, cancellationToken);
+				await File.WriteAllTextAsync(
+					commitMsgFile,
+					composed,
+					cancellationToken);
 			}
 			catch (Exception ex)
 			{
@@ -349,7 +384,9 @@ internal class Program
 				{
 					await AppendLinesAsync(
 						commitMsgFile,
-						[$"# Committy: failed to generate AI suggestions ({ex.Message})"]);
+						[
+							$"# Committy: failed to generate AI suggestions ({ex.Message})",
+						]);
 				}
 				catch
 				{
@@ -398,7 +435,8 @@ internal class Program
 		};
 		var backupOption = new Option<bool>("--backup")
 		{
-			Description = "Save the previous hook as prepare-commit-msg.bak before replacing it",
+			Description =
+				"Save the previous hook as prepare-commit-msg.bak before replacing it",
 		};
 
 		var command = new Command(
@@ -424,7 +462,8 @@ internal class Program
 			{
 				if (dryRun)
 				{
-					await Console.Out.WriteLineAsync("[dry-run] would re-stamp the global hook template");
+					await Console.Out.WriteLineAsync(
+						"[dry-run] would re-stamp the global hook template");
 				}
 				else
 				{
@@ -468,10 +507,16 @@ internal class Program
 		CancellationToken cancellationToken)
 	{
 		HttpClient http = HttpClientProvider.Create(config.TimeoutSeconds);
-		IChatCompletionClient client = new ChatCompletionClientFactory(http).Create(config);
-		var generator = new CommitMessageGenerator(client, config.MaxTokensOverride);
+		IChatCompletionClient client =
+			new ChatCompletionClientFactory(http).Create(config);
+		var generator = new CommitMessageGenerator(
+			client,
+			config.MaxTokensOverride);
 
-		return await generator.GenerateAsync(patch, titlesOnly, cancellationToken);
+		return await generator.GenerateAsync(
+			patch,
+			titlesOnly,
+			cancellationToken);
 	}
 
 	private static async Task<int> Main(string[] args)
@@ -480,21 +525,24 @@ internal class Program
 			"--provider",
 			"-p")
 		{
-			Description = "LLM provider to use: azure, anthropic, or openai (overrides config)",
+			Description =
+				"LLM provider to use: azure, anthropic, or openai (overrides config)",
 			HelpName = "provider",
 		};
 		var apiKeyOption = new Option<string?>(
 			"--api-key",
 			"-k")
 		{
-			Description = "API key for the selected provider (overrides config and environment)",
+			Description =
+				"API key for the selected provider (overrides config and environment)",
 			HelpName = "API key",
 		};
 		var endpointOption = new Option<string?>(
 			"--endpoint",
 			"-e")
 		{
-			Description = "Azure OpenAI endpoint host URL; omit everything after the domain",
+			Description =
+				"Azure OpenAI endpoint host URL; omit everything after the domain",
 			HelpName = "endpoint URL",
 		};
 		var deploymentOption = new Option<string?>(
@@ -518,25 +566,29 @@ internal class Program
 		};
 		var clipboardOption = new Option<bool>(
 			"--clipboard",
-			"-c") { Description = "Copy first suggestion to clipboard" };
+			"-c")
+		{ Description = "Copy first suggestion to clipboard" };
 		var titlesOnlyOption = new Option<bool>(
 			"--titles-only",
 			"-t")
 		{
-			Description = "Generate 5 title-only suggestions instead of a single title+body message",
+			Description =
+				"Generate 5 title-only suggestions instead of a single title+body message",
 		};
 
-		var rootCommand = new RootCommand("Generate AI-powered commit messages from git patches")
-		{
-			providerOption,
-			apiKeyOption,
-			endpointOption,
-			deploymentOption,
-			modelOption,
-			noGitOption,
-			clipboardOption,
-			titlesOnlyOption,
-		};
+		var rootCommand =
+			new RootCommand(
+				"Generate AI-powered commit messages from git patches")
+			{
+				providerOption,
+				apiKeyOption,
+				endpointOption,
+				deploymentOption,
+				modelOption,
+				noGitOption,
+				clipboardOption,
+				titlesOnlyOption,
+			};
 
 		rootCommand.SetAction(async (parseResult, cancellationToken) =>
 		{
@@ -552,7 +604,9 @@ internal class Program
 
 			try
 			{
-				CommittyConfig config = await ResolveConfigAsync(overrides, cancellationToken);
+				CommittyConfig config = await ResolveConfigAsync(
+					overrides,
+					cancellationToken);
 				string? error = config.Validate();
 
 				if (error is not null)
@@ -561,22 +615,26 @@ internal class Program
 					Environment.Exit(1);
 				}
 
-				bool titlesOnly = parseResult.GetValue(titlesOnlyOption) || config.TitlesOnly;
+				bool titlesOnly = parseResult.GetValue(titlesOnlyOption)
+					|| config.TitlesOnly;
 
 				string patch;
 
 				if (isGitAccessDisabled || Console.IsInputRedirected)
 				{
-					patch = await CommittyService.ReadPatchFromStdinAsync(cancellationToken);
+					patch = await CommittyService.ReadPatchFromStdinAsync(
+						cancellationToken);
 				}
 				else
 				{
-					patch = await GitService.GetStagedDiffAsync(cancellationToken);
+					patch = await GitService.GetStagedDiffAsync(
+						cancellationToken);
 				}
 
 				if (string.IsNullOrWhiteSpace(patch))
 				{
-					await Console.Error.WriteLineAsync("Error: No patch data available.");
+					await Console.Error.WriteLineAsync(
+						"Error: No patch data available.");
 					Environment.Exit(1);
 				}
 
@@ -594,7 +652,9 @@ internal class Program
 
 				if (copyToClipboard && suggestions.Count > 0)
 				{
-					await CommittyService.CopyToClipboardAsync(suggestions[0], cancellationToken);
+					await CommittyService.CopyToClipboardAsync(
+						suggestions[0],
+						cancellationToken);
 				}
 			}
 			catch (OperationCanceledException)
@@ -619,7 +679,9 @@ internal class Program
 	private static string Mask(string value) =>
 		value.Length <= 4 ? "****" : $"{value[..4]}…";
 
-	private static void PrintConfigSummary(List<(string Key, string Display)> written, bool global)
+	private static void PrintConfigSummary(
+		List<(string Key, string Display)> written,
+		bool global)
 	{
 		string scope = global ? "global" : "local";
 
@@ -650,7 +712,11 @@ internal class Program
 			"OPENAI_BASE_URL. API keys come from environment variables instead (below).");
 	}
 
-	private static string? Prompt(string label, string? flagValue, string? current, bool secret)
+	private static string? Prompt(
+		string label,
+		string? flagValue,
+		string? current,
+		bool secret)
 	{
 		// A flag always wins; otherwise prompt interactively, falling back to the current value.
 		if (flagValue is not null)
@@ -663,7 +729,8 @@ internal class Program
 			return current;
 		}
 
-		string shown = current is null ? string.Empty : secret ? "****" : current;
+		string shown =
+			current is null ? string.Empty : secret ? "****" : current;
 		Console.Write(current is null ? $"{label}: " : $"{label} [{shown}]: ");
 
 		string? input = secret ? ReadSecret() : Console.ReadLine();
@@ -712,7 +779,9 @@ internal class Program
 	private static async Task<CommittyConfig> ResolveConfigAsync(
 		ConfigOverrides? overrides,
 		CancellationToken cancellationToken)
-		=> await CommittyConfigResolver.ResolveAsync(overrides, cancellationToken);
+		=> await CommittyConfigResolver.ResolveAsync(
+			overrides,
+			cancellationToken);
 
 	private static async Task<Provider> ResolveProviderForConfigAsync(
 		string? flag,
@@ -724,7 +793,7 @@ internal class Program
 		}
 
 		string? current = await GitConfigStore.GetAsync(
-			CommittyConfigResolver.ProviderKey,
+			CommittyConfigResolver.PROVIDER_KEY,
 			cancellationToken);
 
 		if (Console.IsInputRedirected)
@@ -735,13 +804,15 @@ internal class Program
 		Console.WriteLine("Select a provider:");
 		Console.WriteLine("  1) azure     (Azure OpenAI)");
 		Console.WriteLine("  2) anthropic (Claude)");
-		Console.WriteLine("  3) openai    (openai.com or a self-hosted OpenAI-compatible server)");
-		string defaultChoice = CommittyConfigResolver.ParseProvider(current) switch
-		{
-			Provider.Anthropic => "2",
-			Provider.OpenAI    => "3",
-			_                  => "1",
-		};
+		Console.WriteLine(
+			"  3) openai    (openai.com or a self-hosted OpenAI-compatible server)");
+		string defaultChoice =
+			CommittyConfigResolver.ParseProvider(current) switch
+			{
+				Provider.Anthropic => "2",
+				Provider.OpenAI => "3",
+				_ => "1",
+			};
 		Console.Write($"Choice [{defaultChoice}]: ");
 
 		string? choice = Console.ReadLine()?.Trim();
@@ -750,8 +821,8 @@ internal class Program
 		return choice switch
 		{
 			"2" or "anthropic" or "claude" => Provider.Anthropic,
-			"3" or "openai" or "local"     => Provider.OpenAI,
-			_                              => Provider.Azure,
+			"3" or "openai" or "local" => Provider.OpenAI,
+			_ => Provider.Azure,
 		};
 	}
 

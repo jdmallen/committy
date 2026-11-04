@@ -10,7 +10,8 @@ public static class GitService
 	/// staged.
 	/// In hook usage, diff comes via stdin instead.
 	/// </summary>
-	public static async Task<string> GetStagedDiffAsync(CancellationToken cancellationToken = default)
+	public static async Task<string> GetStagedDiffAsync(
+		CancellationToken cancellationToken = default)
 		=> await TryGetStagedDiffAsync(cancellationToken).ConfigureAwait(false)
 			?? throw new InvalidOperationException(
 				"No staged changes found. Use 'git add' to stage files for commit.");
@@ -21,7 +22,8 @@ public static class GitService
 	public static async Task<string?> TryGetStagedDiffAsync(
 		CancellationToken cancellationToken = default)
 	{
-		await EnsureInsideWorkTreeAsync(cancellationToken).ConfigureAwait(false);
+		await EnsureInsideWorkTreeAsync(cancellationToken)
+			.ConfigureAwait(false);
 
 		BufferedCommandResult result = await Cli.Wrap("git")
 			.WithArguments(["diff", "--cached"])
@@ -31,17 +33,21 @@ public static class GitService
 
 		if (result.ExitCode != 0)
 		{
-			throw new InvalidOperationException($"Git diff failed: {result.StandardError}");
+			throw new InvalidOperationException(
+				$"Git diff failed: {result.StandardError}");
 		}
 
-		return string.IsNullOrWhiteSpace(result.StandardOutput) ? null : result.StandardOutput;
+		return string.IsNullOrWhiteSpace(result.StandardOutput)
+			? null
+			: result.StandardOutput;
 	}
 
 	/// <summary>
 	/// Throws a clear error when the working directory isn't inside a git work tree,
 	/// so callers get an actionable message instead of git's raw <c>diff</c> usage output.
 	/// </summary>
-	private static async Task EnsureInsideWorkTreeAsync(CancellationToken cancellationToken)
+	private static async Task EnsureInsideWorkTreeAsync(
+		CancellationToken cancellationToken)
 	{
 		BufferedCommandResult result = await Cli.Wrap("git")
 			.WithArguments(["rev-parse", "--is-inside-work-tree"])
@@ -50,7 +56,8 @@ public static class GitService
 			.ConfigureAwait(false);
 
 		if (result.ExitCode != 0
-			|| !result.StandardOutput.Trim().Equals("true", StringComparison.OrdinalIgnoreCase))
+			|| !result.StandardOutput.Trim()
+				.Equals("true", StringComparison.OrdinalIgnoreCase))
 		{
 			throw new InvalidOperationException(
 				"Not a git repository. Run committy from inside a git repository.");

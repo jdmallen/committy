@@ -1,30 +1,30 @@
 <Project Sdk="Microsoft.NET.Sdk">
 
-    <PropertyGroup>
-        <OutputType>Exe</OutputType>
-        <TargetFramework>net10.0</TargetFramework>
-        <Nullable>enable</Nullable>
-        <ImplicitUsings>enable</ImplicitUsings>
-        <AssemblyName>committy</AssemblyName>
-        <LangVersion>latest</LangVersion>
-        <PublishSingleFile>true</PublishSingleFile>
-        <SelfContained>true</SelfContained>
-        <PublishTrimmed>false</PublishTrimmed>
-        <PublishReadyToRun>false</PublishReadyToRun>
-    </PropertyGroup>
+	<PropertyGroup>
+		<OutputType>Exe</OutputType>
+		<TargetFramework>net10.0</TargetFramework>
+		<Nullable>enable</Nullable>
+		<ImplicitUsings>enable</ImplicitUsings>
+		<AssemblyName>committy</AssemblyName>
+		<LangVersion>latest</LangVersion>
+		<PublishSingleFile>true</PublishSingleFile>
+		<SelfContained>true</SelfContained>
+		<PublishTrimmed>false</PublishTrimmed>
+		<PublishReadyToRun>false</PublishReadyToRun>
+	</PropertyGroup>
 
-    <ItemGroup>
-        <PackageReference Include="JetBrains.Annotations" Version="2025.2.4"/>
-        <PackageReference Include="System.CommandLine" Version="2.0.1"/>
-        <PackageReference Include="TextCopy" Version="6.2.1"/>
-        <PackageReference Include="Microsoft.Extensions.Http" Version="10.0.1"/>
-        <PackageReference Include="CliWrap" Version="3.10.0"/>
-        <PackageReference Include="JDMallen.Toolbox.AI" Version="4.2.1"/>
-    </ItemGroup>
+	<ItemGroup>
+		<PackageReference Include="JetBrains.Annotations" Version="2025.2.4"/>
+		<PackageReference Include="System.CommandLine" Version="2.0.1"/>
+		<PackageReference Include="TextCopy" Version="6.2.1"/>
+		<PackageReference Include="Microsoft.Extensions.Http" Version="10.0.1"/>
+		<PackageReference Include="CliWrap" Version="3.10.0"/>
+		<PackageReference Include="JDMallen.Toolbox.AI" Version="4.2.1"/>
+	</ItemGroup>
 
-    <ItemGroup>
-        <!-- Chat client types (IChatCompletionClient et al.) used throughout. -->
-        <Using Include="JDMallen.Toolbox.AI"/>
-    </ItemGroup>
+	<ItemGroup>
+		<!-- Chat client types (IChatCompletionClient et al.) used throughout. -->
+		<Using Include="JDMallen.Toolbox.AI"/>
+	</ItemGroup>
 
 </Project>

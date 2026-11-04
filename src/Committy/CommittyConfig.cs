@@ -21,7 +21,7 @@ public sealed class AzureConfig
 
 	/// <summary>
 	/// Generation budget, or null to keep the prompt's own per-mode default
-	/// (or <see cref="CommittyConfigResolver.DefaultAzureReasoningMaxTokens" />
+	/// (or <see cref="CommittyConfigResolver.DEFAULT_AZURE_REASONING_MAX_TOKENS" />
 	/// for a reasoning deployment).
 	/// </summary>
 	public int? MaxTokens { get; init; }
@@ -37,7 +37,9 @@ public sealed class AzureConfig
 	/// <summary>The budget to send, or null for the prompt's default.</summary>
 	public int? EffectiveMaxTokens =>
 		MaxTokens
-		?? (ReasoningModel ? CommittyConfigResolver.DefaultAzureReasoningMaxTokens : null);
+		?? (ReasoningModel
+			? CommittyConfigResolver.DEFAULT_AZURE_REASONING_MAX_TOKENS
+			: null);
 
 	public string? Validate() =>
 		string.IsNullOrWhiteSpace(ApiKey)
@@ -115,7 +117,7 @@ public sealed class CommittyConfig
 	/// The HTTP timeout for the hosted providers, which answer in seconds. Only
 	/// the self-hosted path needs to override it.
 	/// </summary>
-	public const int DefaultTimeoutSeconds = 30;
+	public const int DEFAULT_TIMEOUT_SECONDS = 30;
 
 	public AnthropicConfig? Anthropic { get; init; }
 
@@ -136,14 +138,14 @@ public sealed class CommittyConfig
 		Provider switch
 		{
 			Provider.OpenAI => OpenAI?.MaxTokens,
-			Provider.Azure  => Azure?.EffectiveMaxTokens,
-			_               => null,
+			Provider.Azure => Azure?.EffectiveMaxTokens,
+			_ => null,
 		};
 
 	public int TimeoutSeconds =>
 		Provider == Provider.OpenAI
-			? OpenAI?.TimeoutSeconds ?? DefaultTimeoutSeconds
-			: DefaultTimeoutSeconds;
+			? OpenAI?.TimeoutSeconds ?? DEFAULT_TIMEOUT_SECONDS
+			: DEFAULT_TIMEOUT_SECONDS;
 
 	/// <summary>
 	/// Returns a human-readable error if the selected provider is
@@ -152,11 +154,15 @@ public sealed class CommittyConfig
 	public string? Validate() =>
 		Provider switch
 		{
-			Provider.Azure => Azure is null ? "Azure configuration missing." : Azure.Validate(),
+			Provider.Azure => Azure is null
+				? "Azure configuration missing."
+				: Azure.Validate(),
 			Provider.Anthropic => Anthropic is null
 				? "Anthropic configuration missing."
 				: Anthropic.Validate(),
-			Provider.OpenAI => OpenAI is null ? "OpenAI configuration missing." : OpenAI.Validate(),
+			Provider.OpenAI => OpenAI is null
+				? "OpenAI configuration missing."
+				: OpenAI.Validate(),
 			_ => $"Unknown provider: {Provider}",
 		};
 }

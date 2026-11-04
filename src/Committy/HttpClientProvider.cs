@@ -1,4 +1,5 @@
 using System.Reflection;
+
 using Microsoft.Extensions.DependencyInjection;
 
 namespace Committy;
@@ -18,7 +19,8 @@ public static class HttpClientProvider
 	/// self-hosted model may need minutes, most of it spent loading weights from
 	/// disk before the first token.
 	/// </param>
-	public static HttpClient Create(int timeoutSeconds = CommittyConfig.DefaultTimeoutSeconds)
+	public static HttpClient Create(
+		int timeoutSeconds = CommittyConfig.DEFAULT_TIMEOUT_SECONDS)
 	{
 		var services = new ServiceCollection();
 
@@ -27,15 +29,19 @@ public static class HttpClientProvider
 			client =>
 			{
 				client.Timeout = TimeSpan.FromSeconds(timeoutSeconds);
-				client.DefaultRequestHeaders.Accept.ParseAdd("application/json");
+				client.DefaultRequestHeaders.Accept.ParseAdd(
+					"application/json");
 
-				AssemblyName? assembly = Assembly.GetAssembly(typeof(HttpClientProvider))?.GetName();
+				AssemblyName? assembly = Assembly
+					.GetAssembly(typeof(HttpClientProvider))
+					?.GetName();
 				client.DefaultRequestHeaders.UserAgent.ParseAdd(
 					$"{assembly?.Name}/{assembly?.Version?.ToString() ?? string.Empty}");
 			});
 
 		ServiceProvider provider = services.BuildServiceProvider();
 
-		return provider.GetRequiredService<IHttpClientFactory>().CreateClient(CLIENT_NAME);
+		return provider.GetRequiredService<IHttpClientFactory>()
+			.CreateClient(CLIENT_NAME);
 	}
 }

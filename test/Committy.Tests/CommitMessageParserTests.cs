@@ -20,13 +20,16 @@ public class CommitMessageParserTests
 
 		Assert.Single(result);
 		Assert.DoesNotContain("\r", result[0]);
-		Assert.Equal("feat: add thing\n\nDoes the thing.\nMore detail.", result[0]);
+		Assert.Equal(
+			"feat: add thing\n\nDoes the thing.\nMore detail.",
+			result[0]);
 	}
 
 	[Fact]
 	public void Parse_TitleAndBody_ReturnsSingleMessage()
 	{
-		const string message = "feat(auth): add OAuth2\n\nReplace the password flow with OAuth2.";
+		const string message =
+			"feat(auth): add OAuth2\n\nReplace the password flow with OAuth2.";
 
 		List<string> result = CommitMessageParser.Parse(message, false);
 
@@ -40,7 +43,9 @@ public class CommitMessageParserTests
 		List<string> result = CommitMessageParser.Parse("", true);
 
 		Assert.Equal(5, result.Count);
-		Assert.All(result, line => Assert.StartsWith("feat: implement changes", line));
+		Assert.All(
+			result,
+			line => Assert.StartsWith("feat: implement changes", line));
 	}
 
 	[Fact]

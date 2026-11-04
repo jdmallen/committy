@@ -20,7 +20,9 @@ public class GitServiceTests
 	private static async Task InRepoAsync(Func<string, Task> body)
 	{
 		string original = Directory.GetCurrentDirectory();
-		string repo = Path.Combine(Path.GetTempPath(), "committy-git-" + Path.GetRandomFileName());
+		string repo = Path.Combine(
+			Path.GetTempPath(),
+			"committy-git-" + Path.GetRandomFileName());
 		Directory.CreateDirectory(repo);
 
 		try
@@ -29,7 +31,8 @@ public class GitServiceTests
 			string emptyTemplate = Path.Combine(repo, ".empty-template");
 			Directory.CreateDirectory(emptyTemplate);
 			await Cli.Wrap("git")
-				.WithArguments(["-C", repo, "init", $"--template={emptyTemplate}"])
+				.WithArguments(
+					["-C", repo, "init", $"--template={emptyTemplate}"])
 				.ExecuteBufferedAsync();
 
 			Directory.SetCurrentDirectory(repo);
@@ -50,10 +53,15 @@ public class GitServiceTests
 		}
 	}
 
-	private static async Task StageFileAsync(string repo, string name, string content)
+	private static async Task StageFileAsync(
+		string repo,
+		string name,
+		string content)
 	{
 		await File.WriteAllTextAsync(Path.Combine(repo, name), content);
-		await Cli.Wrap("git").WithArguments(["-C", repo, "add", name]).ExecuteBufferedAsync();
+		await Cli.Wrap("git")
+			.WithArguments(["-C", repo, "add", name])
+			.ExecuteBufferedAsync();
 	}
 
 	/// <summary>
@@ -63,7 +71,9 @@ public class GitServiceTests
 	private static async Task OutsideRepoAsync(Func<Task> body)
 	{
 		string original = Directory.GetCurrentDirectory();
-		string dir = Path.Combine(Path.GetTempPath(), "committy-nogit-" + Path.GetRandomFileName());
+		string dir = Path.Combine(
+			Path.GetTempPath(),
+			"committy-nogit-" + Path.GetRandomFileName());
 		Directory.CreateDirectory(dir);
 
 		try
@@ -87,65 +97,63 @@ public class GitServiceTests
 	}
 
 	[Fact]
-	public async Task TryGetStagedDiffAsync_OutsideRepository_ThrowsInvalidOperationException()
-	{
-		await OutsideRepoAsync(async () =>
+	public async Task
+		TryGetStagedDiffAsync_OutsideRepository_ThrowsInvalidOperationException()
+		=> await OutsideRepoAsync(async () =>
 		{
-			var exception = await Assert.ThrowsAsync<InvalidOperationException>(()
-				=> GitService.TryGetStagedDiffAsync(CancellationToken.None));
+			var exception =
+				await Assert.ThrowsAsync<InvalidOperationException>(()
+					=> GitService.TryGetStagedDiffAsync(
+						CancellationToken.None));
 
 			Assert.Contains("Not a git repository", exception.Message);
 		});
-	}
 
 	[Fact]
-	public async Task GetStagedDiffAsync_NothingStaged_ThrowsInvalidOperationException()
-	{
-		await InRepoAsync(async _ =>
+	public async Task
+		GetStagedDiffAsync_NothingStaged_ThrowsInvalidOperationException()
+		=> await InRepoAsync(async _ =>
 		{
-			var exception = await Assert.ThrowsAsync<InvalidOperationException>(()
-				=> GitService.GetStagedDiffAsync(CancellationToken.None));
+			var exception =
+				await Assert.ThrowsAsync<InvalidOperationException>(()
+					=> GitService.GetStagedDiffAsync(CancellationToken.None));
 
 			Assert.Contains("No staged changes found", exception.Message);
 		});
-	}
 
 	[Fact]
 	public async Task GetStagedDiffAsync_WithStagedChange_ReturnsDiff()
-	{
-		await InRepoAsync(async repo =>
+		=> await InRepoAsync(async repo =>
 		{
 			await StageFileAsync(repo, "file.txt", "content\n");
 
-			string diff = await GitService.GetStagedDiffAsync(CancellationToken.None);
+			string diff =
+				await GitService.GetStagedDiffAsync(CancellationToken.None);
 
 			Assert.Contains("diff --git", diff);
 		});
-	}
 
 	[Fact]
 	public async Task TryGetStagedDiffAsync_NothingStaged_ReturnsNull()
-	{
-		await InRepoAsync(async _ =>
+		=> await InRepoAsync(async _ =>
 		{
-			string? diff = await GitService.TryGetStagedDiffAsync(CancellationToken.None);
+			string? diff =
+				await GitService.TryGetStagedDiffAsync(CancellationToken.None);
 
 			Assert.Null(diff);
 		});
-	}
 
 	[Fact]
 	public async Task TryGetStagedDiffAsync_WithStagedChange_ReturnsDiff()
-	{
-		await InRepoAsync(async repo =>
+		=> await InRepoAsync(async repo =>
 		{
 			await StageFileAsync(repo, "file.txt", "hello world\n");
 
-			string? diff = await GitService.TryGetStagedDiffAsync(CancellationToken.None);
+			string? diff =
+				await GitService.TryGetStagedDiffAsync(CancellationToken.None);
 
 			Assert.NotNull(diff);
 			Assert.Contains("diff --git", diff);
 			Assert.Contains("hello world", diff);
 		});
-	}
 }

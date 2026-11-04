@@ -12,7 +12,7 @@ namespace Committy;
 /// </summary>
 public static class HookInstaller
 {
-	public const string HookName = "prepare-commit-msg";
+	public const string HOOK_NAME = "prepare-commit-msg";
 
 	/// <summary>
 	/// The installed hook. Intentionally minimal and version-stable: it guards
@@ -68,30 +68,36 @@ public static class HookInstaller
 		if (global)
 		{
 			string templateDir = Path.Combine(
-				Environment.GetFolderPath(Environment.SpecialFolder.UserProfile),
+				Environment.GetFolderPath(
+					Environment.SpecialFolder.UserProfile),
 				".git-templates");
 			hooksDir = Path.Combine(templateDir, "hooks");
 			Directory.CreateDirectory(hooksDir);
 
-			await SetGlobalTemplateDirAsync(templateDir, cancellationToken).ConfigureAwait(false);
+			await SetGlobalTemplateDirAsync(templateDir, cancellationToken)
+				.ConfigureAwait(false);
 		}
 		else
 		{
-			string repo = Path.GetFullPath(string.IsNullOrWhiteSpace(repoPath) ? "." : repoPath);
+			string repo = Path.GetFullPath(
+				string.IsNullOrWhiteSpace(repoPath) ? "." : repoPath);
 
 			if (!Directory.Exists(repo))
 			{
-				await output.WriteLineAsync($"Error: Repository path does not exist: {repo}")
+				await output.WriteLineAsync(
+						$"Error: Repository path does not exist: {repo}")
 					.ConfigureAwait(false);
 
 				return 1;
 			}
 
-			string? gitDir = await TryGetGitDirAsync(repo, cancellationToken).ConfigureAwait(false);
+			string? gitDir = await TryGetGitDirAsync(repo, cancellationToken)
+				.ConfigureAwait(false);
 
 			if (gitDir is null)
 			{
-				await output.WriteLineAsync($"Error: Not a valid git repository: {repo}")
+				await output.WriteLineAsync(
+						$"Error: Not a valid git repository: {repo}")
 					.ConfigureAwait(false);
 
 				return 1;
@@ -107,7 +113,8 @@ public static class HookInstaller
 			// Respect a custom core.hooksPath (e.g. a repo-tracked ".githooks" dir); git
 			// never looks in <gitdir>/hooks once that's set, so writing there would
 			// silently install a hook that never runs.
-			hooksDir = await TryGetHooksDirAsync(repo, cancellationToken).ConfigureAwait(false)
+			hooksDir = await TryGetHooksDirAsync(repo, cancellationToken)
+					.ConfigureAwait(false)
 				?? defaultHooksDir;
 
 			Directory.CreateDirectory(hooksDir);
@@ -122,9 +129,11 @@ public static class HookInstaller
 			}
 		}
 
-		await WriteTrampolineAsync(hooksDir, cancellationToken).ConfigureAwait(false);
+		await WriteTrampolineAsync(hooksDir, cancellationToken)
+			.ConfigureAwait(false);
 
-		await output.WriteLineAsync($"✓ Hook installed: {Path.Combine(hooksDir, HookName)}")
+		await output.WriteLineAsync(
+				$"✓ Hook installed: {Path.Combine(hooksDir, HOOK_NAME)}")
 			.ConfigureAwait(false);
 
 		if (global)
@@ -173,7 +182,9 @@ public static class HookInstaller
 		string.Equals(
 			Path.TrimEndingDirectorySeparator(Path.GetFullPath(a)),
 			Path.TrimEndingDirectorySeparator(Path.GetFullPath(b)),
-			OperatingSystem.IsWindows() ? StringComparison.OrdinalIgnoreCase : StringComparison.Ordinal);
+			OperatingSystem.IsWindows()
+				? StringComparison.OrdinalIgnoreCase
+				: StringComparison.Ordinal);
 
 	private static void MakeExecutable(string path)
 	{
@@ -197,13 +208,12 @@ public static class HookInstaller
 	private static async Task SetGlobalTemplateDirAsync(
 		string templateDir,
 		CancellationToken cancellationToken)
-	{
-		await Cli.Wrap("git")
-			.WithArguments(["config", "--global", "init.templateDir", templateDir])
+		=> await Cli.Wrap("git")
+			.WithArguments(
+				["config", "--global", "init.templateDir", templateDir])
 			.WithValidation(CommandResultValidation.None)
 			.ExecuteBufferedAsync(cancellationToken)
 			.ConfigureAwait(false);
-	}
 
 	private static async Task<string?> TryGetGitDirAsync(
 		string repo,
@@ -215,9 +225,10 @@ public static class HookInstaller
 			.ExecuteBufferedAsync(cancellationToken)
 			.ConfigureAwait(false);
 
-		return result.ExitCode == 0 && !string.IsNullOrWhiteSpace(result.StandardOutput)
-			? result.StandardOutput.Trim()
-			: null;
+		return result.ExitCode == 0
+			&& !string.IsNullOrWhiteSpace(result.StandardOutput)
+				? result.StandardOutput.Trim()
+				: null;
 	}
 
 	/// <summary>
@@ -246,7 +257,9 @@ public static class HookInstaller
 			return null;
 		}
 
-		return Path.IsPathRooted(path) ? path : Path.GetFullPath(Path.Combine(repo, path));
+		return Path.IsPathRooted(path)
+			? path
+			: Path.GetFullPath(Path.Combine(repo, path));
 	}
 
 	/// <summary>
@@ -259,9 +272,10 @@ public static class HookInstaller
 	{
 		Directory.CreateDirectory(hooksDir);
 
-		string hookPath = Path.Combine(hooksDir, HookName);
+		string hookPath = Path.Combine(hooksDir, HOOK_NAME);
 
-		await File.WriteAllTextAsync(hookPath, Trampoline, cancellationToken).ConfigureAwait(false);
+		await File.WriteAllTextAsync(hookPath, Trampoline, cancellationToken)
+			.ConfigureAwait(false);
 		MakeExecutable(hookPath);
 	}
 }

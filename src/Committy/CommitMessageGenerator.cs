@@ -23,7 +23,9 @@ public sealed class CommitMessageGenerator(
 	{
 		if (string.IsNullOrWhiteSpace(patch))
 		{
-			throw new ArgumentException("Patch cannot be null or empty", nameof(patch));
+			throw new ArgumentException(
+				"Patch cannot be null or empty",
+				nameof(patch));
 		}
 
 		try
@@ -32,11 +34,13 @@ public sealed class CommitMessageGenerator(
 				patch,
 				titlesOnly,
 				maxTokensOverride);
-			string raw = await client.CompleteAsync(request, cancellationToken).ConfigureAwait(false);
+			string raw = await client.CompleteAsync(request, cancellationToken)
+				.ConfigureAwait(false);
 
 			return CommitMessageParser.Parse(raw, titlesOnly);
 		}
-		catch (Exception ex) when (ex is not ArgumentException and not OperationCanceledException)
+		catch (Exception ex) when (ex is not ArgumentException
+									   and not OperationCanceledException)
 		{
 			throw new InvalidOperationException(
 				$"Failed to generate commit message suggestions: {ex.Message}",

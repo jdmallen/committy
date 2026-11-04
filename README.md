@@ -102,22 +102,20 @@ from PowerShell, Command Prompt, and Git Bash.
 
 **4. Configure a provider**
 
-Run `committy config` to choose a provider and store credentials. With no flags
-it
+Run `committy config` to choose a provider and its settings. With no flags it
 prompts interactively; pass flags to script it:
 
 ```bash
-# Interactive (prompts for provider, key, and any provider-specific fields)
+# Interactive (prompts for provider and any provider-specific fields)
 committy config
 
 # Azure OpenAI, non-interactive
 committy config --provider azure \
-  --api-key "your_api_key_here" \
   --endpoint "https://your-endpoint.openai.azure.com" \
   --deployment "your-deployment-name"
 
 # Anthropic (Claude), non-interactive
-committy config --provider anthropic --api-key "sk-ant-..."
+committy config --provider anthropic
 
 # Local / OpenAI-compatible, non-interactive (--endpoint is the base URL)
 committy config --provider openai \
@@ -131,7 +129,36 @@ scope it to the current repository. committy reads these values at commit time,
 and prints
 exactly which keys it set. See [Configuration](#configuration) for the full key
 list and
-environment-variable overrides.
+environment-variable fallbacks.
+
+**5. Set your API key**
+
+API keys live in environment variables, not git config:
+
+| Provider  | Variable                     |
+|-----------|------------------------------|
+| Azure     | `AZURE_OPENAI_API_KEY`       |
+| Anthropic | `ANTHROPIC_API_KEY_COMMITTY` |
+| OpenAI    | `OPENAI_API_KEY_COMMITTY` (optional) |
+
+`committy config` finishes by saying whether the variable is set, never showing
+its value:
+
+- **Windows:** it offers to save the key as a user environment variable, typed
+  with `*` shown. `--api-key` saves it without asking. It is written after the
+  git config, and only terminals opened afterwards see it.
+- **Linux and macOS:** it prints the line to add to your shell's startup file
+  (`~/.zshrc`, `~/.bashrc`, fish's `set -Ux`, and so on, from `$SHELL`). It
+  never edits startup files, and `--api-key` is not saved.
+
+> **Commits from desktop apps:** committy runs from git's commit hook, so it
+> also runs when a git GUI or IDE commits. Those apps may not load your shell's
+> startup file, and so may see neither the key nor committy on `PATH`. VS Code
+> and JetBrains IDEs usually copy the shell's environment at startup; plain git
+> GUIs may not. On Linux with a systemd desktop session (e.g. GNOME), also put
+> `AZURE_OPENAI_API_KEY=<your-key>` (or your provider's variable) in
+> `~/.config/environment.d/committy.conf`, `chmod 600` it, and log in again.
+> Windows user variables reach desktop apps already.
 
 > For Azure, the deployment name often matches the model you selected (e.g.
 `gpt-4.1-mini`,
@@ -199,10 +226,9 @@ with a flag or environment variable:
 committy --provider anthropic --api-key "sk-ant-..."
 
 # Use a local model for one run, without touching git config
-COMMITTY_PROVIDER=openai \
-OPENAI_BASE_URL=http://10.10.0.20:8080/v1 \
-OPENAI_MODEL=thinkingcap-27b-q4km \
-  committy
+committy --provider openai \
+         --endpoint "http://10.10.0.20:8080/v1" \
+         --model "thinkingcap-27b-q4km"
 
 # Override Azure settings explicitly
 committy --provider azure \
@@ -227,7 +253,7 @@ committy --provider azure \
 | Option          | Alias | Environment variable                                  | Default                     | Description                                                                     |
 |-----------------|-------|-------------------------------------------------------|-----------------------------|---------------------------------------------------------------------------------|
 | `--provider`    | `-p`  | `COMMITTY_PROVIDER`                                   | `azure`                     | LLM provider: `azure`, `anthropic`, or `openai` (alias `local`).                |
-| `--api-key`     | `-k`  | `AZURE_OPENAI_API_KEY` / `ANTHROPIC_API_KEY_COMMITTY` / `OPENAI_API_KEY_COMMITTY` | —       | API key for the selected provider; optional for `openai`.                       |
+| `--api-key`     | `-k`  | `AZURE_OPENAI_API_KEY` / `ANTHROPIC_API_KEY_COMMITTY` / `OPENAI_API_KEY_COMMITTY` | —       | API key for one run; with `config`, saved as a user env var (Windows only).     |
 | `--endpoint`    | `-e`  | `AZURE_OPENAI_ENDPOINT_HOST` / `OPENAI_BASE_URL`      | —                           | Azure endpoint host URL (domain only), or the `openai` base URL including `/v1`. |
 | `--deployment`  | `-d`  | `AZURE_OPENAI_DEPLOYMENT`                             | `gpt-4.1-mini`              | Azure OpenAI deployment name.                                                   |
 | `--model`       | `-m`  | `ANTHROPIC_MODEL` / `OPENAI_MODEL`                    | `claude-haiku-4-5-20251001` | Anthropic or `openai` model name.                                               |
@@ -264,22 +290,47 @@ global (`~/.gitconfig`).
 |-----------------------------|-----------|---------------------------------------|
 | `committy.provider`             | —         | `azure`, `anthropic`, or `openai`         |
 | `committy.titlesonly`           | —         | `true` to default to titles-only mode     |
-| `committy.azure.apikey`         | Azure     | API key                                   |
+| `committy.azure.apikey`         | Azure     | API key; legacy, use `AZURE_OPENAI_API_KEY` |
 | `committy.azure.endpoint`       | Azure     | Endpoint host URL                         |
 | `committy.azure.deployment`     | Azure     | Deployment name                           |
-| `committy.anthropic.apikey`     | Anthropic | API key                                   |
+| `committy.azure.reasoningmodel` | Azure     | `true` for a reasoning deployment         |
+| `committy.azure.maxtokens`      | Azure     | Generation budget; see below              |
+| `committy.anthropic.apikey`     | Anthropic | API key; legacy, use the env var          |
 | `committy.anthropic.model`      | Anthropic | Model name                                |
 | `committy.openai.baseurl`       | OpenAI    | Base URL including `/v1`                  |
 | `committy.openai.model`         | OpenAI    | Model name                                |
-| `committy.openai.apikey`        | OpenAI    | API key (optional)                        |
+| `committy.openai.apikey`        | OpenAI    | API key; legacy, use the env var          |
 | `committy.openai.timeoutseconds`| OpenAI    | Request timeout; default `300`            |
 | `committy.openai.maxtokens`     | OpenAI    | Generation budget; default `2048`         |
 
 These are plain `git config` keys, so you can also set them by hand — e.g.
-`git config --global committy.provider anthropic`. Environment variables (the
-names in the
-Options table) override git config for a single invocation, which is handy in
-CI.
+`git config --global committy.provider anthropic`.
+
+Precedence, highest first:
+
+1. **Settings:** CLI flag, then git config, then environment variable (the
+   names in the Options table), then the built-in default. A leftover shell
+   export never overrides what `committy config` wrote; use a flag for a
+   one-off change.
+2. **API keys:** CLI flag, then environment variable, then git config. The
+   git config keys are only read for configs written by committy 1.3.0 or
+   earlier; `committy config` no longer writes them.
+
+### Azure reasoning deployments
+
+Reasoning models (o-series, gpt-5 and later) reject `temperature`, and spend
+their hidden reasoning from the same token budget as the answer. For such a
+deployment, set `committy.azure.reasoningmodel` to `true` (`committy config`
+asks for it):
+
+```sh
+git config --global committy.azure.reasoningmodel true
+```
+
+committy then leaves out `temperature` and raises the budget from the built-in
+100 (titles) or 500 (title + body) to `2048`. Set `committy.azure.maxtokens` to
+use a different budget, for a reasoning deployment or not. If a reasoning model
+returns an empty message, raise it.
 
 ### Local and other OpenAI-compatible models
 
@@ -301,16 +352,21 @@ splits it into `reasoning_content` or inlines it as `<think>…</think>`.
 > quantized model generally follows the prompt less reliably than the hosted
 > providers, so review the message before committing.
 
-> **Note:** API keys are stored in plaintext in your git config file (
-`~/.gitconfig` or the
-> repo's `.git/config`). These files are not committed, but treat them like any
-> other local
-> secret.
+> **Note:** committy 1.3.0 and earlier stored API keys in plaintext in git
+> config, and committy still reads one when the environment variable is unset.
+> That fallback also keeps desktop-app commits working (see
+> step 5, "Set your API key", under [Install](#install)). If you only commit from terminals,
+> remove it once the variable is set, e.g.
+> `git config --global --unset committy.azure.apikey`.
 
 ### Troubleshooting
 
 - **"Committy not found in PATH"** — ensure the executable is on your `PATH`;
   test with `committy --help`.
+- **Azure `400` mentioning `temperature` or `max_tokens`** (e.g. "Unsupported
+  parameter") means a reasoning deployment: set
+  `committy.azure.reasoningmodel true` (see
+  [Azure reasoning deployments](#azure-reasoning-deployments)).
 - **"… configuration incomplete / missing"** — run `committy config` to set up a
   provider, or check the relevant environment variables.
 - **Hook not running** — confirm you're in a git repo with staged changes (

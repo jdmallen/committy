@@ -113,12 +113,10 @@ public class OpenAIProviderTests
 		Assert.Equal(4096, Wrap(Config(maxTokens: 4096)).MaxTokensOverride);
 	}
 
-	[Theory]
-	[InlineData(Provider.Azure)]
-	[InlineData(Provider.Anthropic)]
-	public void MaxTokensOverride_HostedProviders_IsNull(Provider provider)
+	[Fact]
+	public void MaxTokensOverride_Anthropic_IsNull()
 	{
-		var config = new CommittyConfig { Provider = provider };
+		var config = new CommittyConfig { Provider = Provider.Anthropic };
 
 		Assert.Null(config.MaxTokensOverride);
 	}

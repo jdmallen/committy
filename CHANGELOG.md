@@ -5,6 +5,54 @@ All notable changes to this project are documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [1.4.0]
+
+Fixes Azure OpenAI reasoning deployments (o-series, gpt-5 and later, e.g.
+gpt-6-luna), which rejected every request.
+
+### Added
+
+- **`committy.azure.reasoningmodel`.** Set it to `true` for a reasoning
+  deployment: `temperature`, which those models reject, is then not sent, and
+  the generation budget defaults to `2048` instead of the built-in 100/500,
+  because the hidden reasoning is spent from the same budget. `committy config`
+  asks for it (y/n).
+- **`committy.azure.maxtokens`.** Optional generation budget for Azure, for a
+  reasoning deployment or not. Unset keeps the defaults above.
+
+### Changed
+
+- **`committy config` no longer asks for or stores the API key in git
+  config.** Keys live in environment variables (`AZURE_OPENAI_API_KEY`,
+  `ANTHROPIC_API_KEY_COMMITTY`, `OPENAI_API_KEY_COMMITTY`). The command now
+  ends by saying whether that variable is set, without showing its value. On
+  Windows it offers to save the key as a user environment variable (input
+  masked, written after the git config); `config --api-key` saves it there
+  without asking. On Linux and macOS it prints the line for your shell's
+  startup file, from `$SHELL`, and edits nothing. A key already in git config
+  from an earlier version is still read as a fallback, which also keeps
+  commits from desktop apps working; `committy config` points it out and
+  suggests removing it only if you commit from terminals alone. On Linux it
+  also shows the `~/.config/environment.d/committy.conf` line that gives
+  desktop-session apps the key.
+- **git config now wins over environment variables for every setting except
+  API keys.** The order is CLI flag, git config, environment variable, default,
+  so a stale `AZURE_OPENAI_DEPLOYMENT`, `ANTHROPIC_MODEL`, `OPENAI_MODEL`,
+  `OPENAI_BASE_URL`, `AZURE_OPENAI_ENDPOINT_HOST`, `COMMITTY_PROVIDER` or
+  `COMMITTY_TITLES_ONLY` export no longer overrides `committy config`. Those
+  variables still apply when the git config key is unset. API keys keep CLI
+  flag, environment variable, git config, so a key can stay out of
+  `~/.gitconfig`.
+- **`COMMITTY_TITLES_ONLY` and `committy.titlesonly` no longer combine.**
+  Previously either one being true turned titles-only on; now an explicit
+  `committy.titlesonly false` wins over the variable. `--titles-only` still
+  forces it on.
+- **JDMallen.Toolbox.AI 3.1.0 -> 4.2.1.** Azure requests now send
+  `max_completion_tokens` instead of the deprecated `max_tokens`, which
+  reasoning models refuse, and no longer send `top_p`, `frequency_penalty` or
+  `presence_penalty` (the service defaults). Non-reasoning deployments behave
+  as before.
+
 ## [1.3.0]
 
 Adds a third provider: any endpoint speaking the OpenAI

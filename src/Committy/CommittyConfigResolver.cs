@@ -9,13 +9,13 @@ public sealed record ConfigOverrides(
 	string? Model = null);
 
 /// <summary>
-/// Resolves the effective <see cref="CommittyConfig" /> with the precedence
-/// CLI flag → environment variable → git config → built-in default. Git config
-/// keys
-/// live under the <c>committy.*</c> section and are written by
-/// <c>committy config</c>;
-/// the legacy <c>AZURE_OPENAI_*</c> environment variables remain supported as
-/// overrides.
+/// Resolves the effective <see cref="CommittyConfig" />. Settings use CLI flag,
+/// then git config, then environment variable, then built-in default; API keys
+/// use CLI flag, then environment variable, then git config, so a key can stay
+/// out of ~/.gitconfig. Git config keys live under the <c>committy.*</c>
+/// section and are written by <c>committy config</c>; the environment
+/// variables (including the legacy <c>AZURE_OPENAI_*</c> ones) remain as
+/// fallbacks.
 /// </summary>
 public sealed class CommittyConfigResolver
 {
@@ -36,12 +36,21 @@ public sealed class CommittyConfigResolver
 	/// </summary>
 	public const int DefaultOpenAIMaxTokens = 2048;
 
+	/// <summary>
+	/// The budget for an Azure reasoning deployment when
+	/// <see cref="AzureMaxTokensKey" /> is unset. Its hidden reasoning is spent
+	/// from the same budget, so the prompt's 100/500 would leave no answer.
+	/// </summary>
+	public const int DefaultAzureReasoningMaxTokens = 2048;
+
 	// git config keys
 	public const string ProviderKey = "committy.provider";
 	public const string TitlesOnlyKey = "committy.titlesonly";
 	public const string AzureApiKeyKey = "committy.azure.apikey";
 	public const string AzureEndpointKey = "committy.azure.endpoint";
 	public const string AzureDeploymentKey = "committy.azure.deployment";
+	public const string AzureReasoningModelKey = "committy.azure.reasoningmodel";
+	public const string AzureMaxTokensKey = "committy.azure.maxtokens";
 	public const string AnthropicApiKeyKey = "committy.anthropic.apikey";
 	public const string AnthropicModelKey = "committy.anthropic.model";
 	public const string OpenAIApiKeyKey = "committy.openai.apikey";
@@ -53,12 +62,12 @@ public sealed class CommittyConfigResolver
 	// environment variables
 	private const string PROVIDER_ENV = "COMMITTY_PROVIDER";
 	private const string TITLES_ONLY_ENV = "COMMITTY_TITLES_ONLY";
-	private const string AZURE_API_KEY_ENV = "AZURE_OPENAI_API_KEY";
+	public const string AZURE_API_KEY_ENV = "AZURE_OPENAI_API_KEY";
 	private const string AZURE_ENDPOINT_ENV = "AZURE_OPENAI_ENDPOINT_HOST";
 	private const string AZURE_DEPLOYMENT_ENV = "AZURE_OPENAI_DEPLOYMENT";
-	private const string ANTHROPIC_API_KEY_ENV = "ANTHROPIC_API_KEY_COMMITTY";
+	public const string ANTHROPIC_API_KEY_ENV = "ANTHROPIC_API_KEY_COMMITTY";
 	private const string ANTHROPIC_MODEL_ENV = "ANTHROPIC_MODEL";
-	private const string OPENAI_API_KEY_ENV = "OPENAI_API_KEY_COMMITTY";
+	public const string OPENAI_API_KEY_ENV = "OPENAI_API_KEY_COMMITTY";
 	private const string OPENAI_BASE_URL_ENV = "OPENAI_BASE_URL";
 	private const string OPENAI_MODEL_ENV = "OPENAI_MODEL";
 
@@ -97,23 +106,65 @@ public sealed class CommittyConfigResolver
 	private static int ParsePositiveInt(string? value, int fallback) =>
 		int.TryParse(value?.Trim(), out int parsed) && parsed > 0 ? parsed : fallback;
 
-	public static async Task<CommittyConfig> ResolveAsync(
+	/// <summary>As <see cref="ParsePositiveInt" />, but unset stays null.</summary>
+	public static int? ParseOptionalPositiveInt(string? value) =>
+		int.TryParse(value?.Trim(), out int parsed) && parsed > 0 ? parsed : null;
+
+	/// <summary>
+	/// Reads a yes/no answer as git config's canonical "true"/"false", or null
+	/// when it is neither, so <c>committy config</c> can ask again.
+	/// </summary>
+	public static string? NormalizeBool(string? value) =>
+		value?.Trim().ToLowerInvariant() switch
+		{
+			"y" or "yes" or "true" or "1" or "on"  => "true",
+			"n" or "no" or "false" or "0" or "off" => "false",
+			_                                      => null,
+		};
+
+	public static Task<CommittyConfig> ResolveAsync(
 		ConfigOverrides? overrides = null,
+		CancellationToken cancellationToken = default) =>
+		ResolveAsync(
+			overrides,
+			Environment.GetEnvironmentVariable,
+			GitConfigStore.GetAsync,
+			cancellationToken);
+
+	/// <summary>
+	/// Resolves against injected lookups, so tests can supply environment
+	/// variables and git config without touching the real ones.
+	/// </summary>
+	public static async Task<CommittyConfig> ResolveAsync(
+		ConfigOverrides? overrides,
+		Func<string, string?> getEnvironmentVariable,
+		Func<string, CancellationToken, Task<string?>> getGitConfig,
 		CancellationToken cancellationToken = default)
 	{
 		overrides ??= new ConfigOverrides();
 
-		string? providerName =
-			overrides.Provider
-			?? Environment.GetEnvironmentVariable(PROVIDER_ENV)
-			?? await GitConfigStore.GetAsync(ProviderKey, cancellationToken).ConfigureAwait(false);
+		// Settings: flag, then git config, then the environment variable as a
+		// fallback, so a stray shell export never silently beats `committy config`.
+		async Task<string?> Setting(string? flag, string gitKey, string envVar) =>
+			NullIfBlank(flag)
+			?? NullIfBlank(await getGitConfig(gitKey, cancellationToken).ConfigureAwait(false))
+			?? NullIfBlank(getEnvironmentVariable(envVar));
 
-		Provider provider = ParseProvider(providerName);
+		// API keys: flag, then the environment variable, then git config, so a
+		// secret can live in the shell (or a CI secret) instead of ~/.gitconfig.
+		async Task<string?> Key(string? flag, string envVar, string gitKey) =>
+			NullIfBlank(flag)
+			?? NullIfBlank(getEnvironmentVariable(envVar))
+			?? NullIfBlank(await getGitConfig(gitKey, cancellationToken).ConfigureAwait(false));
 
-		bool titlesOnly =
-			IsTruthy(Environment.GetEnvironmentVariable(TITLES_ONLY_ENV))
-			|| IsTruthy(
-				await GitConfigStore.GetAsync(TitlesOnlyKey, cancellationToken).ConfigureAwait(false));
+		async Task<string?> GitOnly(string gitKey) =>
+			NullIfBlank(await getGitConfig(gitKey, cancellationToken).ConfigureAwait(false));
+
+		Provider provider = ParseProvider(
+			await Setting(overrides.Provider, ProviderKey, PROVIDER_ENV).ConfigureAwait(false));
+
+		bool titlesOnly = IsTruthy(
+			await Setting(null, TitlesOnlyKey, TITLES_ONLY_ENV).ConfigureAwait(false));
 
 		return provider switch
 		{
@@ -123,13 +174,9 @@ public sealed class CommittyConfigResolver
 				TitlesOnly = titlesOnly,
 				Anthropic = new AnthropicConfig
 				{
-					ApiKey = overrides.ApiKey
-						?? Environment.GetEnvironmentVariable(ANTHROPIC_API_KEY_ENV)
-						?? await GitConfigStore.GetAsync(AnthropicApiKeyKey, cancellationToken)
-							.ConfigureAwait(false),
-					Model = overrides.Model
-						?? Environment.GetEnvironmentVariable(ANTHROPIC_MODEL_ENV)
-						?? await GitConfigStore.GetAsync(AnthropicModelKey, cancellationToken)
+					ApiKey = await Key(overrides.ApiKey, ANTHROPIC_API_KEY_ENV, AnthropicApiKeyKey)
+						.ConfigureAwait(false),
+					Model = await Setting(overrides.Model, AnthropicModelKey, ANTHROPIC_MODEL_ENV)
 							.ConfigureAwait(false)
 						?? DefaultAnthropicModel,
 				},
@@ -142,28 +189,20 @@ public sealed class CommittyConfigResolver
 				{
 					// Optional: self-hosted runners generally accept anonymous
 					// requests, so a missing key is not a misconfiguration.
-					ApiKey = overrides.ApiKey
-						?? Environment.GetEnvironmentVariable(OPENAI_API_KEY_ENV)
-						?? await GitConfigStore.GetAsync(OpenAIApiKeyKey, cancellationToken)
-							.ConfigureAwait(false),
+					ApiKey = await Key(overrides.ApiKey, OPENAI_API_KEY_ENV, OpenAIApiKeyKey)
+						.ConfigureAwait(false),
 					// --endpoint doubles as the base URL; the two mean the same
 					// thing to the user and it keeps the flag surface small.
-					BaseUrl = overrides.Endpoint
-						?? Environment.GetEnvironmentVariable(OPENAI_BASE_URL_ENV)
-						?? await GitConfigStore.GetAsync(OpenAIBaseUrlKey, cancellationToken)
-							.ConfigureAwait(false),
-					Model = overrides.Model
-						?? Environment.GetEnvironmentVariable(OPENAI_MODEL_ENV)
-						?? await GitConfigStore.GetAsync(OpenAIModelKey, cancellationToken)
+					BaseUrl = await Setting(overrides.Endpoint, OpenAIBaseUrlKey, OPENAI_BASE_URL_ENV)
+						.ConfigureAwait(false),
+					Model = await Setting(overrides.Model, OpenAIModelKey, OPENAI_MODEL_ENV)
 							.ConfigureAwait(false)
 						?? string.Empty,
 					TimeoutSeconds = ParsePositiveInt(
-						await GitConfigStore.GetAsync(OpenAITimeoutKey, cancellationToken)
-							.ConfigureAwait(false),
+						await GitOnly(OpenAITimeoutKey).ConfigureAwait(false),
 						DefaultOpenAITimeoutSeconds),
 					MaxTokens = ParsePositiveInt(
-						await GitConfigStore.GetAsync(OpenAIMaxTokensKey, cancellationToken)
-							.ConfigureAwait(false),
+						await GitOnly(OpenAIMaxTokensKey).ConfigureAwait(false),
 						DefaultOpenAIMaxTokens),
 				},
 			},
@@ -173,21 +212,25 @@ public sealed class CommittyConfigResolver
 				TitlesOnly = titlesOnly,
 				Azure = new AzureConfig
 				{
-					ApiKey = overrides.ApiKey
-						?? Environment.GetEnvironmentVariable(AZURE_API_KEY_ENV)
-						?? await GitConfigStore.GetAsync(AzureApiKeyKey, cancellationToken)
-							.ConfigureAwait(false),
-					Endpoint = overrides.Endpoint
-						?? Environment.GetEnvironmentVariable(AZURE_ENDPOINT_ENV)
-						?? await GitConfigStore.GetAsync(AzureEndpointKey, cancellationToken)
-							.ConfigureAwait(false),
-					Deployment = overrides.Deployment
-						?? Environment.GetEnvironmentVariable(AZURE_DEPLOYMENT_ENV)
-						?? await GitConfigStore.GetAsync(AzureDeploymentKey, cancellationToken)
+					ApiKey = await Key(overrides.ApiKey, AZURE_API_KEY_ENV, AzureApiKeyKey)
+						.ConfigureAwait(false),
+					Endpoint = await Setting(overrides.Endpoint, AzureEndpointKey, AZURE_ENDPOINT_ENV)
+						.ConfigureAwait(false),
+					Deployment = await Setting(
+								overrides.Deployment,
+								AzureDeploymentKey,
+								AZURE_DEPLOYMENT_ENV)
 							.ConfigureAwait(false)
 						?? DefaultDeployment,
+					ReasoningModel = NormalizeBool(
+						await GitOnly(AzureReasoningModelKey).ConfigureAwait(false)) == "true",
+					MaxTokens = ParseOptionalPositiveInt(
+						await GitOnly(AzureMaxTokensKey).ConfigureAwait(false)),
 				},
 			},
 		};
 	}
+
+	private static string? NullIfBlank(string? value) =>
+		string.IsNullOrWhiteSpace(value) ? null : value.Trim();
 }

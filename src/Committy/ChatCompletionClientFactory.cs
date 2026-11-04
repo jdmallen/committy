@@ -16,7 +16,10 @@ public sealed class ChatCompletionClientFactory(HttpClient httpClient)
 				new AzureOpenAIClientOptions(
 					config.Azure!.ApiKey!,
 					config.Azure.Endpoint!,
-					config.Azure.Deployment)),
+					config.Azure.Deployment)
+				{
+					IsReasoningModel = config.Azure.ReasoningModel,
+				}),
 			Provider.Anthropic => new AnthropicChatClient(
 				httpClient,
 				new AnthropicClientOptions(

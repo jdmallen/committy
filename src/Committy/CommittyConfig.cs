@@ -19,6 +19,26 @@ public sealed class AzureConfig
 
 	public string? Endpoint { get; init; }
 
+	/// <summary>
+	/// Generation budget, or null to keep the prompt's own per-mode default
+	/// (or <see cref="CommittyConfigResolver.DefaultAzureReasoningMaxTokens" />
+	/// for a reasoning deployment).
+	/// </summary>
+	public int? MaxTokens { get; init; }
+
+	/// <summary>
+	/// Set for a reasoning deployment (o-series, gpt-5 and later reasoning
+	/// models): <c>temperature</c> is then not sent, because those models reject
+	/// sampling parameters, and the budget defaults higher because the hidden
+	/// reasoning is spent from it.
+	/// </summary>
+	public bool ReasoningModel { get; init; }
+
+	/// <summary>The budget to send, or null for the prompt's default.</summary>
+	public int? EffectiveMaxTokens =>
+		MaxTokens
+		?? (ReasoningModel ? CommittyConfigResolver.DefaultAzureReasoningMaxTokens : null);
+
 	public string? Validate() =>
 		string.IsNullOrWhiteSpace(ApiKey)
 			? "Azure OpenAI API key is required (run `committy config` or set AZURE_OPENAI_API_KEY)."
@@ -109,10 +129,16 @@ public sealed class CommittyConfig
 
 	/// <summary>
 	/// The generation budget to use, or null to keep the prompt's own per-mode
-	/// default. Only the OpenAI provider overrides it, because a thinking block
-	/// is spent from the same budget as the answer.
+	/// default. The OpenAI provider and Azure reasoning deployments override it,
+	/// because a thinking block is spent from the same budget as the answer.
 	/// </summary>
-	public int? MaxTokensOverride => Provider == Provider.OpenAI ? OpenAI?.MaxTokens : null;
+	public int? MaxTokensOverride =>
+		Provider switch
+		{
+			Provider.OpenAI => OpenAI?.MaxTokens,
+			Provider.Azure  => Azure?.EffectiveMaxTokens,
+			_               => null,
+		};
 
 	public int TimeoutSeconds =>
 		Provider == Provider.OpenAI

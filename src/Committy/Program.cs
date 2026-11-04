@@ -27,7 +27,8 @@ internal class Program
 		};
 		var apiKeyOption = new Option<string?>("--api-key", "-k")
 		{
-			Description = "API key for the provider (optional for openai)",
+			Description =
+				"API key for the provider, saved as a user environment variable (Windows only)",
 			HelpName = "API key",
 		};
 		var endpointOption = new Option<string?>("--endpoint", "-e")
@@ -55,7 +56,9 @@ internal class Program
 		};
 
 		var command
-			= new Command("config", "Configure the LLM provider and credentials (stored in git config)")
+			= new Command(
+				"config",
+				"Configure the LLM provider (stored in git config) and check its API key variable")
 			{
 				providerOption,
 				apiKeyOption,
@@ -91,11 +94,6 @@ internal class Program
 					Provider.Anthropic =>
 					[
 						new ConfigField(
-							"Anthropic API key",
-							CommittyConfigResolver.AnthropicApiKeyKey,
-							parseResult.GetValue(apiKeyOption),
-							Secret: true),
-						new ConfigField(
 							"Anthropic model",
 							CommittyConfigResolver.AnthropicModelKey,
 							parseResult.GetValue(modelOption),
@@ -111,13 +109,6 @@ internal class Program
 							"OpenAI model",
 							CommittyConfigResolver.OpenAIModelKey,
 							parseResult.GetValue(modelOption)),
-						// Blank is a valid answer: SetAsync skips empty values, and
-						// self-hosted runners generally do not authenticate.
-						new ConfigField(
-							"OpenAI API key (blank if the server needs none)",
-							CommittyConfigResolver.OpenAIApiKeyKey,
-							parseResult.GetValue(apiKeyOption),
-							Secret: true),
 						new ConfigField(
 							"OpenAI timeout in seconds",
 							CommittyConfigResolver.OpenAITimeoutKey,
@@ -132,11 +123,6 @@ internal class Program
 					_ =>
 					[
 						new ConfigField(
-							"Azure OpenAI API key",
-							CommittyConfigResolver.AzureApiKeyKey,
-							parseResult.GetValue(apiKeyOption),
-							Secret: true),
-						new ConfigField(
 							"Azure OpenAI endpoint",
 							CommittyConfigResolver.AzureEndpointKey,
 							parseResult.GetValue(endpointOption)),
@@ -145,6 +131,18 @@ internal class Program
 							CommittyConfigResolver.AzureDeploymentKey,
 							parseResult.GetValue(deploymentOption),
 							CommittyConfigResolver.DefaultDeployment),
+						new ConfigField(
+							"Azure reasoning model, e.g. o-series or gpt-5 (y/n)",
+							CommittyConfigResolver.AzureReasoningModelKey,
+							null,
+							"false",
+							Boolean: true),
+						// Blank keeps the prompt's own budget, or 2048 for a
+						// reasoning deployment.
+						new ConfigField(
+							$"Azure max tokens (blank for the default; {CommittyConfigResolver.DefaultAzureReasoningMaxTokens} for reasoning models)",
+							CommittyConfigResolver.AzureMaxTokensKey,
+							null),
 					],
 				};
 
@@ -157,6 +155,19 @@ internal class Program
 						field.FlagValue,
 						current,
 						field.Secret);
+
+					if (field.Boolean)
+					{
+						string? normalized = CommittyConfigResolver.NormalizeBool(value);
+						while (normalized is null && !Console.IsInputRedirected)
+						{
+							Console.WriteLine("  Please answer y or n.");
+							normalized = CommittyConfigResolver.NormalizeBool(
+								Prompt(field.Label, null, current, false));
+						}
+
+						value = normalized ?? CommittyConfigResolver.NormalizeBool(current);
+					}
 
 					await SetAsync(
 						written,
@@ -179,6 +190,36 @@ internal class Program
 				}
 
 				PrintConfigSummary(written, global);
+
+				// Keys live in environment variables, not git config. A key typed
+				// on Windows is saved last, once the git config is written.
+				(string apiKeyVariable, string apiKeyGitKey) = provider switch
+				{
+					Provider.Anthropic => (CommittyConfigResolver.ANTHROPIC_API_KEY_ENV,
+						CommittyConfigResolver.AnthropicApiKeyKey),
+					Provider.OpenAI => (CommittyConfigResolver.OPENAI_API_KEY_ENV,
+						CommittyConfigResolver.OpenAIApiKeyKey),
+					_ => (CommittyConfigResolver.AZURE_API_KEY_ENV,
+						CommittyConfigResolver.AzureApiKeyKey),
+				};
+				string? storedGitKey =
+					await GitConfigStore.GetAsync(apiKeyGitKey, cancellationToken) is null
+						? null
+						: apiKeyGitKey;
+				var apiKeySetup = new ApiKeySetup(
+					new SystemUserEnvironment(),
+					Console.Out,
+					Console.ReadLine,
+					ReadSecret,
+					Environment.GetEnvironmentVariable("SHELL"),
+					OperatingSystem.IsLinux());
+				string? pendingApiKey = apiKeySetup.Run(
+					apiKeyVariable,
+					provider == Provider.OpenAI,
+					parseResult.GetValue(apiKeyOption),
+					storedGitKey,
+					!Console.IsInputRedirected);
+				apiKeySetup.Apply(apiKeyVariable, pendingApiKey);
 			}
 			catch (Exception ex)
 			{
@@ -604,9 +645,9 @@ internal class Program
 		}
 
 		Console.WriteLine(
-			"\nCommitty reads these at commit time. Environment variables (e.g. ANTHROPIC_API_KEY_COMMITTY,");
+			"\nCommitty reads these at commit time, ahead of environment variables such as");
 		Console.WriteLine(
-			"AZURE_OPENAI_API_KEY, OPENAI_BASE_URL) override them for a single invocation.");
+			"OPENAI_BASE_URL. API keys come from environment variables instead (below).");
 	}
 
 	private static string? Prompt(string label, string? flagValue, string? current, bool secret)
@@ -738,12 +779,14 @@ internal class Program
 	/// <summary>
 	/// One persisted <c>committy config</c> field: a label for prompting, the git
 	/// config key it maps to, the flag value (if any), an optional default shown when
-	/// nothing is stored, and whether the value should be masked.
+	/// nothing is stored, whether the value should be masked, and whether it is a
+	/// yes/no setting stored as "true"/"false".
 	/// </summary>
 	private sealed record ConfigField(
 		string Label,
 		string Key,
 		string? FlagValue,
 		string? Default = null,
-		bool Secret = false);
+		bool Secret = false,
+		bool Boolean = false);
 }

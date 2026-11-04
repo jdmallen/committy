@@ -378,13 +378,13 @@ splits it into `reasoning_content` or inlines it as `<think>…</think>`.
 ## LLM Usage Disclaimer
 
 Committy sends your **staged diff** to your configured LLM provider (Azure
-OpenAI or
-Anthropic) to generate commit message suggestions. Be mindful of what you stage:
+OpenAI,
+Anthropic, or local) to generate commit message suggestions. Be mindful of what you stage:
 secrets,
 credentials, or proprietary code in a diff will be transmitted to that
 provider's API.
 Review your organization's data-handling policies before use.
 
-Generative LLM tools were used to help modify tests and scripts during
-development, but this
-project was generally not "vibe coded."
+Generative LLM tools were used to help develop this project; mostly Claude Opus 5.5.
+That said, every line of code, commit message, and documentation was reviewed and 
+edited by a human (yours truly) before being committed to the repository.

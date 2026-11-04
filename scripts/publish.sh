@@ -7,7 +7,7 @@ set -euo pipefail
 repo_root="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
 cd "$repo_root"
 
-project="src/Committy/Committy.csproj"
+project="src/JDMallen.Committy/JDMallen.Committy.csproj"
 exe_name="committy"
 default_runtimes=(linux-x64 linux-arm64 win-x64 win-arm64 osx-x64 osx-arm64)
 

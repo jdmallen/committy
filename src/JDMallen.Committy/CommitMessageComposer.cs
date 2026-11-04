@@ -1,6 +1,6 @@
 using System.Text;
 
-namespace Committy;
+namespace JDMallen.Committy;
 
 /// <summary>
 /// Builds the contents of the prepare-commit-msg file from the suggestions the

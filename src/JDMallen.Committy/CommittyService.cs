@@ -1,6 +1,6 @@
 using TextCopy;
 
-namespace Committy;
+namespace JDMallen.Committy;
 
 /// <summary>
 /// Process-level helpers shared by the CLI: reading the patch from stdin and

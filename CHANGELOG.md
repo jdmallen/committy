@@ -53,6 +53,35 @@ gpt-6-luna), which rejected every request.
   `presence_penalty` (the service defaults). Non-reasoning deployments behave
   as before.
 
+### Internal
+
+No behavioral change for users; recorded so the diff between 1.3.0 and 1.4.0
+reads cleanly.
+
+- **Projects and solution renamed with a `JDMallen.` prefix**, matching the
+  other JDMallen repos: `JDMallen.Committy.slnx`,
+  `src/JDMallen.Committy/JDMallen.Committy.csproj` and
+  `test/JDMallen.Committy.Tests/JDMallen.Committy.Tests.csproj`. The binary is
+  still `committy` (`<AssemblyName>` is unchanged), and so is the
+  `committy/<version>` User-Agent built from it. `scripts/publish.sh` points
+  at the new project path.
+- **`.editorconfig` added,** and the solution reformatted to it: tabs, 80-column
+  wrapping, and ALL_UPPER constants. Rider keeps enum members PascalCase
+  (`resharper_csharp_naming_rule.enum_member`). CA1711 is off for tests, where
+  xUnit's `[CollectionDefinition]` markers are named `*Collection`.
+- **Public constants renamed to ALL_UPPER,** e.g.
+  `CommittyConfigResolver.DefaultDeployment` -> `DEFAULT_DEPLOYMENT`,
+  `ProviderKey` -> `PROVIDER_KEY`, and
+  `CommittyConfig.DefaultTimeoutSeconds` -> `DEFAULT_TIMEOUT_SECONDS`. The
+  git config keys and environment variable names they hold are unchanged.
+- **`CommittyConfigResolver` is now a static class;** every member already was.
+- **Resolver lookups are injectable.** A `ResolveAsync` overload takes the
+  environment-variable and git config readers, so the precedence tests run
+  without touching the real environment or `~/.gitconfig`.
+- **New tests:** the Azure request body (`AzureProviderTests`), resolution
+  order (`CommittyConfigResolverTests`) and the API-key step of
+  `committy config` (`ApiKeySetupTests`).
+
 ## [1.3.0]
 
 Adds a third provider: any endpoint speaking the OpenAI

@@ -1,4 +1,4 @@
-namespace Committy;
+namespace JDMallen.Committy;
 
 /// <summary>
 /// Builds the right <see cref="IChatCompletionClient" /> for the resolved

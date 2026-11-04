@@ -1,4 +1,4 @@
-namespace Committy;
+namespace JDMallen.Committy;
 
 /// <summary>
 /// Turns the model's raw completion text into the list of suggestions committy

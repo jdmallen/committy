@@ -1,7 +1,7 @@
 using CliWrap;
 using CliWrap.Buffered;
 
-namespace Committy;
+namespace JDMallen.Committy;
 
 public static class GitService
 {

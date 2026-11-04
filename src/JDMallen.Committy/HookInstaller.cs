@@ -1,7 +1,7 @@
 using CliWrap;
 using CliWrap.Buffered;
 
-namespace Committy;
+namespace JDMallen.Committy;
 
 /// <summary>
 /// Installs the committy git hook. The hook itself is a thin "trampoline" whose

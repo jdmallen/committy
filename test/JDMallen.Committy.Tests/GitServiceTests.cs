@@ -1,7 +1,7 @@
 using CliWrap;
 using CliWrap.Buffered;
 
-namespace Committy.Tests;
+namespace JDMallen.Committy.Tests;
 
 // GitService runs `git diff --cached` in the process working directory, so these tests
 // change it. Isolate the class in a non-parallel collection so that mutation can't race

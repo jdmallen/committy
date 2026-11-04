@@ -1,4 +1,4 @@
-namespace Committy;
+namespace JDMallen.Committy;
 
 /// <summary>Optional per-invocation overrides, typically sourced from CLI flags.</summary>
 public sealed record ConfigOverrides(

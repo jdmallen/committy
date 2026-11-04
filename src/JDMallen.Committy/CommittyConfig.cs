@@ -1,4 +1,4 @@
-namespace Committy;
+namespace JDMallen.Committy;
 
 public enum Provider
 {

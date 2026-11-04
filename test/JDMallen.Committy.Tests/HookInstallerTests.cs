@@ -1,7 +1,7 @@
 using CliWrap;
 using CliWrap.Buffered;
 
-namespace Committy.Tests;
+namespace JDMallen.Committy.Tests;
 
 public class HookInstallerTests
 {

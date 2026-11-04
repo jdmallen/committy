@@ -1,4 +1,4 @@
-namespace Committy.Tests;
+namespace JDMallen.Committy.Tests;
 
 public class CommitMessageParserTests
 {

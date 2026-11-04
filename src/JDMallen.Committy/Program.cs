@@ -3,7 +3,7 @@ using System.Globalization;
 
 using JetBrains.Annotations;
 
-namespace Committy;
+namespace JDMallen.Committy;
 
 [UsedImplicitly]
 internal class Program

@@ -1,7 +1,7 @@
 using CliWrap;
 using CliWrap.Buffered;
 
-namespace Committy;
+namespace JDMallen.Committy;
 
 /// <summary>
 /// Reads and writes committy settings through <c>git config</c>. Reading uses

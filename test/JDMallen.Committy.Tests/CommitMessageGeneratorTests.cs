@@ -1,7 +1,7 @@
 using NSubstitute;
 using NSubstitute.ExceptionExtensions;
 
-namespace Committy.Tests;
+namespace JDMallen.Committy.Tests;
 
 public class CommitMessageGeneratorTests
 {

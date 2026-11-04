@@ -1,4 +1,4 @@
-namespace Committy;
+namespace JDMallen.Committy;
 
 /// <summary>
 /// Reads environment variables and, where the OS keeps them outside shell

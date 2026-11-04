@@ -1,4 +1,4 @@
-namespace Committy;
+namespace JDMallen.Committy;
 
 /// <summary>
 /// Orchestrates commit message generation independently of any provider: build the

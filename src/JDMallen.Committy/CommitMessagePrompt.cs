@@ -1,6 +1,6 @@
 using System.Globalization;
 
-namespace Committy;
+namespace JDMallen.Committy;
 
 /// <summary>
 /// Builds the provider-agnostic <see cref="CompletionRequest" /> for a commit

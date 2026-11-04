@@ -2,7 +2,7 @@ using System.Reflection;
 
 using Microsoft.Extensions.DependencyInjection;
 
-namespace Committy;
+namespace JDMallen.Committy;
 
 /// <summary>
 /// Builds the shared <see cref="HttpClient" /> backed by

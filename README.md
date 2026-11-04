@@ -4,14 +4,10 @@
 > Anthropic (Claude).
 
 Committy is a cross-platform .NET 10 console app that reads your staged changes
-and
-writes a Conventional Commits message for you — either a single title + body
-that it
-pre-fills into your editor, or five title-only suggestions to pick from. It
-installs
-as a `prepare-commit-msg` git hook, so suggestions appear automatically when you
-run
-`git commit`.
+and writes a Conventional Commits message for you — either a single title + body
+that it pre-fills into your editor, or five title-only suggestions to pick from.
+It installs as a `prepare-commit-msg` git hook, so suggestions appear
+automatically when you run `git commit`.
 
 <!-- shields -->
 <!--
@@ -30,8 +26,9 @@ run
   - **Azure OpenAI** — endpoint, API key, and a deployment name,
   - **Anthropic (Claude)** — an API key, or
   - **OpenAI-compatible** — a base URL and model name; covers openai.com and
-    self-hosted runners (llama.cpp, llama-swap, Ollama, vLLM, LM Studio). An API
-    key is optional, since self-hosted servers usually accept anonymous requests.
+    self-hosted runners (llama.cpp, llama-swap, Ollama, vLLM, LM Studio). An
+    API key is optional, since self-hosted servers usually accept anonymous
+    requests.
 
 **1. Build the executable**
 
@@ -51,8 +48,7 @@ dotnet publish -c Release -r linux-x64 -o ./dist/linux-x64
 **2. Put `committy` on your `PATH`**
 
 Copy the built executable (`dist/<runtime>/committy`, or `committy.exe` on
-Windows)
-to a directory on your `PATH`, e.g.:
+Windows) to a directory on your `PATH`, e.g.:
 
 ```bash
 sudo cp ./dist/linux-x64/committy /usr/local/bin/
@@ -69,18 +65,16 @@ committy install-hook --global      # template for all future repositories
 ```
 
 The installed hook is a thin **trampoline** that only calls
-`committy prepare-commit-msg`;
-all logic lives in the binary, so upgrading committy upgrades its behavior
-everywhere and
-a per-repo hook can't drift out of sync. The hook always exits 0, so it can
-never block a
-commit. On Windows, git runs the hook through its bundled bash, so the same
-command works
-from PowerShell, Command Prompt, and Git Bash.
+`committy prepare-commit-msg`; all logic lives in the binary, so upgrading
+committy upgrades its behavior everywhere and a per-repo hook can't drift out of
+sync. The hook always exits 0, so it can never block a commit. On Windows, git
+runs the hook through its bundled bash, so the same command works from
+PowerShell, Command Prompt, and Git Bash.
 
 > **Upgrading from an older committy?** Earlier versions installed a logic-heavy
-> hook that can fall out of sync with a newer binary. Run `committy repair-hooks`
-> to replace stale committy-managed hooks with the current trampoline:
+> hook that can fall out of sync with a newer binary. Run
+> `committy repair-hooks` to replace stale committy-managed hooks with the
+> current trampoline:
 >
 > ```bash
 > committy repair-hooks                          # repair the current repo
@@ -90,11 +84,11 @@ from PowerShell, Command Prompt, and Git Bash.
 > committy repair-hooks --git-dir ~/.cfg         # a headless repo (e.g. dotfiles)
 > ```
 >
-> Headless repositories — a separate git directory with no in-tree `.git`, such as
-> a `~/.cfg` dotfiles repo driven by `git --git-dir=~/.cfg --work-tree=~` — are
-> intentionally skipped by `--scan`. Point committy straight at the git directory
-> with `--git-dir <dir>` (repeatable) to install (`committy install-hook ~/.cfg`)
-> or repair their hooks.
+> Headless repositories — a separate git directory with no in-tree `.git`, such
+> as a `~/.cfg` dotfiles repo driven by `git --git-dir=~/.cfg --work-tree=~` —
+> are intentionally skipped by `--scan`. Point committy straight at the git
+> directory with `--git-dir <dir>` (repeatable) to install
+> (`committy install-hook ~/.cfg`) or repair their hooks.
 >
 > Only hooks it recognizes as committy-managed are touched; hooks you wrote
 > yourself are reported and left untouched. Add `--backup` to keep the previous
@@ -124,12 +118,10 @@ committy config --provider openai \
 ```
 
 By default this writes to your **global** git config (`~/.gitconfig`); add
-`--local` to
-scope it to the current repository. committy reads these values at commit time,
-and prints
-exactly which keys it set. See [Configuration](#configuration) for the full key
-list and
-environment-variable fallbacks.
+`--local` to scope it to the current repository. committy reads these values at
+commit time, and prints exactly which keys it set. See
+[Configuration](#configuration) for the full key list and environment-variable
+fallbacks.
 
 **5. Set your API key**
 
@@ -161,8 +153,8 @@ its value:
 > Windows user variables reach desktop apps already.
 
 > For Azure, the deployment name often matches the model you selected (e.g.
-`gpt-4.1-mini`,
-> committy's default), but verify it in the Azure portal — it isn't guaranteed.
+> `gpt-4.1-mini`, committy's default), but verify it in the Azure portal — it
+> isn't guaranteed.
 
 ## Usage
 
@@ -174,24 +166,20 @@ git commit
 ```
 
 Committy reads the staged diff and pre-fills your editor with a suggested commit
-message
-that you can edit or accept.
+message that you can edit or accept.
 
 ### Output modes
 
 - **Title + body** (default): one Conventional Commits message — a short title
-  plus a body
-  summarizing the change. Pre-filled into your commit message.
+  plus a body summarizing the change. Pre-filled into your commit message.
 - **Titles only** (`--titles-only` / `COMMITTY_TITLES_ONLY=1`): five title-only
-  suggestions,
-  inserted as comments at the top of the commit message; uncomment the one you
-  want.
+  suggestions, inserted as comments at the top of the commit message; uncomment
+  the one you want.
 
 To make titles-only the default, set `COMMITTY_TITLES_ONLY=1` (accepted truthy
-values:
-`1`, `true`, `yes`, `on`, case-insensitive) or run
-`committy config --titles-only`, which
-persists `committy.titlesonly=true` in git config.
+values: `1`, `true`, `yes`, `on`, case-insensitive) or run
+`committy config --titles-only`, which persists `committy.titlesonly=true` in
+git config.
 
 ### Manual usage
 
@@ -218,8 +206,7 @@ COMMITTY_TITLES_ONLY=1 committy
 ```
 
 Settings come from your saved config, but any of them can be overridden
-per-invocation
-with a flag or environment variable:
+per-invocation with a flag or environment variable:
 
 ```bash
 # Override the configured provider for one run
@@ -271,20 +258,16 @@ For every setting, the precedence is **flag → environment variable → git
 config → default**.
 
 **Clipboard support** is optional: Linux needs `xsel` or `xclip`; macOS uses
-built-in
-`pbcopy`/`pbpaste`; Windows uses the built-in clipboard APIs. If a clipboard
-tool isn't
-available, committy shows a one-time warning and continues normally.
+built-in `pbcopy`/`pbpaste`; Windows uses the built-in clipboard APIs. If a
+clipboard tool isn't available, committy shows a one-time warning and continues
+normally.
 
 ## Configuration
 
 `committy config` stores settings in **git config** under the `committy.*`
-section, so the
-repo-vs-global distinction is native and committy can read it immediately at
-commit time
-(no shell restart needed). Use `--local` to scope to the current repository; the
-default is
-global (`~/.gitconfig`).
+section, so the repo-vs-global distinction is native and committy can read it
+immediately at commit time (no shell restart needed). Use `--local` to scope to
+the current repository; the default is global (`~/.gitconfig`).
 
 | git config key              | Provider  | Purpose                               |
 |-----------------------------|-----------|---------------------------------------|
@@ -340,13 +323,13 @@ because of how self-hosted models behave:
 
 - **`timeoutseconds` defaults to `300`**, not 30. A cold model loads its weights
   from disk before generating a single token, which can take minutes.
-- **`maxtokens` defaults to `2048`**, replacing the built-in 100 (titles) and 500
-  (title + body) budgets. A reasoning model spends most of its output on a
-  thinking block that committy discards, so a small budget truncates the thought
-  and leaves no message behind.
+- **`maxtokens` defaults to `2048`**, replacing the built-in 100 (titles) and
+  500 (title + body) budgets. A reasoning model spends most of its output on a
+  thinking block that committy discards, so a small budget truncates the
+  thought and leaves no message behind.
 
-Reasoning models are supported: the thinking block is stripped whether the server
-splits it into `reasoning_content` or inlines it as `<think>…</think>`.
+Reasoning models are supported: the thinking block is stripped whether the
+server splits it into `reasoning_content` or inlines it as `<think>…</think>`.
 
 > **Quality note:** output quality tracks the model you point at. A small
 > quantized model generally follows the prompt less reliably than the hosted
@@ -354,8 +337,8 @@ splits it into `reasoning_content` or inlines it as `<think>…</think>`.
 
 > **Note:** committy 1.3.0 and earlier stored API keys in plaintext in git
 > config, and committy still reads one when the environment variable is unset.
-> That fallback also keeps desktop-app commits working (see
-> step 5, "Set your API key", under [Install](#install)). If you only commit from terminals,
+> That fallback also keeps desktop-app commits working (see step 5, "Set your
+> API key", under [Install](#install)). If you only commit from terminals,
 > remove it once the variable is set, e.g.
 > `git config --global --unset committy.azure.apikey`.
 
@@ -369,8 +352,8 @@ splits it into `reasoning_content` or inlines it as `<think>…</think>`.
   [Azure reasoning deployments](#azure-reasoning-deployments)).
 - **"… configuration incomplete / missing"** — run `committy config` to set up a
   provider, or check the relevant environment variables.
-- **Hook not running** — confirm you're in a git repo with staged changes (
-  `git diff --cached`); re-run `committy install-hook` if needed.
+- **Hook not running** — confirm you're in a git repo with staged changes
+  (`git diff --cached`); re-run `committy install-hook` if needed.
 - **Old/odd hook behavior after upgrading** — run `committy repair-hooks` (add
   `--scan <dir>` to sweep many repos) to replace stale hooks with the current
   trampoline.
@@ -378,13 +361,12 @@ splits it into `reasoning_content` or inlines it as `<think>…</think>`.
 ## LLM Usage Disclaimer
 
 Committy sends your **staged diff** to your configured LLM provider (Azure
-OpenAI,
-Anthropic, or local) to generate commit message suggestions. Be mindful of what you stage:
-secrets,
-credentials, or proprietary code in a diff will be transmitted to that
-provider's API.
-Review your organization's data-handling policies before use.
+OpenAI, Anthropic, or local) to generate commit message suggestions. Be mindful
+of what you stage: secrets, credentials, or proprietary code in a diff will be
+transmitted to that provider's API. Review your organization's data-handling
+policies before use.
 
-Generative LLM tools were used to help develop this project; mostly Claude Opus 5.5.
-That said, every line of code, commit message, and documentation was reviewed and 
-edited by a human (yours truly) before being committed to the repository.
+Generative LLM tools were used to help develop this project; mostly Claude
+Opus 5.5. That said, every line of code, commit message, and documentation was
+reviewed and edited by a human (yours truly) before being committed to the
+repository.

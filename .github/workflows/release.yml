@@ -1,11 +1,12 @@
 # Releases a new version whenever a commit lands on main (e.g. a merged PR)
 # with a <Version> in Directory.Build.props that hasn't been tagged yet:
-#   1. builds the release archives with scripts/publish.sh (default runtimes),
-#   2. tags the pushed commit with the raw semver (no 'v' prefix), and
-#   3. creates a GitHub release whose notes are that version's CHANGELOG.md
+#   1. runs the test suite, so a failing commit never ships,
+#   2. builds the release archives with scripts/publish.sh (default runtimes),
+#   3. tags the pushed commit with the raw semver (no 'v' prefix), and
+#   4. creates a GitHub release whose notes are that version's CHANGELOG.md
 #      section, with the archives and a SHA256SUMS.txt attached.
 # (Tagging and release creation are one atomic gh call, ordered after the
-# build so a failed publish never leaves a dangling tag.)
+# tests and build so a failed run never leaves a dangling tag.)
 # If the version's tag already exists, the run is a no-op, so routine merges
 # that don't bump <Version> never re-release.
 name: Release
@@ -55,6 +56,10 @@ jobs:
         uses: actions/setup-dotnet@v4
         with:
           dotnet-version: '10.0.x'
+
+      - name: Run tests
+        if: steps.tag_check.outputs.exists == 'false'
+        run: dotnet test --configuration Release
 
       - name: Publish release binaries
         if: steps.tag_check.outputs.exists == 'false'

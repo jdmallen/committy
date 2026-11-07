@@ -78,15 +78,15 @@ public static class CommittyConfigResolver
 		value?.Trim().ToLowerInvariant() switch
 		{
 			"1" or "true" or "yes" or "on" => true,
-			_ => false,
+			_                              => false,
 		};
 
 	public static Provider ParseProvider(string? name) =>
 		name?.Trim().ToLowerInvariant() switch
 		{
 			"anthropic" or "claude" => Provider.Anthropic,
-			"openai" or "local" => Provider.OpenAI,
-			_ => Provider.Azure,
+			"openai" or "local"     => Provider.OpenAI,
+			_                       => Provider.Azure,
 		};
 
 	/// <summary>
@@ -98,8 +98,8 @@ public static class CommittyConfigResolver
 		provider switch
 		{
 			Provider.Anthropic => "anthropic",
-			Provider.OpenAI => "openai",
-			_ => "azure",
+			Provider.OpenAI    => "openai",
+			_                  => "azure",
 		};
 
 	/// <summary>
@@ -124,9 +124,9 @@ public static class CommittyConfigResolver
 	public static string? NormalizeBool(string? value) =>
 		value?.Trim().ToLowerInvariant() switch
 		{
-			"y" or "yes" or "true" or "1" or "on" => "true",
+			"y" or "yes" or "true" or "1" or "on"  => "true",
 			"n" or "no" or "false" or "0" or "off" => "false",
-			_ => null,
+			_                                      => null,
 		};
 
 	public static Task<CommittyConfig> ResolveAsync(
@@ -142,11 +142,76 @@ public static class CommittyConfigResolver
 	/// Resolves against injected lookups, so tests can supply environment
 	/// variables and git config without touching the real ones.
 	/// </summary>
-	public static async Task<CommittyConfig> ResolveAsync(
+	public static Task<CommittyConfig> ResolveAsync(
 		ConfigOverrides? overrides,
 		Func<string, string?> getEnvironmentVariable,
 		Func<string, CancellationToken, Task<string?>> getGitConfig,
+		CancellationToken cancellationToken = default) =>
+		ResolveAsync(
+			overrides,
+			getEnvironmentVariable,
+			async (key, token) =>
+				await getGitConfig(key, token).ConfigureAwait(false) is
+				{
+				} value
+					? new GitConfigValue(value, null)
+					: null,
+			null,
+			cancellationToken);
+
+	/// <summary>
+	/// Resolves the configuration as
+	/// <see cref="ResolveAsync(ConfigOverrides?, CancellationToken)" /> does,
+	/// and also reports where each setting came from, including the git
+	/// config scope. Run from inside a repository, a local value shows as such.
+	/// </summary>
+	public static Task<ResolvedConfig> ResolveWithSourcesAsync(
+		ConfigOverrides? overrides = null,
+		CancellationToken cancellationToken = default) =>
+		ResolveWithSourcesAsync(
+			overrides,
+			Environment.GetEnvironmentVariable,
+			GitConfigStore.GetWithScopeAsync,
+			cancellationToken);
+
+	/// <summary>
+	/// As
+	/// <see cref="ResolveWithSourcesAsync(ConfigOverrides?, CancellationToken)" />,
+	/// against injected lookups.
+	/// </summary>
+	public static async Task<ResolvedConfig> ResolveWithSourcesAsync(
+		ConfigOverrides? overrides,
+		Func<string, string?> getEnvironmentVariable,
+		Func<string, CancellationToken, Task<GitConfigValue?>> getGitConfig,
 		CancellationToken cancellationToken = default)
+	{
+		var sources = new Dictionary<string, ConfigSource>();
+		CommittyConfig config = await ResolveAsync(
+				overrides,
+				getEnvironmentVariable,
+				getGitConfig,
+				sources,
+				cancellationToken)
+			.ConfigureAwait(false);
+
+		return new ResolvedConfig(config, sources);
+	}
+
+
+	/// <param name="getGitConfig"></param>
+	/// <param name="sources">
+	/// When set, receives where each setting came from, keyed by git config
+	/// key.
+	/// </param>
+	/// <param name="overrides"></param>
+	/// <param name="getEnvironmentVariable"></param>
+	/// <param name="cancellationToken"></param>
+	private static async Task<CommittyConfig> ResolveAsync(
+		ConfigOverrides? overrides,
+		Func<string, string?> getEnvironmentVariable,
+		Func<string, CancellationToken, Task<GitConfigValue?>> getGitConfig,
+		Dictionary<string, ConfigSource>? sources,
+		CancellationToken cancellationToken)
 	{
 		overrides ??= new ConfigOverrides();
 
@@ -250,28 +315,68 @@ public static class CommittyConfigResolver
 		};
 
 		async Task<string?> GitOnly(string gitKey) =>
-			NullIfBlank(
-				await getGitConfig(gitKey, cancellationToken)
-					.ConfigureAwait(false));
+			await FromGit(gitKey).ConfigureAwait(false)
+			?? Default(gitKey);
 
 		// API keys: flag, then the environment variable, then git config, so a
 		// secret can live in the shell (or a CI secret) instead of ~/.gitconfig.
 		async Task<string?> Key(string? flag, string envVar, string gitKey) =>
-			NullIfBlank(flag)
-			?? NullIfBlank(getEnvironmentVariable(envVar))
-			?? NullIfBlank(
-				await getGitConfig(gitKey, cancellationToken)
-					.ConfigureAwait(false));
+			FromFlag(flag, gitKey)
+			?? FromEnvironment(envVar, gitKey)
+			?? await FromGit(gitKey).ConfigureAwait(false)
+			?? Default(gitKey);
 
 		// Settings: flag, then git config, then the environment variable as a
 		// fallback, so a stray shell export never silently beats `committy config`.
 		async Task<string?> Setting(string? flag, string gitKey, string envVar)
 			=>
-				NullIfBlank(flag)
-				?? NullIfBlank(
-					await getGitConfig(gitKey, cancellationToken)
-						.ConfigureAwait(false))
-				?? NullIfBlank(getEnvironmentVariable(envVar));
+				FromFlag(flag, gitKey)
+				?? await FromGit(gitKey).ConfigureAwait(false)
+				?? FromEnvironment(envVar, gitKey)
+				?? Default(gitKey);
+
+		string? FromFlag(string? flag, string gitKey) =>
+			Record(NullIfBlank(flag), gitKey, ConfigSource.FromFlag);
+
+		string? FromEnvironment(string envVar, string gitKey) =>
+			Record(
+				NullIfBlank(getEnvironmentVariable(envVar)),
+				gitKey,
+				new ConfigSource(ConfigSourceKind.Environment, envVar));
+
+		async Task<string?> FromGit(string gitKey)
+		{
+			GitConfigValue? found =
+				await getGitConfig(gitKey, cancellationToken)
+					.ConfigureAwait(false);
+
+			return Record(
+				NullIfBlank(found?.Value),
+				gitKey,
+				new ConfigSource(ConfigSourceKind.GitConfig, found?.Scope));
+		}
+
+		// Nothing set: the caller applies the built-in default, if any.
+		string? Default(string gitKey) =>
+			Record(
+				null,
+				gitKey,
+				ConfigSource.FromDefault,
+				true);
+
+		string? Record(
+			string? value,
+			string gitKey,
+			ConfigSource source,
+			bool always = false)
+		{
+			if (sources is not null && (value is not null || always))
+			{
+				sources[gitKey] = source;
+			}
+
+			return value;
+		}
 	}
 
 	private static string? NullIfBlank(string? value) =>

@@ -1,5 +1,6 @@
 using System.CommandLine;
 using System.Globalization;
+using System.Reflection;
 
 using JetBrains.Annotations;
 
@@ -8,6 +9,9 @@ namespace JDMallen.Committy;
 [UsedImplicitly]
 internal class Program
 {
+	/// <summary>The usage log's directory name under local app data.</summary>
+	private const string USAGE_APPLICATION_NAME = "committy";
+
 	private static async Task AppendLinesAsync(
 		string file,
 		IEnumerable<string> lines) => await File.AppendAllTextAsync(
@@ -354,12 +358,13 @@ internal class Program
 					return;
 				}
 
-				List<string> suggestions =
+				CommitSuggestions suggestions =
 					await GenerateAsync(
 						config,
 						patch,
 						config.TitlesOnly,
 						cancellationToken);
+				RecordUsage(suggestions.Usage);
 
 				string existing = File.Exists(commitMsgFile)
 					? await File.ReadAllTextAsync(
@@ -368,9 +373,10 @@ internal class Program
 					: string.Empty;
 
 				string composed = CommitMessageComposer.Compose(
-					suggestions,
+					suggestions.Messages,
 					config.TitlesOnly,
-					existing);
+					existing,
+					suggestions.Usage);
 
 				await File.WriteAllTextAsync(
 					commitMsgFile,
@@ -500,7 +506,7 @@ internal class Program
 	/// need minutes where a hosted one needs seconds, and a single invocation
 	/// makes exactly one completion call.
 	/// </summary>
-	private static async Task<List<string>> GenerateAsync(
+	private static async Task<CommitSuggestions> GenerateAsync(
 		CommittyConfig config,
 		string patch,
 		bool titlesOnly,
@@ -566,14 +572,18 @@ internal class Program
 		};
 		var clipboardOption = new Option<bool>(
 			"--clipboard",
-			"-c")
-		{ Description = "Copy first suggestion to clipboard" };
+			"-c") { Description = "Copy first suggestion to clipboard" };
 		var titlesOnlyOption = new Option<bool>(
 			"--titles-only",
 			"-t")
 		{
 			Description =
 				"Generate 5 title-only suggestions instead of a single title+body message",
+		};
+		var infoOption = new Option<bool>("--info")
+		{
+			Description =
+				"Show the configuration in effect here, where each setting comes from, and lifetime token usage",
 		};
 
 		var rootCommand =
@@ -588,6 +598,7 @@ internal class Program
 				noGitOption,
 				clipboardOption,
 				titlesOnlyOption,
+				infoOption,
 			};
 
 		rootCommand.SetAction(async (parseResult, cancellationToken) =>
@@ -601,6 +612,14 @@ internal class Program
 				parseResult.GetValue(endpointOption),
 				parseResult.GetValue(deploymentOption),
 				parseResult.GetValue(modelOption));
+
+			if (parseResult.GetValue(infoOption))
+			{
+				Console.WriteLine(
+					await BuildInfoReportAsync(overrides, cancellationToken));
+
+				return;
+			}
 
 			try
 			{
@@ -638,22 +657,23 @@ internal class Program
 					Environment.Exit(1);
 				}
 
-				List<string> suggestions =
+				CommitSuggestions suggestions =
 					await GenerateAsync(
 						config,
 						patch,
 						titlesOnly,
 						cancellationToken);
+				RecordUsage(suggestions.Usage);
 
-				foreach (string suggestion in suggestions)
+				foreach (string suggestion in suggestions.Messages)
 				{
 					Console.WriteLine(suggestion);
 				}
 
-				if (copyToClipboard && suggestions.Count > 0)
+				if (copyToClipboard && suggestions.Messages.Count > 0)
 				{
 					await CommittyService.CopyToClipboardAsync(
-						suggestions[0],
+						suggestions.Messages[0],
 						cancellationToken);
 				}
 			}
@@ -674,6 +694,51 @@ internal class Program
 		rootCommand.Subcommands.Add(BuildConfigCommand());
 
 		return await rootCommand.Parse(args).InvokeAsync();
+	}
+
+	private static async Task<string> BuildInfoReportAsync(
+		ConfigOverrides overrides,
+		CancellationToken cancellationToken)
+	{
+		ResolvedConfig resolved =
+			await CommittyConfigResolver.ResolveWithSourcesAsync(
+				overrides,
+				cancellationToken);
+		string? repository =
+			await GitService.TryGetRepositoryAsync(cancellationToken);
+		string usagePath = TokenUsageLog.DefaultPath(USAGE_APPLICATION_NAME);
+		TokenUsageTotals? totals =
+			TokenUsageLog.Read(usagePath, out string? usageError);
+
+		return InfoReport.Build(
+			BuildVersionLine(),
+			repository,
+			resolved,
+			new InfoReport.UsageReport(usagePath, totals, usageError));
+	}
+
+	private static string BuildVersionLine() =>
+		$"committy {typeof(Program).Assembly.GetCustomAttribute<AssemblyInformationalVersionAttribute>()?.InformationalVersion}";
+
+	/// <summary>
+	/// Adds one run's tokens to the lifetime totals. A failure is reported on
+	/// stderr and otherwise ignored: the suggestions matter more than the
+	/// count.
+	/// </summary>
+	private static void RecordUsage(TokenUsage? usage)
+	{
+		var run = new TokenUsageTally();
+		run.Add(usage);
+		string path = TokenUsageLog.DefaultPath(USAGE_APPLICATION_NAME);
+		if (!TokenUsageLog.TryRecord(
+			    path,
+			    run,
+			    DateTimeOffset.Now,
+			    out string? error))
+		{
+			Console.Error.WriteLine(
+				$"Warning: token usage not recorded in {path}: {error}");
+		}
 	}
 
 	private static string Mask(string value) =>
@@ -810,8 +875,8 @@ internal class Program
 			CommittyConfigResolver.ParseProvider(current) switch
 			{
 				Provider.Anthropic => "2",
-				Provider.OpenAI => "3",
-				_ => "1",
+				Provider.OpenAI    => "3",
+				_                  => "1",
 			};
 		Console.Write($"Choice [{defaultChoice}]: ");
 
@@ -821,8 +886,8 @@ internal class Program
 		return choice switch
 		{
 			"2" or "anthropic" or "claude" => Provider.Anthropic,
-			"3" or "openai" or "local" => Provider.OpenAI,
-			_ => Provider.Azure,
+			"3" or "openai" or "local"     => Provider.OpenAI,
+			_                              => Provider.Azure,
 		};
 	}
 

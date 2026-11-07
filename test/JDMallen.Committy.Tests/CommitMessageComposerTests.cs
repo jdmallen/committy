@@ -1,3 +1,5 @@
+using System.Globalization;
+
 namespace JDMallen.Committy.Tests;
 
 public class CommitMessageComposerTests
@@ -69,5 +71,62 @@ public class CommitMessageComposerTests
 
 		Assert.Contains("# feat: x", result);
 		Assert.EndsWith("# Or write your own commit message above\n", result);
+	}
+
+	[Fact]
+	public void Compose_WithUsage_EndsWithTheTokenComment()
+	{
+		CultureInfo.CurrentCulture = CultureInfo.InvariantCulture;
+
+		string titleAndBody = CommitMessageComposer.Compose(
+			["feat: x"],
+			false,
+			EXISTING,
+			new TokenUsage(1200, 34));
+		string titlesOnly = CommitMessageComposer.Compose(
+			["feat: x"],
+			true,
+			EXISTING,
+			new TokenUsage(1200, 34));
+
+		const string comment =
+			"# Committy: 1,234 tokens (1,200 in, 34 out)\n";
+		Assert.EndsWith(comment, titleAndBody);
+		Assert.EndsWith(
+			$"# Or write your own commit message above\n{comment}",
+			titlesOnly);
+	}
+
+	[Fact]
+	public void Compose_WithUsage_KeepsTheCommentAboveTheVerboseDiff()
+	{
+		CultureInfo.CurrentCulture = CultureInfo.InvariantCulture;
+		const string verbose =
+			EXISTING
+			+ "# ------------------------ >8 ------------------------\n"
+			+ "# Do not modify or remove the line above.\n"
+			+ "diff --git a/x b/x\n";
+
+		string result = CommitMessageComposer.Compose(
+			["feat: x"],
+			false,
+			verbose,
+			new TokenUsage(10, 5));
+
+		int comment = result.IndexOf(
+			"# Committy: 15 tokens",
+			StringComparison.Ordinal);
+		int scissors = result.IndexOf(">8", StringComparison.Ordinal);
+		Assert.InRange(comment, 0, scissors);
+		Assert.EndsWith("diff --git a/x b/x\n", result);
+	}
+
+	[Fact]
+	public void Compose_WithoutUsage_WritesNoTokenComment()
+	{
+		string result =
+			CommitMessageComposer.Compose(["feat: x"], false, EXISTING);
+
+		Assert.DoesNotContain("tokens", result);
 	}
 }

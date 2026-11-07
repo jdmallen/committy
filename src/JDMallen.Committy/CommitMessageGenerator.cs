@@ -16,7 +16,7 @@ public sealed class CommitMessageGenerator(
 	IChatCompletionClient client,
 	int? maxTokensOverride = null)
 {
-	public async Task<List<string>> GenerateAsync(
+	public async Task<CommitSuggestions> GenerateAsync(
 		string patch,
 		bool titlesOnly,
 		CancellationToken cancellationToken = default)
@@ -34,13 +34,16 @@ public sealed class CommitMessageGenerator(
 				patch,
 				titlesOnly,
 				maxTokensOverride);
-			string raw = await client.CompleteAsync(request, cancellationToken)
+			CompletionResult result = await client
+				.GetCompletionAsync(request, cancellationToken)
 				.ConfigureAwait(false);
 
-			return CommitMessageParser.Parse(raw, titlesOnly);
+			return new CommitSuggestions(
+				CommitMessageParser.Parse(result.Text, titlesOnly),
+				result.Usage);
 		}
 		catch (Exception ex) when (ex is not ArgumentException
-									   and not OperationCanceledException)
+			                           and not OperationCanceledException)
 		{
 			throw new InvalidOperationException(
 				$"Failed to generate commit message suggestions: {ex.Message}",
@@ -48,3 +51,15 @@ public sealed class CommitMessageGenerator(
 		}
 	}
 }
+
+/// <summary>The parsed suggestions and the tokens it took to get them.</summary>
+/// <param name="Messages">
+/// In titles-only mode, the title suggestions. Otherwise the single title+body
+/// message.
+/// </param>
+/// <param name="Usage">
+/// The request's token usage, or null when the provider didn't report it.
+/// </param>
+public sealed record CommitSuggestions(
+	List<string> Messages,
+	TokenUsage? Usage);

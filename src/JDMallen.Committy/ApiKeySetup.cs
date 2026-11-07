@@ -26,7 +26,8 @@ public sealed class SystemUserEnvironment : IUserEnvironment
 {
 	public bool CanPersist => OperatingSystem.IsWindows();
 
-	public string? GetVariable(string name) => Environment.GetEnvironmentVariable(name);
+	public string? GetVariable(string name)
+		=> Environment.GetEnvironmentVariable(name);
 
 	public void SetPersistent(string name, string value)
 	{
@@ -165,10 +166,10 @@ public sealed class ApiKeySetup(
 			string? answer = readLine()?.Trim().ToLowerInvariant();
 			bool? save = answer switch
 			{
-				null or "" => defaultYes,
+				null or ""   => defaultYes,
 				"y" or "yes" => true,
-				"n" or "no" => false,
-				_ => null,
+				"n" or "no"  => false,
+				_            => null,
 			};
 
 			if (save is false)
@@ -260,10 +261,10 @@ public sealed class ApiKeySetup(
 		return shellName switch
 		{
 			"fish" => ($"set -Ux {variable} {value}", null),
-			"zsh" => ($"export {variable}={value}", "~/.zshrc"),
+			"zsh"  => ($"export {variable}={value}", "~/.zshrc"),
 			"bash" => ($"export {variable}={value}", "~/.bashrc"),
 			"tcsh" => ($"setenv {variable} {value}", "~/.tcshrc"),
-			"csh" => ($"setenv {variable} {value}", "~/.cshrc"),
+			"csh"  => ($"setenv {variable} {value}", "~/.cshrc"),
 			"pwsh" or "powershell" => ($"$env:{variable} = {value}",
 				"$PROFILE"),
 			"nu" => ($"$env.{variable} = {value}", "$nu.env-path"),

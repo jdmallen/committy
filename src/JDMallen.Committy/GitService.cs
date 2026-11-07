@@ -43,6 +43,33 @@ public static class GitService
 	}
 
 	/// <summary>
+	/// The repository committy is being run in, as git sees it: the work tree's
+	/// top level, or the git directory for a headless repository (such as a
+	/// <c>GIT_DIR=~/.cfg</c> dotfiles setup). Null outside any repository,
+	/// where only global and system git config apply.
+	/// </summary>
+	public static async Task<string?> TryGetRepositoryAsync(
+		CancellationToken cancellationToken = default)
+	{
+		foreach (string flag in (string[])
+		         ["--show-toplevel", "--absolute-git-dir"])
+		{
+			BufferedCommandResult result = await Cli.Wrap("git")
+				.WithArguments(["rev-parse", flag])
+				.WithValidation(CommandResultValidation.None)
+				.ExecuteBufferedAsync(cancellationToken)
+				.ConfigureAwait(false);
+			string path = result.StandardOutput.Trim();
+			if (result.ExitCode == 0 && path.Length > 0)
+			{
+				return path;
+			}
+		}
+
+		return null;
+	}
+
+	/// <summary>
 	/// Throws a clear error when the working directory isn't inside a git work tree,
 	/// so callers get an actionable message instead of git's raw <c>diff</c> usage output.
 	/// </summary>
@@ -56,8 +83,8 @@ public static class GitService
 			.ConfigureAwait(false);
 
 		if (result.ExitCode != 0
-			|| !result.StandardOutput.Trim()
-				.Equals("true", StringComparison.OrdinalIgnoreCase))
+		    || !result.StandardOutput.Trim()
+			    .Equals("true", StringComparison.OrdinalIgnoreCase))
 		{
 			throw new InvalidOperationException(
 				"Not a git repository. Run committy from inside a git repository.");

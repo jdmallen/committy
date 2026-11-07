@@ -1,3 +1,4 @@
+using System.Globalization;
 using System.Text;
 
 namespace JDMallen.Committy;
@@ -17,6 +18,13 @@ public static class CommitMessageComposer
 		"# Or write your own commit message above";
 
 	/// <summary>
+	/// The line <c>git commit --verbose</c> puts above the diff. Git ignores
+	/// everything after it, so the token count goes above it.
+	/// </summary>
+	private const string SCISSORS_LINE =
+		"# ------------------------ >8 ------------------------";
+
+	/// <summary>
 	/// Produces the new commit-message file contents.
 	/// </summary>
 	/// <param name="suggestions">
@@ -28,12 +36,30 @@ public static class CommitMessageComposer
 	/// The current contents of the commit message file
 	/// (git's template).
 	/// </param>
+	/// <param name="usage">
+	/// The tokens the suggestions took, written as a comment at the bottom; null
+	/// (the provider didn't report usage) writes nothing.
+	/// </param>
 	public static string Compose(
 		IReadOnlyList<string> suggestions,
 		bool titlesOnly,
-		string existingContent)
+		string existingContent,
+		TokenUsage? usage = null)
 	{
 		string existing = NormalizeNewlines(existingContent).TrimEnd('\n');
+		var scissors = string.Empty;
+		int scissorsAt =
+			existing.StartsWith(SCISSORS_LINE, StringComparison.Ordinal)
+				? 0
+				: existing.IndexOf(
+					$"\n{SCISSORS_LINE}",
+					StringComparison.Ordinal);
+		if (usage is not null && scissorsAt >= 0)
+		{
+			scissors = existing[scissorsAt..].TrimStart('\n');
+			existing = existing[..scissorsAt].TrimEnd('\n');
+		}
+
 		var sb = new StringBuilder();
 
 		if (titlesOnly)
@@ -43,7 +69,7 @@ public static class CommitMessageComposer
 			sb.Append('\n');
 
 			foreach (string line in suggestions.SelectMany(suggestion
-						 => NormalizeNewlines(suggestion).Split('\n')))
+				         => NormalizeNewlines(suggestion).Split('\n')))
 			{
 				sb.Append("# ").Append(line).Append('\n');
 			}
@@ -66,8 +92,24 @@ public static class CommitMessageComposer
 			sb.Append(existing).Append('\n');
 		}
 
+		if (usage is not null)
+		{
+			sb.Append(UsageComment(usage)).Append('\n');
+		}
+
+		if (scissors.Length > 0)
+		{
+			sb.Append(scissors).Append('\n');
+		}
+
 		return sb.ToString();
 	}
+
+	/// <summary>The token-count comment, e.g. "# Committy: 1,234 tokens (…)".</summary>
+	private static string UsageComment(TokenUsage usage) =>
+		string.Create(
+			CultureInfo.CurrentCulture,
+			$"# Committy: {usage.TotalTokens:N0} tokens ({usage.InputTokens:N0} in, {usage.OutputTokens:N0} out)");
 
 	private static string NormalizeNewlines(string value) =>
 		value.Replace("\r\n", "\n").Replace("\r", "\n");

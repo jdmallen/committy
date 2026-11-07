@@ -5,6 +5,27 @@ All notable changes to this project are documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [1.5.0]
+
+### Added
+
+- **Token usage.** When the provider reports usage, the hook ends the commit
+  message with a comment such as
+  `# Committy: 1,234 tokens (1,200 in, 34 out)`, placed above the diff when
+  committing with `--verbose`. Every run (hook or manual) is added to lifetime
+  totals in `usage.json` in the local app data directory.
+- **`committy --info`.** Shows the configuration in effect for the current
+  directory, so a repository's local git config is reflected, along with the
+  source of each setting (flag, `git config --local`/`--global`/`--system`,
+  environment variable, or default), whether the API key is set (never its
+  value), and the lifetime token total and average per run.
+
+### Changed
+
+- Requires `JDMallen.Toolbox.AI` 4.4.0: completions go through
+  `GetCompletionAsync` instead of the deprecated `CompleteAsync`, and usage is
+  kept with its `TokenUsageLog`, shared with shelly.
+
 ## [1.4.0]
 
 Fixes Azure OpenAI reasoning deployments (o-series, gpt-5 and later, e.g.

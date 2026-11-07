@@ -27,7 +27,7 @@ public class CommitMessageGeneratorTests
 	{
 		var client = Substitute.For<IChatCompletionClient>();
 		var inner = new HttpRequestException("boom");
-		client.CompleteAsync(
+		client.GetCompletionAsync(
 				Arg.Any<CompletionRequest>(),
 				Arg.Any<CancellationToken>())
 			.ThrowsAsync(inner);
@@ -48,21 +48,26 @@ public class CommitMessageGeneratorTests
 	public async Task GenerateAsync_TitleAndBody_PassesRequestAndParsesResult()
 	{
 		var client = Substitute.For<IChatCompletionClient>();
-		client.CompleteAsync(
+		client.GetCompletionAsync(
 				Arg.Any<CompletionRequest>(),
 				Arg.Any<CancellationToken>())
-			.Returns("feat: do thing\n\nDetail.");
+			.Returns(
+				new CompletionResult("feat: do thing\n\nDetail.")
+				{
+					Usage = new TokenUsage(1200, 34),
+				});
 
 		var generator = new CommitMessageGenerator(client);
 
-		List<string> result = await generator.GenerateAsync(PATCH, false);
+		CommitSuggestions result = await generator.GenerateAsync(PATCH, false);
 
-		Assert.Single(result);
-		Assert.Equal("feat: do thing\n\nDetail.", result[0]);
+		Assert.Single(result.Messages);
+		Assert.Equal("feat: do thing\n\nDetail.", result.Messages[0]);
+		Assert.Equal(new TokenUsage(1200, 34), result.Usage);
 
 		// The generator builds the prompt; title+body mode uses the larger token budget.
 		await client.Received(1)
-			.CompleteAsync(
+			.GetCompletionAsync(
 				Arg.Is<CompletionRequest>(r
 					=> r.MaxTokens == 500 && r.UserPrompt.Contains(PATCH)),
 				Arg.Any<CancellationToken>());
@@ -72,18 +77,19 @@ public class CommitMessageGeneratorTests
 	public async Task GenerateAsync_TitlesOnly_UsesTitlesPromptBudget()
 	{
 		var client = Substitute.For<IChatCompletionClient>();
-		client.CompleteAsync(
+		client.GetCompletionAsync(
 				Arg.Any<CompletionRequest>(),
 				Arg.Any<CancellationToken>())
-			.Returns("feat: a\nfix: b");
+			.Returns(new CompletionResult("feat: a\nfix: b"));
 
 		var generator = new CommitMessageGenerator(client);
 
-		List<string> result = await generator.GenerateAsync(PATCH, true);
+		CommitSuggestions result = await generator.GenerateAsync(PATCH, true);
 
-		Assert.Equal(5, result.Count);
+		Assert.Equal(5, result.Messages.Count);
+		Assert.Null(result.Usage);
 		await client.Received(1)
-			.CompleteAsync(
+			.GetCompletionAsync(
 				Arg.Is<CompletionRequest>(r => r.MaxTokens == 100),
 				Arg.Any<CancellationToken>());
 	}

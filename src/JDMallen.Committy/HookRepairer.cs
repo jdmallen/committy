@@ -94,7 +94,7 @@ public static class HookRepairer
 			}
 
 			if (!await IsGitDirAsync(full, cancellationToken)
-					.ConfigureAwait(false))
+				    .ConfigureAwait(false))
 			{
 				await output
 					.WriteLineAsync($"Skipping {full}: not a git directory.")
@@ -137,7 +137,7 @@ public static class HookRepairer
 			string dir = stack.Pop();
 
 			if (Directory.Exists(Path.Combine(dir, ".git"))
-				|| File.Exists(Path.Combine(dir, ".git")))
+			    || File.Exists(Path.Combine(dir, ".git")))
 			{
 				yield return dir;
 			}
@@ -155,7 +155,7 @@ public static class HookRepairer
 			}
 
 			foreach (string sub in subdirs.Where(sub
-						 => Path.GetFileName(sub) is not ".git"))
+				         => Path.GetFileName(sub) is not ".git"))
 			{
 				stack.Push(sub);
 			}
@@ -354,8 +354,8 @@ public static class HookRepairer
 		if (repos.Count == 0)
 		{
 			if (scanRoots.Count == 0
-				&& gitDirs.Count == 0
-				&& currentRepoRequired)
+			    && gitDirs.Count == 0
+			    && currentRepoRequired)
 			{
 				await output.WriteLineAsync(
 						"Error: not inside a git repository. Run from a repo, or pass --scan <dir> to sweep, --git-dir <dir> for a headless repo, or --global.")

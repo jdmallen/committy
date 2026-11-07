@@ -224,6 +224,50 @@ committy --provider azure \
          --deployment "your-deployment"
 ```
 
+### Token usage
+
+When the provider reports token usage, the hook adds a comment at the bottom
+of the commit message (above the diff, with `git commit --verbose`):
+
+```text
+# Committy: 1,234 tokens (1,200 in, 34 out)
+```
+
+Git drops comment lines, so it never ends up in the commit. Every run, from the
+hook or by hand, is added to lifetime totals in `usage.json`
+(`~/.local/share/committy/` on Linux, `%LOCALAPPDATA%\committy\` on Windows,
+`~/Library/Application Support/committy/` on macOS). Runs whose provider
+reported no usage are not counted. Delete `usage.json` to start over.
+
+### Checking your configuration
+
+`committy --info` shows the settings committy would use if run in the current
+directory, where each one comes from, and the lifetime token totals. Inside a
+repository with its own `committy config --local` settings, those are what it
+shows. API keys are reported as set or not set, never shown.
+
+```text
+committy 1.5.0
+
+  repository:  /home/me/git/project
+  provider:    openai (git config --local)
+  base url:    http://10.10.0.20:8080/v1 (git config --local)
+  model:       thinkingcap-27b-q4km (git config --global)
+  timeout:     300s (default)
+  max tokens:  2,048 (default)
+  api key:     not set (optional)
+  titles only: no (default)
+
+  usage log:   /home/me/.local/share/committy/usage.json
+  total:       12,345 tokens (10,000 in, 2,345 out) over 42 runs since 2026-11-06
+  average:     294 tokens per run (238 in, 56 out)
+```
+
+Sources are a command-line flag, `git config --local` / `--global` /
+`--system`, an environment variable (shown as `$NAME`), or `default`. Flags
+given with `--info`, such as `--provider`, are applied the same way as for a
+normal run.
+
 ### Subcommands
 
 | Command                                 | Description                                                                                                                                     |
@@ -247,6 +291,7 @@ committy --provider azure \
 | `--titles-only` | `-t`  | `COMMITTY_TITLES_ONLY`                                | off                         | Generate five title-only suggestions instead of a single title + body message. |
 | `--clipboard`   | `-c`  | —                                                     | off                         | Copy the first suggestion to the clipboard.                                     |
 | `--no-git`      | —     | —                                                     | off                         | Rely solely on stdin; never call `git diff --cached` as a fallback.             |
+| `--info`        |       |                                                       | off                         | Show the configuration in effect here, its sources, and lifetime token usage.  |
 | `--local`       | —     | —                                                     | off                         | (`config` only) Write to the current repo's git config instead of global.       |
 | `--global`      | `-g`  | —                                                     | off                         | (`install-hook` / `repair-hooks`) Target the global hook template.              |
 | `--scan <dir>`  | —     | —                                                     | current repo                | (`repair-hooks` only) Recursively sweep a directory for repos; repeatable.      |
@@ -254,8 +299,11 @@ committy --provider azure \
 | `--dry-run`     | —     | —                                                     | off                         | (`repair-hooks` only) Report what would change without modifying anything.      |
 | `--backup`      | —     | —                                                     | off                         | (`repair-hooks` only) Save the previous hook as `prepare-commit-msg.bak`.       |
 
-For every setting, the precedence is **flag → environment variable → git
-config → default**.
+Settings are taken from the **flag, then git config, then the environment
+variable, then the default**. API keys are the exception: **flag, then
+environment variable, then git config**. See
+[Configuration](#configuration) for details, or run `committy --info` to see
+which source each setting came from.
 
 **Clipboard support** is optional: Linux needs `xsel` or `xclip`; macOS uses
 built-in `pbcopy`/`pbpaste`; Windows uses the built-in clipboard APIs. If a

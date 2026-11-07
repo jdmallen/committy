@@ -33,6 +33,36 @@ public static class GitConfigStore
 		return string.IsNullOrEmpty(value) ? null : value;
 	}
 
+	/// <summary>
+	/// As <see cref="GetAsync" />, but also says which scope (local, global,
+	/// system, worktree or command) the winning value came from.
+	/// </summary>
+	public static async Task<GitConfigValue?> GetWithScopeAsync(
+		string key,
+		CancellationToken cancellationToken = default)
+	{
+		BufferedCommandResult result = await Cli.Wrap("git")
+			.WithArguments(["config", "--show-scope", "--get", key])
+			.WithValidation(CommandResultValidation.None)
+			.ExecuteBufferedAsync(cancellationToken)
+			.ConfigureAwait(false);
+
+		return result.ExitCode == 0
+			? ParseScopedValue(result.StandardOutput)
+			: null;
+	}
+
+	/// <summary>Parses <c>--show-scope</c> output: "scope\tvalue".</summary>
+	public static GitConfigValue? ParseScopedValue(string output)
+	{
+		string line = output.TrimEnd('\r', '\n');
+		int tab = line.IndexOf('\t');
+		string? scope = tab < 0 ? null : line[..tab];
+		string value = (tab < 0 ? line : line[(tab + 1)..]).Trim();
+
+		return value.Length == 0 ? null : new GitConfigValue(value, scope);
+	}
+
 	public static async Task SetAsync(
 		string key,
 		string value,
@@ -54,3 +84,11 @@ public static class GitConfigStore
 		}
 	}
 }
+
+/// <summary>A git config value and the scope it was read from.</summary>
+/// <param name="Value">The value.</param>
+/// <param name="Scope">
+/// "local", "global", "system", "worktree" or "command", or null when the
+/// scope is unknown.
+/// </param>
+public sealed record GitConfigValue(string Value, string? Scope);

@@ -1,4 +1,5 @@
 using System.Globalization;
+using System.Text.RegularExpressions;
 
 namespace JDMallen.Committy.Tests;
 
@@ -13,7 +14,8 @@ public class InfoReportTests
 	private async Task<string> Build(
 		string? repository = "/home/me/repo",
 		TokenUsageTotals? totals = null,
-		string? usageError = null)
+		string? usageError = null,
+		string? azureCliPath = "/usr/bin/az")
 	{
 		CultureInfo.CurrentCulture = CultureInfo.InvariantCulture;
 		ResolvedConfig resolved =
@@ -29,7 +31,8 @@ public class InfoReportTests
 			new InfoReport.UsageReport(
 				USAGE_PATH,
 				usageError is null ? totals ?? new TokenUsageTotals() : null,
-				usageError));
+				usageError),
+			_ => azureCliPath);
 	}
 
 	[Fact]
@@ -132,5 +135,88 @@ public class InfoReportTests
 		string report = await Build(usageError: "bad json");
 
 		Assert.Contains("total:       (unreadable: bad json)", report);
+	}
+
+	[Fact]
+	public async Task Info_ApiKeyAuth_ShowsTheAuthAndKeyRows()
+	{
+		_gitConfig[CommittyConfigResolver.PROVIDER_KEY] =
+			new GitConfigValue("azure", "global");
+
+		string report = await Build();
+
+		Assert.Matches(@"auth:\s+apikey \(default\)", report);
+		Assert.Matches(@"api key:\s+not set", report);
+		Assert.DoesNotContain("sign in:", report);
+	}
+
+	[Fact]
+	public async Task Info_AzureCli_ShowsTenantScopeAzAndSignIn()
+	{
+		_gitConfig[CommittyConfigResolver.AZURE_ENDPOINT_KEY] =
+			new GitConfigValue("https://example.openai.azure.com", "global");
+		_gitConfig[CommittyConfigResolver.AZURE_AUTH_KEY] =
+			new GitConfigValue("azurecli", "global");
+		_gitConfig[CommittyConfigResolver.AZURE_TENANT_KEY] =
+			new GitConfigValue("contoso.com", "local");
+		_environment[CommittyConfigResolver.AZURE_API_KEY_ENV] = SECRET;
+
+		string report = await Build();
+
+		Assert.Matches(
+			@"auth:\s+azurecli, Microsoft Entra ID via the Azure CLI \(git config --global\)",
+			report);
+		Assert.Matches(@"tenant:\s+contoso\.com \(git config --local\)", report);
+		Assert.Matches(
+			$@"scope:\s+{Regex.Escape(AzureOpenAIScopes.DEFAULT)} \(default\)",
+			report);
+		Assert.Matches(@"az:\s+/usr/bin/az \(PATH\)", report);
+		Assert.Matches(
+			$@"sign in:\s+az login --tenant contoso\.com --scope {Regex.Escape(AzureOpenAIScopes.DEFAULT)}",
+			report);
+		Assert.DoesNotContain("api key:", report);
+		Assert.DoesNotContain(SECRET, report);
+		Assert.DoesNotContain("problem:", report);
+	}
+
+	[Fact]
+	public async Task Info_AzureCli_NoTenant_UsesAzsCurrentTenant()
+	{
+		_gitConfig[CommittyConfigResolver.AZURE_AUTH_KEY] =
+			new GitConfigValue("azurecli", "global");
+
+		string report = await Build();
+
+		Assert.Matches(@"tenant:\s+az's current tenant", report);
+	}
+
+	[Fact]
+	public async Task Info_AzureCli_AzMissing_ReportsTheProblem()
+	{
+		_gitConfig[CommittyConfigResolver.AZURE_ENDPOINT_KEY] =
+			new GitConfigValue("https://example.openai.azure.com", "global");
+		_gitConfig[CommittyConfigResolver.AZURE_AUTH_KEY] =
+			new GitConfigValue("azurecli", "global");
+
+		string report = await Build(azureCliPath: null);
+
+		Assert.Matches(@"az:\s+not found", report);
+		Assert.Matches(
+			$@"problem:\s+.*{Regex.Escape(CommittyConfigResolver.AZURE_AZ_PATH_KEY)}",
+			report);
+	}
+
+	[Fact]
+	public async Task Info_UnknownAuth_ReportsIt()
+	{
+		_gitConfig[CommittyConfigResolver.AZURE_AUTH_KEY] =
+			new GitConfigValue("azureidentity", "global");
+
+		string report = await Build();
+
+		Assert.Matches(
+			@"auth:\s+azureidentity, unknown \(expected apikey or azurecli\)",
+			report);
+		Assert.Matches(@"problem:\s+Unknown Azure auth 'azureidentity'", report);
 	}
 }

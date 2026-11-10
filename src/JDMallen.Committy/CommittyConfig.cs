@@ -7,13 +7,52 @@ public enum Provider
 	OpenAI,
 }
 
+/// <summary>How committy authenticates to Azure OpenAI.</summary>
+public enum AzureAuth
+{
+	/// <summary>An <c>api-key</c> header (the default).</summary>
+	ApiKey,
+
+	/// <summary>
+	/// A Microsoft Entra ID bearer token from the signed-in Azure CLI
+	/// (<c>az account get-access-token</c>).
+	/// </summary>
+	AzureCli,
+}
+
 /// <summary>
-/// Azure OpenAI settings. <see cref="ApiKey" /> and
-/// <see cref="Endpoint" /> are required.
+/// Azure OpenAI settings. <see cref="Endpoint" /> is required, and so is
+/// <see cref="ApiKey" /> when <see cref="Auth" /> is
+/// <see cref="AzureAuth.ApiKey" />.
 /// </summary>
 public sealed class AzureConfig
 {
 	public string? ApiKey { get; init; }
+
+	public AzureAuth Auth { get; init; } = AzureAuth.ApiKey;
+
+	/// <summary>
+	/// The configured <c>committy.azure.auth</c> value when it names no known
+	/// method, so <see cref="Validate" /> can report it; otherwise null.
+	/// </summary>
+	public string? UnknownAuth { get; init; }
+
+	/// <summary>
+	/// The Entra tenant (GUID or domain) to get tokens from, or null for the
+	/// tenant of the current <c>az</c> account.
+	/// </summary>
+	public string? TenantId { get; init; }
+
+	/// <summary>
+	/// The token scope, or null for <see cref="AzureOpenAIScopes.DEFAULT" />.
+	/// </summary>
+	public string? Scope { get; init; }
+
+	/// <summary>
+	/// The full path to <c>az</c>, for when the PATH committy runs with lacks it
+	/// (e.g. a git hook launched from a GUI client), or null to use PATH.
+	/// </summary>
+	public string? AzPath { get; init; }
 
 	public required string Deployment { get; init; }
 
@@ -41,12 +80,75 @@ public sealed class AzureConfig
 			? CommittyConfigResolver.DEFAULT_AZURE_REASONING_MAX_TOKENS
 			: null);
 
-	public string? Validate() =>
-		string.IsNullOrWhiteSpace(ApiKey)
-			? "Azure OpenAI API key is required (run `committy config` or set AZURE_OPENAI_API_KEY)."
-			: string.IsNullOrWhiteSpace(Endpoint)
-				? "Azure OpenAI endpoint is required (run `committy config` or set AZURE_OPENAI_ENDPOINT_HOST)."
-				: null;
+	/// <summary>The Azure CLI token provider settings for this config.</summary>
+	public AzureCliTokenProviderOptions TokenProviderOptions() =>
+		new()
+		{
+			Scope = string.IsNullOrWhiteSpace(Scope)
+				? AzureOpenAIScopes.DEFAULT
+				: Scope.Trim(),
+			TenantId = string.IsNullOrWhiteSpace(TenantId)
+				? null
+				: TenantId.Trim(),
+			AzExecutablePath = string.IsNullOrWhiteSpace(AzPath)
+				? null
+				: AzPath.Trim(),
+		};
+
+	public string? Validate()
+	{
+		if (UnknownAuth is not null)
+		{
+			return $"Unknown Azure auth '{UnknownAuth}' in {CommittyConfigResolver.AZURE_AUTH_KEY} (expected apikey or azurecli).";
+		}
+
+		if (string.IsNullOrWhiteSpace(Endpoint))
+		{
+			return "Azure OpenAI endpoint is required (run `committy config` or set AZURE_OPENAI_ENDPOINT_HOST).";
+		}
+
+		return Auth switch
+		{
+			AzureAuth.AzureCli => ValidateTokenProviderOptions(),
+			_ => string.IsNullOrWhiteSpace(ApiKey)
+				? "Azure OpenAI API key is required (run `committy config` or set AZURE_OPENAI_API_KEY)."
+				: null,
+		};
+	}
+
+	/// <summary>
+	/// Builds the Azure CLI token provider the same way a request would, so a
+	/// bad tenant or scope is reported up front, naming the setting to fix.
+	/// </summary>
+	private string? ValidateTokenProviderOptions()
+	{
+		AzureCliTokenProviderOptions options = TokenProviderOptions();
+
+		if (!IsValid(options))
+		{
+			// The toolbox validates scope before tenant; retrying without the
+			// tenant tells the two apart.
+			return IsValid(options with { TenantId = null })
+				? $"{CommittyConfigResolver.AZURE_TENANT_KEY} must be a tenant GUID or domain name (got '{options.TenantId}')."
+				: $"{CommittyConfigResolver.AZURE_SCOPE_KEY} must be an https URL such as {AzureOpenAIScopes.DEFAULT} (got '{options.Scope}').";
+		}
+
+		return null;
+
+		static bool IsValid(AzureCliTokenProviderOptions candidate)
+		{
+			try
+			{
+				_ = new AzureCliTokenProvider(candidate);
+
+				return true;
+			}
+			catch (ArgumentException)
+			{
+				return false;
+			}
+		}
+	}
 }
 
 /// <summary>Anthropic (Claude) settings. <see cref="ApiKey" /> is required.</summary>

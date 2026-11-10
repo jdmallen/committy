@@ -29,6 +29,11 @@ indent_size = 4
 tab_width = 4
 max_line_length = 80
 
+# Rider's "Best fit": tabs indent, and spaces after them nudge continuation
+# lines into alignment (e.g. "\t\t\t    || ..."). Mixed leading whitespace is
+# therefore intended; don't normalize it to all tabs or all spaces.
+resharper_csharp_alignment_tab_fill_style = optimal_fill
+
 # New line preferences
 insert_final_newline = true
 

@@ -145,4 +145,92 @@ public class CommittyConfigResolverTests
 		Assert.True(config.Azure!.ReasoningModel);
 		Assert.Equal(4096, config.MaxTokensOverride);
 	}
+
+	[Fact]
+	public async Task AzureAuth_DefaultsToApiKey()
+	{
+		CommittyConfig config = await Resolve();
+
+		Assert.Equal(AzureAuth.ApiKey, config.Azure!.Auth);
+		Assert.Null(config.Azure.UnknownAuth);
+		Assert.Null(config.Azure.TenantId);
+	}
+
+	[Fact]
+	public async Task AzureAuth_GitConfig_ReadsAllAzureCliSettings()
+	{
+		_gitConfig[CommittyConfigResolver.AZURE_AUTH_KEY] = "AzureCli";
+		_gitConfig[CommittyConfigResolver.AZURE_TENANT_KEY] = "contoso.com";
+		_gitConfig[CommittyConfigResolver.AZURE_SCOPE_KEY] =
+			AzureOpenAIScopes.COGNITIVE_SERVICES;
+		_gitConfig[CommittyConfigResolver.AZURE_AZ_PATH_KEY] = "/opt/az/bin/az";
+
+		AzureConfig azure = (await Resolve()).Azure!;
+
+		Assert.Equal(AzureAuth.AzureCli, azure.Auth);
+		Assert.Equal("contoso.com", azure.TenantId);
+		Assert.Equal(AzureOpenAIScopes.COGNITIVE_SERVICES, azure.Scope);
+		Assert.Equal("/opt/az/bin/az", azure.AzPath);
+	}
+
+	[Fact]
+	public async Task AzureAuth_FlagsBeatGitConfig()
+	{
+		_gitConfig[CommittyConfigResolver.AZURE_AUTH_KEY] = "apikey";
+		_gitConfig[CommittyConfigResolver.AZURE_TENANT_KEY] = "config.com";
+
+		AzureConfig azure = (await Resolve(
+				new ConfigOverrides(AzureAuth: "azurecli", TenantId: "flag.com")))
+			.Azure!;
+
+		Assert.Equal(AzureAuth.AzureCli, azure.Auth);
+		Assert.Equal("flag.com", azure.TenantId);
+	}
+
+	[Fact]
+	public async Task AzureAuth_Unknown_IsKeptForValidation()
+	{
+		_gitConfig[CommittyConfigResolver.AZURE_AUTH_KEY] = "azureidentity";
+
+		AzureConfig azure = (await Resolve()).Azure!;
+
+		Assert.Equal("azureidentity", azure.UnknownAuth);
+		Assert.Contains("azureidentity", azure.Validate());
+	}
+
+	[Fact]
+	public async Task AzureAuth_IsNotReadFromTheEnvironment()
+	{
+		// Only flags and git config select keyless auth; a stray export must
+		// not switch a working key setup over.
+		_environment["COMMITTY_AZURE_AUTH"] = "azurecli";
+
+		Assert.Equal(AzureAuth.ApiKey, (await Resolve()).Azure!.Auth);
+	}
+
+	[Fact]
+	public async Task AzureAuth_Sources_AreRecorded()
+	{
+		var gitConfig = new Dictionary<string, GitConfigValue>
+		{
+			[CommittyConfigResolver.AZURE_AUTH_KEY] =
+				new("azurecli", "global"),
+		};
+
+		ResolvedConfig resolved =
+			await CommittyConfigResolver.ResolveWithSourcesAsync(
+				new ConfigOverrides(TenantId: "flag.com"),
+				_ => null,
+				(key, _) => Task.FromResult(gitConfig.GetValueOrDefault(key)));
+
+		Assert.Equal(
+			"git config --global",
+			resolved.Sources[CommittyConfigResolver.AZURE_AUTH_KEY].ToString());
+		Assert.Equal(
+			ConfigSource.FromFlag,
+			resolved.Sources[CommittyConfigResolver.AZURE_TENANT_KEY]);
+		Assert.Equal(
+			ConfigSource.FromDefault,
+			resolved.Sources[CommittyConfigResolver.AZURE_SCOPE_KEY]);
+	}
 }

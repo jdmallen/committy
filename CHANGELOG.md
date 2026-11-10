@@ -5,6 +5,33 @@ All notable changes to this project are documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [1.6.0]
+
+### Added
+
+- **Keyless Azure OpenAI sign-in (Microsoft Entra ID).** Set
+  `committy.azure.auth` to `azurecli` (`committy config --azure-auth azurecli`)
+  and committy sends an Entra ID bearer token from the signed-in Azure CLI
+  instead of an API key. Optional `committy.azure.tenant` (`--tenant`),
+  `committy.azure.scope`, and `committy.azure.azpath` (for git hooks started
+  from a desktop app whose `PATH` lacks `az`). `apikey` stays the default.
+- `--azure-auth` and `--tenant` on the root command, to override the auth
+  method or tenant for one run.
+- `committy config` with `azurecli` skips the API key step and instead shows
+  the `az` it found and the signed-in account (read-only `az account show`),
+  or the `az login` command to run.
+- `committy --info` shows the auth method, and for `azurecli` the tenant,
+  scope, `az` location, and sign-in command.
+
+### Changed
+
+- Requires `JDMallen.Toolbox.AI` 4.5.0.
+
+### Fixed
+
+- A multi-line error from the commit hook is now commented out on every line,
+  so no part of it can end up in the commit message.
+
 ## [1.5.0]
 
 ### Added

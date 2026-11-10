@@ -16,14 +16,22 @@ public static class InfoReport
 	/// </param>
 	/// <param name="resolved">The configuration and its sources.</param>
 	/// <param name="usage">The usage block's inputs.</param>
+	/// <param name="locateAzureCli">
+	/// Finds the <c>az</c> an Azure config would run, or null when there is
+	/// none; defaults to <see cref="AzureCli.Locate" /> on this process's PATH.
+	/// </param>
 	/// <exception cref="ArgumentOutOfRangeException"></exception>
 	public static string Build(
 		string versionLine,
 		string? repository,
 		ResolvedConfig resolved,
-		UsageReport usage)
+		UsageReport usage,
+		Func<AzureConfig, string?>? locateAzureCli = null)
 	{
+		locateAzureCli ??= azure =>
+			AzureCli.Locate(azure, Environment.GetEnvironmentVariable);
 		CommittyConfig config = resolved.Config;
+		string? problem = config.Validate();
 		var rows = new List<(string Label, string Value)>
 		{
 			("repository",
@@ -101,11 +109,7 @@ public static class InfoReport
 							? Count(maxTokens)
 							: "built-in (100 for titles, 500 for a message)",
 						CommittyConfigResolver.AZURE_MAX_TOKENS_KEY));
-				rows.Add(
-					KeyRow(
-						azure.ApiKey,
-						CommittyConfigResolver.AZURE_API_KEY_KEY,
-						false));
+				AddAzureAuthRows(azure);
 
 				break;
 			default:
@@ -122,9 +126,9 @@ public static class InfoReport
 				config.TitlesOnly ? "yes" : "no",
 				CommittyConfigResolver.TITLES_ONLY_KEY));
 
-		if (config.Validate() is { } error)
+		if (problem is not null)
 		{
-			rows.Add(("problem", error));
+			rows.Add(("problem", problem));
 		}
 
 		StringBuilder report =
@@ -153,6 +157,57 @@ public static class InfoReport
 				out ConfigSource? source)
 				? (label, $"{value} ({source})")
 				: (label, value);
+		}
+
+		void AddAzureAuthRows(AzureConfig azure)
+		{
+			string authValue = azure.UnknownAuth is { } unknown
+				? $"{unknown}, unknown (expected apikey or azurecli)"
+				: azure.Auth == AzureAuth.AzureCli
+					? "azurecli, Microsoft Entra ID via the Azure CLI"
+					: "apikey";
+			rows.Add(
+				Row("auth", authValue, CommittyConfigResolver.AZURE_AUTH_KEY));
+
+			if (azure.Auth != AzureAuth.AzureCli || azure.UnknownAuth is not null)
+			{
+				rows.Add(
+					KeyRow(
+						azure.ApiKey,
+						CommittyConfigResolver.AZURE_API_KEY_KEY,
+						false));
+
+				return;
+			}
+
+			AzureCliTokenProviderOptions options = azure.TokenProviderOptions();
+			rows.Add(
+				options.TenantId is null
+					? ("tenant",
+						$"az's current tenant (not set: {CommittyConfigResolver.AZURE_TENANT_KEY})")
+					: Row(
+						"tenant",
+						options.TenantId,
+						CommittyConfigResolver.AZURE_TENANT_KEY));
+			rows.Add(
+				Row(
+					"scope",
+					options.Scope,
+					CommittyConfigResolver.AZURE_SCOPE_KEY));
+
+			string? az = locateAzureCli(azure);
+			rows.Add(
+				az is null
+					? ("az", "not found")
+					: options.AzExecutablePath is null
+						? ("az", $"{az} (PATH)")
+						: Row("az", az, CommittyConfigResolver.AZURE_AZ_PATH_KEY));
+			rows.Add(("sign in", AzureCli.SignInCommand(azure)));
+
+			if (az is null)
+			{
+				problem ??= AzureCli.NotFoundMessage(azure);
+			}
 		}
 
 		(string, string) KeyRow(string? apiKey, string gitKey, bool optional)

@@ -129,4 +129,13 @@ public class CommitMessageComposerTests
 
 		Assert.DoesNotContain("tokens", result);
 	}
+
+	[Fact]
+	public void CommentLines_CommentsEveryLine() => Assert.Equal(
+		[
+			"# Committy: failed (Azure CLI could not get a token.",
+			"# Azure CLI said: ERROR: AADSTS50076)",
+		],
+		CommitMessageComposer.CommentLines(
+			"Committy: failed (Azure CLI could not get a token.\r\nAzure CLI said: ERROR: AADSTS50076)"));
 }

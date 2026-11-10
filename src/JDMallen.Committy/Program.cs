@@ -54,6 +54,18 @@ internal class Program
 			Description = "Anthropic or openai model name",
 			HelpName = "model",
 		};
+		var azureAuthOption = new Option<string?>("--azure-auth")
+		{
+			Description =
+				"How to authenticate to Azure OpenAI: apikey (default) or azurecli (Microsoft Entra ID via a signed-in Azure CLI)",
+			HelpName = "method",
+		};
+		var tenantOption = new Option<string?>("--tenant")
+		{
+			Description =
+				"Microsoft Entra tenant ID or domain for azurecli auth; '-' clears it (use az's current tenant)",
+			HelpName = "tenant",
+		};
 		var titlesOnlyOption = new Option<bool>("--titles-only", "-t")
 		{
 			Description = "Make titles-only mode the default",
@@ -74,6 +86,8 @@ internal class Program
 				endpointOption,
 				deploymentOption,
 				modelOption,
+				azureAuthOption,
+				tenantOption,
 				titlesOnlyOption,
 				localOption,
 			};
@@ -84,11 +98,21 @@ internal class Program
 
 			try
 			{
+				// Checked before anything is written, so a typo leaves the
+				// config as it was.
+				if (parseResult.GetValue(tenantOption)?.Trim() is
+					    { } tenantFlag and not "-"
+				    && !AzureCli.IsValidTenant(tenantFlag))
+				{
+					throw new InvalidOperationException(
+						$"'{tenantFlag}' is not a tenant GUID or domain name.");
+				}
+
 				Provider provider = await ResolveProviderForConfigAsync(
 					parseResult.GetValue(providerOption),
 					cancellationToken);
 
-				var written = new List<(string Key, string Display)>();
+				var written = new List<(string Key, string? Display)>();
 
 				await SetAsync(
 					written,
@@ -148,7 +172,8 @@ internal class Program
 							CommittyConfigResolver.AZURE_REASONING_MODEL_KEY,
 							null,
 							"false",
-							Boolean: true),
+							Normalize: CommittyConfigResolver.NormalizeBool,
+							RetryHint: "Please answer y or n."),
 
 						// Blank keeps the prompt's own budget, or 2048 for a
 						// reasoning deployment.
@@ -156,6 +181,14 @@ internal class Program
 							$"Azure max tokens (blank for the default; {CommittyConfigResolver.DEFAULT_AZURE_REASONING_MAX_TOKENS} for reasoning models)",
 							CommittyConfigResolver.AZURE_MAX_TOKENS_KEY,
 							null),
+						new ConfigField(
+							"Azure auth: apikey, or azurecli for Microsoft Entra ID via az",
+							CommittyConfigResolver.AZURE_AUTH_KEY,
+							parseResult.GetValue(azureAuthOption),
+							CommittyConfigResolver.AzureAuthName(
+								AzureAuth.ApiKey),
+							Normalize: NormalizeAzureAuth,
+							RetryHint: "Please answer apikey or azurecli."),
 					],
 				};
 
@@ -172,14 +205,19 @@ internal class Program
 						current,
 						field.Secret);
 
-					if (field.Boolean)
+					if (field.Normalize is { } normalize)
 					{
-						string? normalized =
-							CommittyConfigResolver.NormalizeBool(value);
+						string? normalized = normalize(value);
+						if (normalized is null && field.FlagValue is not null)
+						{
+							throw new InvalidOperationException(
+								$"'{field.FlagValue}' is not valid for {field.Key}. {field.RetryHint}");
+						}
+
 						while (normalized is null && !Console.IsInputRedirected)
 						{
-							Console.WriteLine("  Please answer y or n.");
-							normalized = CommittyConfigResolver.NormalizeBool(
+							Console.WriteLine($"  {field.RetryHint}");
+							normalized = normalize(
 								Prompt(
 									field.Label,
 									null,
@@ -187,8 +225,7 @@ internal class Program
 									false));
 						}
 
-						value = normalized
-							?? CommittyConfigResolver.NormalizeBool(current);
+						value = normalized ?? normalize(current);
 					}
 
 					await SetAsync(
@@ -211,7 +248,30 @@ internal class Program
 						cancellationToken);
 				}
 
-				PrintConfigSummary(written, global);
+				bool usesAzureCli = provider == Provider.Azure
+					&& CommittyConfigResolver.ParseAzureAuth(
+						await GitConfigStore.GetAsync(
+							CommittyConfigResolver.AZURE_AUTH_KEY,
+							cancellationToken))
+					== AzureAuth.AzureCli;
+
+				if (usesAzureCli)
+				{
+					await ConfigureTenantAsync(
+						written,
+						parseResult.GetValue(tenantOption),
+						global,
+						cancellationToken);
+				}
+
+				PrintConfigSummary(written, global, !usesAzureCli);
+
+				if (usesAzureCli)
+				{
+					await WriteAzureCliSetupAsync(cancellationToken);
+
+					return;
+				}
 
 				// Keys live in environment variables, not git config. A key typed
 				// on Windows is saved last, once the git config is written.
@@ -344,14 +404,15 @@ internal class Program
 
 				CommittyConfig config =
 					await ResolveConfigAsync(null, cancellationToken);
-				string? error = config.Validate();
+				string? error = CheckReady(config);
 
 				if (error is not null)
 				{
 					await AppendLinesAsync(
 						commitMsgFile,
 						[
-							$"# Committy: {error}",
+							.. CommitMessageComposer.CommentLines(
+								$"Committy: {error}"),
 							"# Run `committy config` to set up a provider.",
 						]);
 
@@ -388,11 +449,12 @@ internal class Program
 				// Never let a hook failure abort the commit.
 				try
 				{
+					// Messages can span lines (the Azure CLI's own error is
+					// quoted on the next one); every line must stay a comment.
 					await AppendLinesAsync(
 						commitMsgFile,
-						[
-							$"# Committy: failed to generate AI suggestions ({ex.Message})",
-						]);
+						CommitMessageComposer.CommentLines(
+							$"Committy: failed to generate AI suggestions ({ex.Message})"));
 				}
 				catch
 				{
@@ -565,6 +627,18 @@ internal class Program
 			Description = "Anthropic model name",
 			HelpName = "model",
 		};
+		var azureAuthOption = new Option<string?>("--azure-auth")
+		{
+			Description =
+				"Azure OpenAI auth for this run: apikey or azurecli (overrides config)",
+			HelpName = "method",
+		};
+		var tenantOption = new Option<string?>("--tenant")
+		{
+			Description =
+				"Microsoft Entra tenant ID or domain for azurecli auth (overrides config)",
+			HelpName = "tenant",
+		};
 		var noGitOption = new Option<bool>("--no-git")
 		{
 			Description =
@@ -595,6 +669,8 @@ internal class Program
 				endpointOption,
 				deploymentOption,
 				modelOption,
+				azureAuthOption,
+				tenantOption,
 				noGitOption,
 				clipboardOption,
 				titlesOnlyOption,
@@ -611,7 +687,9 @@ internal class Program
 				parseResult.GetValue(apiKeyOption),
 				parseResult.GetValue(endpointOption),
 				parseResult.GetValue(deploymentOption),
-				parseResult.GetValue(modelOption));
+				parseResult.GetValue(modelOption),
+				parseResult.GetValue(azureAuthOption),
+				parseResult.GetValue(tenantOption));
 
 			if (parseResult.GetValue(infoOption))
 			{
@@ -626,7 +704,7 @@ internal class Program
 				CommittyConfig config = await ResolveConfigAsync(
 					overrides,
 					cancellationToken);
-				string? error = config.Validate();
+				string? error = CheckReady(config);
 
 				if (error is not null)
 				{
@@ -714,7 +792,8 @@ internal class Program
 			BuildVersionLine(),
 			repository,
 			resolved,
-			new InfoReport.UsageReport(usagePath, totals, usageError));
+			new InfoReport.UsageReport(usagePath, totals, usageError),
+			azure => AzureCli.Locate(azure, Environment.GetEnvironmentVariable));
 	}
 
 	private static string BuildVersionLine() =>
@@ -745,8 +824,9 @@ internal class Program
 		value.Length <= 4 ? "****" : $"{value[..4]}…";
 
 	private static void PrintConfigSummary(
-		List<(string Key, string Display)> written,
-		bool global)
+		List<(string Key, string? Display)> written,
+		bool global,
+		bool apiKeyStepFollows)
 	{
 		string scope = global ? "global" : "local";
 
@@ -759,22 +839,28 @@ internal class Program
 
 		Console.WriteLine($"\nUpdated git config ({scope}):");
 
-		foreach ((string key, string display) in written)
+		foreach ((string key, string? display) in written)
 		{
-			Console.WriteLine($"  {key} = {display}");
+			Console.WriteLine(
+				display is null ? $"  {key} (unset)" : $"  {key} = {display}");
 		}
 
 		Console.WriteLine("\nEquivalent manual commands:");
 
-		foreach ((string key, string display) in written)
+		foreach ((string key, string? display) in written)
 		{
-			Console.WriteLine($"  git config --{scope} {key} {display}");
+			Console.WriteLine(
+				display is null
+					? $"  git config --{scope} --unset {key}"
+					: $"  git config --{scope} {key} {display}");
 		}
 
 		Console.WriteLine(
 			"\nCommitty reads these at commit time, ahead of environment variables such as");
 		Console.WriteLine(
-			"OPENAI_BASE_URL. API keys come from environment variables instead (below).");
+			apiKeyStepFollows
+				? "OPENAI_BASE_URL. API keys come from environment variables instead (below)."
+				: "AZURE_OPENAI_ENDPOINT_HOST.");
 	}
 
 	private static string? Prompt(
@@ -892,7 +978,7 @@ internal class Program
 	}
 
 	private static async Task SetAsync(
-		List<(string Key, string Display)> written,
+		List<(string Key, string? Display)> written,
 		string key,
 		string? value,
 		bool global,
@@ -915,8 +1001,9 @@ internal class Program
 	/// <summary>
 	/// One persisted <c>committy config</c> field: a label for prompting, the git
 	/// config key it maps to, the flag value (if any), an optional default shown when
-	/// nothing is stored, whether the value should be masked, and whether it is a
-	/// yes/no setting stored as "true"/"false".
+	/// nothing is stored, whether the value should be masked, and, for a field with
+	/// fixed answers, how to read an answer as its canonical value (null when it is
+	/// not one) and what to say before asking again.
 	/// </summary>
 	private sealed record ConfigField(
 		string Label,
@@ -924,5 +1011,90 @@ internal class Program
 		string? FlagValue,
 		string? Default = null,
 		bool Secret = false,
-		bool Boolean = false);
+		Func<string?, string?>? Normalize = null,
+		string? RetryHint = null);
+
+	private static string? NormalizeAzureAuth(string? value) =>
+		CommittyConfigResolver.ParseAzureAuth(value) is { } auth
+			? CommittyConfigResolver.AzureAuthName(auth)
+			: null;
+
+	/// <summary>
+	/// The resolved config's problem, if any, including an Azure CLI that
+	/// cannot be found from the PATH committy runs with.
+	/// </summary>
+	private static string? CheckReady(CommittyConfig config) =>
+		config.Validate()
+		?? (config.Provider == Provider.Azure && config.Azure is { } azure
+			? AzureCli.Problem(azure, Environment.GetEnvironmentVariable)
+			: null);
+
+	/// <summary>
+	/// Asks for the Entra tenant (azurecli only). Blank keeps the current
+	/// value; "-" unsets it, so tokens come from az's current tenant.
+	/// </summary>
+	private static async Task ConfigureTenantAsync(
+		List<(string Key, string? Display)> written,
+		string? flagValue,
+		bool global,
+		CancellationToken cancellationToken)
+	{
+		const string label =
+			"Azure tenant ID or domain (blank keeps; '-' for az's current tenant)";
+		string? current = await GitConfigStore.GetAsync(
+			CommittyConfigResolver.AZURE_TENANT_KEY,
+			cancellationToken);
+		string? value = Prompt(label, flagValue, current, false)?.Trim();
+
+		while (value is not null and not "-" && !AzureCli.IsValidTenant(value))
+		{
+			if (flagValue is not null || Console.IsInputRedirected)
+			{
+				throw new InvalidOperationException(
+					$"'{value}' is not a tenant GUID or domain name.");
+			}
+
+			Console.WriteLine("  Please enter a tenant GUID or domain name.");
+			value = Prompt(label, null, current, false)?.Trim();
+		}
+
+		if (value == "-")
+		{
+			if (current is not null)
+			{
+				await GitConfigStore.UnsetAsync(
+					CommittyConfigResolver.AZURE_TENANT_KEY,
+					global,
+					cancellationToken);
+				written.Add((CommittyConfigResolver.AZURE_TENANT_KEY, null));
+			}
+
+			return;
+		}
+
+		await SetAsync(
+			written,
+			CommittyConfigResolver.AZURE_TENANT_KEY,
+			value,
+			global,
+			false,
+			cancellationToken);
+	}
+
+	/// <summary>
+	/// In place of the API key step: where az is, who is signed in (a
+	/// read-only <c>az account show</c>), and the role the account needs.
+	/// </summary>
+	private static async Task WriteAzureCliSetupAsync(
+		CancellationToken cancellationToken)
+	{
+		AzureConfig azure =
+			(await ResolveConfigAsync(null, cancellationToken)).Azure!;
+		string? az = AzureCli.Locate(azure, Environment.GetEnvironmentVariable);
+		string? accountJson = az is null
+			? null
+			: await AzureCli.ShowAccountAsync(az, cancellationToken);
+
+		AzureCli.WriteSetup(Console.Out, azure, az, accountJson);
+	}
 }

@@ -83,6 +83,32 @@ public static class GitConfigStore
 				$"`git config {scope} {key}` failed: {result.StandardError.Trim()}");
 		}
 	}
+
+	/// <summary>
+	/// Removes <paramref name="key" /> from the global or local config. A key
+	/// that is not set there is not an error.
+	/// </summary>
+	public static async Task UnsetAsync(
+		string key,
+		bool global,
+		CancellationToken cancellationToken = default)
+	{
+		// git config exits 5 when there is nothing to unset.
+		const int NOT_SET_EXIT_CODE = 5;
+		string scope = global ? "--global" : "--local";
+
+		BufferedCommandResult result = await Cli.Wrap("git")
+			.WithArguments(["config", scope, "--unset", key])
+			.WithValidation(CommandResultValidation.None)
+			.ExecuteBufferedAsync(cancellationToken)
+			.ConfigureAwait(false);
+
+		if (result.ExitCode is not 0 and not NOT_SET_EXIT_CODE)
+		{
+			throw new InvalidOperationException(
+				$"`git config {scope} --unset {key}` failed: {result.StandardError.Trim()}");
+		}
+	}
 }
 
 /// <summary>A git config value and the scope it was read from.</summary>

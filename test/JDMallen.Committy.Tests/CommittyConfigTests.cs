@@ -83,4 +83,54 @@ public class CommittyConfigTests
 
 		Assert.Contains("API key", config.Validate());
 	}
+
+	private static AzureConfig AzureCliConfig(
+		string? tenantId = null,
+		string? scope = null,
+		string? endpoint = "https://example.openai.azure.com") =>
+		new()
+		{
+			Auth = AzureAuth.AzureCli,
+			Endpoint = endpoint,
+			Deployment = "gpt-6-luna",
+			TenantId = tenantId,
+			Scope = scope,
+		};
+
+	[Fact]
+	public void Validate_AzureCli_NeedsNoApiKey()
+		=> Assert.Null(AzureCliConfig("contoso.onmicrosoft.com").Validate());
+
+	[Fact]
+	public void Validate_AzureCli_StillNeedsTheEndpoint()
+		=> Assert.Contains("endpoint", AzureCliConfig(endpoint: null).Validate());
+
+	[Fact]
+	public void Validate_AzureCli_BadTenant_NamesTheTenantKey()
+	{
+		string? error = AzureCliConfig("contoso & calc").Validate();
+
+		Assert.NotNull(error);
+		Assert.StartsWith(CommittyConfigResolver.AZURE_TENANT_KEY, error);
+	}
+
+	[Fact]
+	public void Validate_AzureCli_BadScope_NamesTheScopeKey()
+	{
+		string? error = AzureCliConfig(scope: "http://insecure").Validate();
+
+		Assert.NotNull(error);
+		Assert.StartsWith(CommittyConfigResolver.AZURE_SCOPE_KEY, error);
+	}
+
+	[Fact]
+	public void TokenProviderOptions_BlankValuesUseDefaults()
+	{
+		AzureCliTokenProviderOptions options =
+			AzureCliConfig(" ", " ").TokenProviderOptions();
+
+		Assert.Equal(AzureOpenAIScopes.DEFAULT, options.Scope);
+		Assert.Null(options.TenantId);
+		Assert.Null(options.AzExecutablePath);
+	}
 }

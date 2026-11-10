@@ -25,6 +25,14 @@ public static class CommitMessageComposer
 		"# ------------------------ >8 ------------------------";
 
 	/// <summary>
+	/// Prefixes every line of <paramref name="text" /> with "# ", so a
+	/// multi-line message (such as an Azure CLI error quoted on its own line)
+	/// stays entirely a git comment.
+	/// </summary>
+	public static IEnumerable<string> CommentLines(string text) =>
+		text.ReplaceLineEndings("\n").Split('\n').Select(line => $"# {line}");
+
+	/// <summary>
 	/// Produces the new commit-message file contents.
 	/// </summary>
 	/// <param name="suggestions">

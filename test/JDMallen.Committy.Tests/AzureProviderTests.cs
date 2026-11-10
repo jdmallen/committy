@@ -1,4 +1,5 @@
 using System.Net;
+using System.Net.Http.Headers;
 using System.Text;
 using System.Text.Json;
 
@@ -107,10 +108,13 @@ public class AzureProviderTests
 	{
 		public string? RequestBody { get; private set; }
 
+		public HttpRequestHeaders? RequestHeaders { get; private set; }
+
 		protected override async Task<HttpResponseMessage> SendAsync(
 			HttpRequestMessage request,
 			CancellationToken cancellationToken)
 		{
+			RequestHeaders = request.Headers;
 			RequestBody = request.Content is null
 				? null
 				: await request.Content.ReadAsStringAsync(cancellationToken);
@@ -122,6 +126,50 @@ public class AzureProviderTests
 					Encoding.UTF8,
 					"application/json"),
 			};
+		}
+	}
+
+	[UnixFact]
+	public async Task Factory_AzureCli_SendsTheCliTokenAsBearerAndNoApiKey()
+	{
+		DirectoryInfo directory =
+			Directory.CreateTempSubdirectory("committy-azure-provider-tests-");
+		try
+		{
+			long expiresOn = DateTimeOffset.UtcNow.AddHours(1).ToUnixTimeSeconds();
+			string az = FakeAz.Create(
+				directory.FullName,
+				"az",
+				$$"""{ "accessToken": "cli-token", "expires_on": {{expiresOn}} }""");
+			var handler = new CapturingHandler();
+			using var http = new HttpClient(handler);
+			var config = new CommittyConfig
+			{
+				Provider = Provider.Azure,
+				Azure = new AzureConfig
+				{
+					Auth = AzureAuth.AzureCli,
+					ApiKey = "should-not-be-sent",
+					Endpoint = "https://example.openai.azure.com",
+					Deployment = "gpt-6-luna",
+					AzPath = az,
+				},
+			};
+
+			await new CommitMessageGenerator(
+					new ChatCompletionClientFactory(http).Create(config),
+					config.MaxTokensOverride)
+				.GenerateAsync("diff --git a/x b/x", true);
+
+			Assert.Equal("Bearer", handler.RequestHeaders!.Authorization?.Scheme);
+			Assert.Equal(
+				"cli-token",
+				handler.RequestHeaders.Authorization?.Parameter);
+			Assert.False(handler.RequestHeaders.Contains("api-key"));
+		}
+		finally
+		{
+			directory.Delete(true);
 		}
 	}
 }

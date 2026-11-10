@@ -108,6 +108,11 @@ committy config --provider azure \
   --endpoint "https://your-endpoint.openai.azure.com" \
   --deployment "your-deployment-name"
 
+# Azure OpenAI without an API key (Microsoft Entra ID via a signed-in az)
+committy config --provider azure --azure-auth azurecli \
+  --endpoint "https://your-endpoint.openai.azure.com" \
+  --deployment "your-deployment-name"
+
 # Anthropic (Claude), non-interactive
 committy config --provider anthropic
 
@@ -124,6 +129,10 @@ commit time, and prints exactly which keys it set. See
 fallbacks.
 
 **5. Set your API key**
+
+(Using `--azure-auth azurecli`? There is no key: `committy config` checks your
+`az` sign-in instead. See
+[Keyless sign-in (Microsoft Entra ID)](#keyless-sign-in-microsoft-entra-id).)
 
 API keys live in environment variables, not git config:
 
@@ -288,6 +297,8 @@ normal run.
 | `--endpoint`    | `-e`  | `AZURE_OPENAI_ENDPOINT_HOST` / `OPENAI_BASE_URL`      | —                           | Azure endpoint host URL (domain only), or the `openai` base URL including `/v1`. |
 | `--deployment`  | `-d`  | `AZURE_OPENAI_DEPLOYMENT`                             | `gpt-4.1-mini`              | Azure OpenAI deployment name.                                                   |
 | `--model`       | `-m`  | `ANTHROPIC_MODEL` / `OPENAI_MODEL`                    | `claude-haiku-4-5-20251001` | Anthropic or `openai` model name.                                               |
+| `--azure-auth`  |       |                                                       | `apikey`                    | Azure auth: `apikey`, or `azurecli` for Microsoft Entra ID via the Azure CLI.   |
+| `--tenant`      |       |                                                       | az's current tenant         | Entra tenant ID or domain for `azurecli`; with `config`, `-` clears it.         |
 | `--titles-only` | `-t`  | `COMMITTY_TITLES_ONLY`                                | off                         | Generate five title-only suggestions instead of a single title + body message. |
 | `--clipboard`   | `-c`  | —                                                     | off                         | Copy the first suggestion to the clipboard.                                     |
 | `--no-git`      | —     | —                                                     | off                         | Rely solely on stdin; never call `git diff --cached` as a fallback.             |
@@ -326,6 +337,10 @@ the current repository; the default is global (`~/.gitconfig`).
 | `committy.azure.deployment`     | Azure     | Deployment name                           |
 | `committy.azure.reasoningmodel` | Azure     | `true` for a reasoning deployment         |
 | `committy.azure.maxtokens`      | Azure     | Generation budget; see below              |
+| `committy.azure.auth`           | Azure     | `apikey` (default) or `azurecli`          |
+| `committy.azure.tenant`         | Azure     | Entra tenant for `azurecli`; optional     |
+| `committy.azure.scope`          | Azure     | Token scope for `azurecli`; optional      |
+| `committy.azure.azpath`         | Azure     | Full path to `az`, if not on the hook's `PATH` |
 | `committy.anthropic.apikey`     | Anthropic | API key; legacy, use the env var          |
 | `committy.anthropic.model`      | Anthropic | Model name                                |
 | `committy.openai.baseurl`       | OpenAI    | Base URL including `/v1`                  |
@@ -346,6 +361,9 @@ Precedence, highest first:
 2. **API keys:** CLI flag, then environment variable, then git config. The
    git config keys are only read for configs written by committy 1.3.0 or
    earlier; `committy config` no longer writes them.
+3. **Azure auth settings** (`auth`, `tenant`, `scope`, `azpath`): CLI flag
+   (for `auth` and `tenant`), then git config. They have no environment
+   variable, so a stray export cannot switch a working key setup over.
 
 ### Azure reasoning deployments
 
@@ -362,6 +380,53 @@ committy then leaves out `temperature` and raises the budget from the built-in
 100 (titles) or 500 (title + body) to `2048`. Set `committy.azure.maxtokens` to
 use a different budget, for a reasoning deployment or not. If a reasoning model
 returns an empty message, raise it.
+
+### Keyless sign-in (Microsoft Entra ID)
+
+If your Azure OpenAI resource does not allow API keys, committy can use the
+Azure CLI's sign-in instead. Each request then carries an Entra ID bearer
+token from `az account get-access-token`, and no key is read or sent.
+
+1. Install the [Azure CLI](https://learn.microsoft.com/cli/azure/install-azure-cli)
+   (2.54 or later).
+2. Have an admin grant your account the **Cognitive Services OpenAI User**
+   role on the resource (or its resource group). It can take a few minutes to
+   apply.
+3. Sign in for the token's scope:
+
+   ```sh
+   az login --scope https://ai.azure.com/.default
+   ```
+
+4. Point committy at it:
+
+   ```sh
+   committy config --provider azure --azure-auth azurecli \
+     --endpoint "https://your-resource.openai.azure.com" \
+     --deployment "your-deployment-name"
+   ```
+
+   Instead of the API key step, `committy config` shows which `az` it found
+   and who is signed in, or the `az login` command to run.
+
+The endpoint stays host only; both `https://<name>.openai.azure.com` and
+`https://<name>.services.ai.azure.com` work.
+
+Optional settings:
+
+- **`committy.azure.tenant`** (`--tenant`): the tenant to get tokens from,
+  when your account is in more than one. Unset, `az` uses its current tenant.
+- **`committy.azure.scope`**: the token scope. The default,
+  `https://ai.azure.com/.default`, works for Foundry and Azure OpenAI
+  resources; set `https://cognitiveservices.azure.com/.default` if your
+  resource requires it.
+- **`committy.azure.azpath`**: the full path to `az`. The commit hook runs
+  with the `PATH` of whatever started git, and a desktop git client may not
+  include `az` (common with Homebrew and on Windows). `committy --info` shows
+  the `az` that will be used.
+
+To use a different method for one run, pass `--azure-auth apikey` (or
+`azurecli`).
 
 ### Local and other OpenAI-compatible models
 
@@ -400,6 +465,15 @@ server splits it into `reasoning_content` or inlines it as `<think>…</think>`.
   [Azure reasoning deployments](#azure-reasoning-deployments)).
 - **"… configuration incomplete / missing"** — run `committy config` to set up a
   provider, or check the relevant environment variables.
+- **Azure `401` with `azurecli`:** the token was refused. Check that the
+  endpoint is your resource's own subdomain (not a regional endpoint), that
+  you signed in for the right scope and tenant (`committy --info` shows the
+  `az login` command), and give a newly granted role a few minutes to apply.
+- **Azure `403` with `azurecli`:** the token is valid but lacks access. Your
+  account needs the **Cognitive Services OpenAI User** role on the resource.
+- **"Azure CLI ('az') not found on PATH"** in a commit made from a desktop
+  app: set `committy.azure.azpath` to the output of `command -v az` (or
+  `where az` on Windows).
 - **Hook not running** — confirm you're in a git repo with staged changes
   (`git diff --cached`); re-run `committy install-hook` if needed.
 - **Old/odd hook behavior after upgrading** — run `committy repair-hooks` (add

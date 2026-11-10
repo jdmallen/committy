@@ -6,7 +6,9 @@ public sealed record ConfigOverrides(
 	string? ApiKey = null,
 	string? Endpoint = null,
 	string? Deployment = null,
-	string? Model = null);
+	string? Model = null,
+	string? AzureAuth = null,
+	string? TenantId = null);
 
 /// <summary>
 /// Resolves the effective <see cref="CommittyConfig" />. Settings use CLI flag,
@@ -54,6 +56,10 @@ public static class CommittyConfigResolver
 		"committy.azure.reasoningmodel";
 
 	public const string AZURE_MAX_TOKENS_KEY = "committy.azure.maxtokens";
+	public const string AZURE_AUTH_KEY = "committy.azure.auth";
+	public const string AZURE_TENANT_KEY = "committy.azure.tenant";
+	public const string AZURE_SCOPE_KEY = "committy.azure.scope";
+	public const string AZURE_AZ_PATH_KEY = "committy.azure.azpath";
 	public const string ANTHROPIC_API_KEY_KEY = "committy.anthropic.apikey";
 	public const string ANTHROPIC_MODEL_KEY = "committy.anthropic.model";
 	public const string OPEN_AI_API_KEY_KEY = "committy.openai.apikey";
@@ -100,6 +106,30 @@ public static class CommittyConfigResolver
 			Provider.Anthropic => "anthropic",
 			Provider.OpenAI    => "openai",
 			_                  => "azure",
+		};
+
+	/// <summary>
+	/// Reads <c>committy.azure.auth</c>: unset means an API key; null means the
+	/// value names no known method.
+	/// </summary>
+	public static AzureAuth? ParseAzureAuth(string? name) =>
+		name?.Trim().ToLowerInvariant() switch
+		{
+			null or "" or "apikey" or "api-key" or "key"     => AzureAuth.ApiKey,
+			"azurecli" or "azure-cli" or "az" or "cli"       => AzureAuth.AzureCli,
+			_                                                => null,
+		};
+
+	/// <summary>
+	/// The canonical git config spelling for an Azure auth method, so
+	/// <c>committy config</c> writes a value <see cref="ParseAzureAuth" />
+	/// reads back identically.
+	/// </summary>
+	public static string AzureAuthName(AzureAuth auth) =>
+		auth switch
+		{
+			AzureAuth.AzureCli => "azurecli",
+			_                  => "apikey",
 		};
 
 	/// <summary>
@@ -281,12 +311,33 @@ public static class CommittyConfigResolver
 						DEFAULT_OPEN_AI_MAX_TOKENS),
 				},
 			},
-			_ => new CommittyConfig
+			_ => await ResolveAzureAsync().ConfigureAwait(false),
+		};
+
+		async Task<CommittyConfig> ResolveAzureAsync()
+		{
+			string? authName = await FlagOrGit(
+					overrides.AzureAuth,
+					AZURE_AUTH_KEY)
+				.ConfigureAwait(false);
+			AzureAuth? auth = ParseAzureAuth(authName);
+
+			return new CommittyConfig
 			{
 				Provider = Provider.Azure,
 				TitlesOnly = titlesOnly,
 				Azure = new AzureConfig
 				{
+					Auth = auth ?? AzureAuth.ApiKey,
+					UnknownAuth = auth is null ? authName : null,
+					TenantId = await FlagOrGit(
+							overrides.TenantId,
+							AZURE_TENANT_KEY)
+						.ConfigureAwait(false),
+					Scope = await GitOnly(AZURE_SCOPE_KEY)
+						.ConfigureAwait(false),
+					AzPath = await GitOnly(AZURE_AZ_PATH_KEY)
+						.ConfigureAwait(false),
 					ApiKey = await Key(
 							overrides.ApiKey,
 							AZURE_API_KEY_ENV,
@@ -311,11 +362,16 @@ public static class CommittyConfigResolver
 						await GitOnly(AZURE_MAX_TOKENS_KEY)
 							.ConfigureAwait(false)),
 				},
-			},
-		};
+			};
+		}
 
 		async Task<string?> GitOnly(string gitKey) =>
 			await FromGit(gitKey).ConfigureAwait(false)
+			?? Default(gitKey);
+
+		async Task<string?> FlagOrGit(string? flag, string gitKey) =>
+			FromFlag(flag, gitKey)
+			?? await FromGit(gitKey).ConfigureAwait(false)
 			?? Default(gitKey);
 
 		// API keys: flag, then the environment variable, then git config, so a

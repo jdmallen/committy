@@ -13,12 +13,9 @@ public sealed class ChatCompletionClientFactory(HttpClient httpClient)
 		{
 			Provider.Azure => new AzureOpenAIChatClient(
 				httpClient,
-				new AzureOpenAIClientOptions(
-					config.Azure!.ApiKey!,
-					config.Azure.Endpoint!,
-					config.Azure.Deployment)
+				AzureOptions(config.Azure!) with
 				{
-					IsReasoningModel = config.Azure.ReasoningModel,
+					IsReasoningModel = config.Azure!.ReasoningModel,
 				}),
 			Provider.Anthropic => new AnthropicChatClient(
 				httpClient,
@@ -33,5 +30,22 @@ public sealed class ChatCompletionClientFactory(HttpClient httpClient)
 					config.OpenAI.ApiKey)),
 			_ => throw new InvalidOperationException(
 				$"Unsupported provider: {config.Provider}"),
+		};
+
+	/// <summary>
+	/// Key or Entra ID options for <paramref name="azure" />. No token cache:
+	/// a run makes one request, so <c>az</c> is asked for one token at most.
+	/// </summary>
+	private static AzureOpenAIClientOptions AzureOptions(AzureConfig azure) =>
+		azure.Auth switch
+		{
+			AzureAuth.AzureCli => AzureOpenAIClientOptions.ForEntraId(
+				azure.Endpoint!,
+				azure.Deployment,
+				new AzureCliTokenProvider(azure.TokenProviderOptions())),
+			_ => new AzureOpenAIClientOptions(
+				azure.ApiKey!,
+				azure.Endpoint!,
+				azure.Deployment),
 		};
 }

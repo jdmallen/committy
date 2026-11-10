@@ -180,14 +180,16 @@ public static class InfoReport
 			rows.Add(
 				Row("auth", authValue, CommittyConfigResolver.AZURE_AUTH_KEY));
 
-			if (azure.UnknownAuth is null && azure.Auth == AzureAuth.AzureIdentity)
+			if (azure.UnknownAuth is null
+				&& azure.Auth == AzureAuth.AzureIdentity)
 			{
 				AddAzureIdentityRows(azure);
 
 				return;
 			}
 
-			if (azure.Auth != AzureAuth.AzureCli || azure.UnknownAuth is not null)
+			if (azure.Auth != AzureAuth.AzureCli
+				|| azure.UnknownAuth is not null)
 			{
 				rows.Add(
 					KeyRow(
@@ -219,7 +221,10 @@ public static class InfoReport
 					? ("az", "not found")
 					: options.AzExecutablePath is null
 						? ("az", $"{az} (PATH)")
-						: Row("az", az, CommittyConfigResolver.AZURE_AZ_PATH_KEY));
+						: Row(
+							"az",
+							az,
+							CommittyConfigResolver.AZURE_AZ_PATH_KEY));
 			rows.Add(("sign in", AzureCli.SignInCommand(azure)));
 
 			if (az is null)

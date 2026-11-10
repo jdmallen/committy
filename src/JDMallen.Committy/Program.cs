@@ -112,7 +112,7 @@ internal class Program
 				// Checked before anything is written, so a typo leaves the
 				// config as it was.
 				if (parseResult.GetValue(tenantOption)?.Trim() is
-						{ } tenantFlag and not "-"
+				{ } tenantFlag and not "-"
 					&& !AzureCli.IsValidTenant(tenantFlag))
 				{
 					throw new InvalidOperationException(
@@ -690,7 +690,8 @@ internal class Program
 		};
 		var clipboardOption = new Option<bool>(
 			"--clipboard",
-			"-c") { Description = "Copy first suggestion to clipboard" };
+			"-c")
+		{ Description = "Copy first suggestion to clipboard" };
 		var titlesOnlyOption = new Option<bool>(
 			"--titles-only",
 			"-t")
@@ -1016,8 +1017,8 @@ internal class Program
 			CommittyConfigResolver.ParseProvider(current) switch
 			{
 				Provider.Anthropic => "2",
-				Provider.OpenAI    => "3",
-				_                  => "1",
+				Provider.OpenAI => "3",
+				_ => "1",
 			};
 		Console.Write($"Choice [{defaultChoice}]: ");
 
@@ -1027,8 +1028,8 @@ internal class Program
 		return choice switch
 		{
 			"2" or "anthropic" or "claude" => Provider.Anthropic,
-			"3" or "openai" or "local"     => Provider.OpenAI,
-			_                              => Provider.Azure,
+			"3" or "openai" or "local" => Provider.OpenAI,
+			_ => Provider.Azure,
 		};
 	}
 
@@ -1167,7 +1168,9 @@ internal class Program
 				&& flagValue is null
 				&& !Console.IsInputRedirected
 				&& (await ResolveConfigAsync(null, cancellationToken)).Azure is
-					{ UsesInteractiveSignIn: true }
+				{
+					UsesInteractiveSignIn: true,
+				}
 					? await AzureCliTenantAsync(cancellationToken)
 					: null);
 		string? value = Prompt(
@@ -1252,7 +1255,8 @@ internal class Program
 		return az is null
 			? null
 			: AzureCli.ParseAccount(
-				await AzureCli.ShowAccountAsync(az, cancellationToken))?.Tenant;
+					await AzureCli.ShowAccountAsync(az, cancellationToken))
+				?.Tenant;
 	}
 
 	/// <summary>
@@ -1267,7 +1271,7 @@ internal class Program
 			(await ResolveConfigAsync(null, cancellationToken)).Azure!;
 		string credential =
 			CommittyConfigResolver.AzureCredentialName(azure.Credential);
-		string roleLine =
+		const string roleLine =
 			$"  The account needs the \"{AzureCli.DATA_PLANE_ROLE}\" role on the Azure OpenAI resource.";
 
 		Console.WriteLine();
@@ -1322,9 +1326,10 @@ internal class Program
 		}
 		catch (Exception ex)
 			when (ex is AuthenticationFailedException
-				or CredentialUnavailableException)
+					  or CredentialUnavailableException)
 		{
-			await Console.Error.WriteLineAsync($"  Sign-in failed: {ex.Message}");
+			await Console.Error.WriteLineAsync(
+				$"  Sign-in failed: {ex.Message}");
 			await Console.Error.WriteLineAsync(
 				"  The settings above are saved; run `committy config` again to retry.");
 			Environment.Exit(1);

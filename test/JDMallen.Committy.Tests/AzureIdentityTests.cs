@@ -27,7 +27,8 @@ public class AzureIdentityTests
 			Endpoint = "https://example.openai.azure.com",
 			Deployment = "gpt-6-luna",
 			TenantId = tenantId,
-			AuthenticationRecordPath = "/home/me/.config/committy/auth-record.json",
+			AuthenticationRecordPath =
+				"/home/me/.config/committy/auth-record.json",
 		};
 
 	[Theory]
@@ -140,7 +141,8 @@ public class AzureIdentityTests
 
 	[Fact]
 	public void CredentialOptions_BlankTenant_IsNull() =>
-		Assert.Null(IdentityConfig(tenantId: "  ").CredentialOptions(true).TenantId);
+		Assert.Null(
+			IdentityConfig(tenantId: "  ").CredentialOptions(true).TenantId);
 
 	[Theory]
 	[InlineData(AzureCredentialKind.InteractiveBrowser, true)]

@@ -19,6 +19,11 @@ indent_size = 2
 [*.json]
 indent_size = 2
 
+# YAML files (tabs are not allowed in YAML)
+[*.{yml,yaml}]
+indent_style = space
+indent_size = 2
+
 # C# files
 [*.cs]
 

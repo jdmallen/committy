@@ -103,7 +103,9 @@ public class CommittyConfigTests
 
 	[Fact]
 	public void Validate_AzureCli_StillNeedsTheEndpoint()
-		=> Assert.Contains("endpoint", AzureCliConfig(endpoint: null).Validate());
+		=> Assert.Contains(
+			"endpoint",
+			AzureCliConfig(endpoint: null).Validate());
 
 	[Fact]
 	public void Validate_AzureCli_BadTenant_NamesTheTenantKey()

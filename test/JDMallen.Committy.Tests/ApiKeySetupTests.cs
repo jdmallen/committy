@@ -26,12 +26,12 @@ public class ApiKeySetupTests
 		_environment.Variables[VARIABLE] = "super-secret";
 
 		NewSetup()
-		.Run(
-			VARIABLE,
-			false,
-			null,
-			null,
-			true);
+			.Run(
+				VARIABLE,
+				false,
+				null,
+				null,
+				true);
 
 		var output = _output.ToString();
 		Assert.Contains($"{VARIABLE} is set.", output);
@@ -63,12 +63,12 @@ public class ApiKeySetupTests
 		_environment.Variables[VARIABLE] = "k";
 
 		NewSetup()
-		.Run(
-			VARIABLE,
-			false,
-			null,
-			null,
-			true);
+			.Run(
+				VARIABLE,
+				false,
+				null,
+				null,
+				true);
 
 		Assert.DoesNotContain("export", _output.ToString());
 	}
@@ -79,12 +79,12 @@ public class ApiKeySetupTests
 		_environment.Variables[VARIABLE] = "k";
 
 		string? pending = NewSetup()
-		.Run(
-			VARIABLE,
-			false,
-			"flag-key",
-			null,
-			true);
+			.Run(
+				VARIABLE,
+				false,
+				"flag-key",
+				null,
+				true);
 
 		Assert.Null(pending);
 		Assert.Contains("only saved on Windows", _output.ToString());
@@ -124,12 +124,12 @@ public class ApiKeySetupTests
 
 		Assert.Null(
 			NewSetup()
-			.Run(
-				VARIABLE,
-				false,
-				null,
-				null,
-				true));
+				.Run(
+					VARIABLE,
+					false,
+					null,
+					null,
+					true));
 		Assert.Empty(_secrets);
 	}
 
@@ -144,12 +144,12 @@ public class ApiKeySetupTests
 		Assert.Equal(
 			"k",
 			NewSetup()
-			.Run(
-				VARIABLE,
-				false,
-				null,
-				null,
-				true));
+				.Run(
+					VARIABLE,
+					false,
+					null,
+					null,
+					true));
 		Assert.Contains("Please answer y or n.", _output.ToString());
 	}
 
@@ -162,12 +162,12 @@ public class ApiKeySetupTests
 
 		Assert.Null(
 			NewSetup()
-			.Run(
-				VARIABLE,
-				false,
-				null,
-				null,
-				true));
+				.Run(
+					VARIABLE,
+					false,
+					null,
+					null,
+					true));
 		Assert.Contains("[y/N]", _output.ToString());
 	}
 
@@ -179,12 +179,12 @@ public class ApiKeySetupTests
 		Assert.Equal(
 			"flag-key",
 			NewSetup()
-			.Run(
-				VARIABLE,
-				false,
-				"flag-key",
-				null,
-				false));
+				.Run(
+					VARIABLE,
+					false,
+					"flag-key",
+					null,
+					false));
 		Assert.DoesNotContain("Save ", _output.ToString());
 	}
 
@@ -195,12 +195,12 @@ public class ApiKeySetupTests
 
 		Assert.Null(
 			NewSetup()
-			.Run(
-				VARIABLE,
-				false,
-				null,
-				null,
-				false));
+				.Run(
+					VARIABLE,
+					false,
+					null,
+					null,
+					false));
 		Assert.DoesNotContain("Save ", _output.ToString());
 	}
 
@@ -208,12 +208,12 @@ public class ApiKeySetupTests
 	public void Run_StoredGitKey_OffersRemovalOnlyForTerminalOnlyUse()
 	{
 		NewSetup()
-		.Run(
-			VARIABLE,
-			false,
-			null,
-			"committy.azure.apikey",
-			true);
+			.Run(
+				VARIABLE,
+				false,
+				null,
+				"committy.azure.apikey",
+				true);
 
 		var output = _output.ToString();
 		Assert.Contains("If you only", output);
@@ -227,12 +227,12 @@ public class ApiKeySetupTests
 	public void Run_Linux_Unset_AlsoPointsAtEnvironmentD()
 	{
 		NewSetup(isLinux: true)
-		.Run(
-			VARIABLE,
-			false,
-			null,
-			null,
-			true);
+			.Run(
+				VARIABLE,
+				false,
+				null,
+				null,
+				true);
 
 		var output = _output.ToString();
 		Assert.Contains(ApiKeySetup.ENVIRONMENT_D_FILE, output);
@@ -243,12 +243,12 @@ public class ApiKeySetupTests
 	public void Run_NotLinux_Unset_DoesNotMentionEnvironmentD()
 	{
 		NewSetup(isLinux: false)
-		.Run(
-			VARIABLE,
-			false,
-			null,
-			null,
-			true);
+			.Run(
+				VARIABLE,
+				false,
+				null,
+				null,
+				true);
 
 		Assert.DoesNotContain("environment.d", _output.ToString());
 	}
@@ -257,12 +257,12 @@ public class ApiKeySetupTests
 	public void Run_Optional_SaysSo()
 	{
 		NewSetup()
-		.Run(
-			"OPENAI_API_KEY_COMMITTY",
-			true,
-			null,
-			null,
-			true);
+			.Run(
+				"OPENAI_API_KEY_COMMITTY",
+				true,
+				null,
+				null,
+				true);
 
 		Assert.Contains("Optional", _output.ToString());
 	}
@@ -291,7 +291,8 @@ public class ApiKeySetupTests
 
 		public bool CanPersist { get; set; }
 
-		public string? GetVariable(string name) => Variables.GetValueOrDefault(name);
+		public string? GetVariable(string name)
+			=> Variables.GetValueOrDefault(name);
 
 		public void SetPersistent(string name, string value)
 		{

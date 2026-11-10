@@ -68,6 +68,7 @@ public static class CommittyConfigResolver
 	/// <summary>The accepted <see cref="AZURE_CREDENTIAL_KEY" /> values.</summary>
 	public const string AZURE_CREDENTIAL_NAMES =
 		"interactivebrowser, devicecode, default, azurecli or azd";
+
 	public const string ANTHROPIC_API_KEY_KEY = "committy.anthropic.apikey";
 	public const string ANTHROPIC_MODEL_KEY = "committy.anthropic.model";
 	public const string OPEN_AI_API_KEY_KEY = "committy.openai.apikey";
@@ -150,11 +151,15 @@ public static class CommittyConfigResolver
 	public static AzureCredentialKind? ParseAzureCredential(string? name) =>
 		name?.Trim().ToLowerInvariant() switch
 		{
-			null or "" or "interactivebrowser" or "interactive-browser"
+			null
+				or ""
+				or "interactivebrowser"
+				or "interactive-browser"
 				or "browser" => AzureCredentialKind.InteractiveBrowser,
 			"devicecode" or "device-code" or "device" =>
 				AzureCredentialKind.DeviceCode,
-			"default" or "defaultazurecredential" => AzureCredentialKind.Default,
+			"default" or "defaultazurecredential" =>
+				AzureCredentialKind.Default,
 			"azurecli" or "azure-cli" or "az" or "cli" =>
 				AzureCredentialKind.AzureCli,
 			"azd" or "azuredevelopercli" or "azure-developer-cli" =>
@@ -201,8 +206,7 @@ public static class CommittyConfigResolver
 	{
 		string value = line.Trim();
 
-		return value.Length >= 2
-			&& value[0] is '"' or '\''
+		return value is ['"' or '\'', _, ..]
 			&& value[^1] == value[0]
 				? value[1..^1].Trim()
 				: value;
@@ -287,7 +291,6 @@ public static class CommittyConfigResolver
 
 		return new ResolvedConfig(config, sources);
 	}
-
 
 	/// <param name="getGitConfig"></param>
 	/// <param name="sources">

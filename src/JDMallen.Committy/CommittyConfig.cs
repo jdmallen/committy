@@ -71,7 +71,7 @@ public sealed class AzureConfig
 	/// (<c>~/.config/committy</c> on Linux and macOS, <c>%APPDATA%\committy</c>
 	/// on Windows).
 	/// </summary>
-	public static string DefaultAuthenticationRecordPath() =>
+	private static string DefaultAuthenticationRecordPath() =>
 		Path.Combine(
 			Environment.GetFolderPath(
 				Environment.SpecialFolder.ApplicationData),
@@ -171,17 +171,20 @@ public sealed class AzureConfig
 	{
 		if (UnknownAuth is not null)
 		{
-			return $"Unknown Azure auth '{UnknownAuth}' in {CommittyConfigResolver.AZURE_AUTH_KEY} (expected apikey, azurecli or azureidentity).";
+			return
+				$"Unknown Azure auth '{UnknownAuth}' in {CommittyConfigResolver.AZURE_AUTH_KEY} (expected apikey, azurecli or azureidentity).";
 		}
 
 		if (Auth == AzureAuth.AzureIdentity && UnknownCredential is not null)
 		{
-			return $"Unknown Azure credential '{UnknownCredential}' in {CommittyConfigResolver.AZURE_CREDENTIAL_KEY} (expected {CommittyConfigResolver.AZURE_CREDENTIAL_NAMES}).";
+			return
+				$"Unknown Azure credential '{UnknownCredential}' in {CommittyConfigResolver.AZURE_CREDENTIAL_KEY} (expected {CommittyConfigResolver.AZURE_CREDENTIAL_NAMES}).";
 		}
 
 		if (string.IsNullOrWhiteSpace(Endpoint))
 		{
-			return "Azure OpenAI endpoint is required (run `committy config` or set AZURE_OPENAI_ENDPOINT_HOST).";
+			return
+				"Azure OpenAI endpoint is required (run `committy config` or set AZURE_OPENAI_ENDPOINT_HOST).";
 		}
 
 		return Auth switch

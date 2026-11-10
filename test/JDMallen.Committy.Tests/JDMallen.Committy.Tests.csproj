@@ -22,7 +22,7 @@
 	</ItemGroup>
 
 	<ItemGroup>
-		<ProjectReference Include="..\..\src\JDMallen.Committy\JDMallen.Committy.csproj" />
+		<ProjectReference Include="..\..\src\JDMallen.Committy\JDMallen.Committy.csproj"/>
 	</ItemGroup>
 
 </Project>

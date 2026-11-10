@@ -136,7 +136,8 @@ public class AzureProviderTests
 			Directory.CreateTempSubdirectory("committy-azure-provider-tests-");
 		try
 		{
-			long expiresOn = DateTimeOffset.UtcNow.AddHours(1).ToUnixTimeSeconds();
+			long expiresOn =
+				DateTimeOffset.UtcNow.AddHours(1).ToUnixTimeSeconds();
 			string az = FakeAz.Create(
 				directory.FullName,
 				"az",
@@ -161,7 +162,9 @@ public class AzureProviderTests
 					config.MaxTokensOverride)
 				.GenerateAsync("diff --git a/x b/x", true);
 
-			Assert.Equal("Bearer", handler.RequestHeaders!.Authorization?.Scheme);
+			Assert.Equal(
+				"Bearer",
+				handler.RequestHeaders!.Authorization?.Scheme);
 			Assert.Equal(
 				"cli-token",
 				handler.RequestHeaders.Authorization?.Parameter);

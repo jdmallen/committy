@@ -1,21 +1,21 @@
 <Solution>
 	<Folder Name="/GitHub Actions/">
-		<File Path=".github\workflows\ci.yml" />
-		<File Path=".github\workflows\release.yml" />
+		<File Path=".github\workflows\ci.yml"/>
+		<File Path=".github\workflows\release.yml"/>
 	</Folder>
 	<Folder Name="/Solution Items/">
-		<File Path=".gitignore" />
-		<File Path="LICENSE" />
-		<File Path="nuget.config" />
-		<File Path="README.md" />
-		<File Path=".tool-versions" />
-		<File Path="CHANGELOG.md" />
-		<File Path="Directory.Build.props" />
-		<File Path="global.json" />
-		<File Path="hooks/prepare-commit-msg" />
-		<File Path="scripts\publish-dotnet.sh" />
-		<File Path="scripts\publish.sh" />
+		<File Path=".gitignore"/>
+		<File Path="LICENSE"/>
+		<File Path="nuget.config"/>
+		<File Path="README.md"/>
+		<File Path=".tool-versions"/>
+		<File Path="CHANGELOG.md"/>
+		<File Path="Directory.Build.props"/>
+		<File Path="global.json"/>
+		<File Path="hooks/prepare-commit-msg"/>
+		<File Path="scripts\publish-dotnet.sh"/>
+		<File Path="scripts\publish.sh"/>
 	</Folder>
-	<Project Path="src\JDMallen.Committy\JDMallen.Committy.csproj" />
-	<Project Path="test\JDMallen.Committy.Tests\JDMallen.Committy.Tests.csproj" />
+	<Project Path="src\JDMallen.Committy\JDMallen.Committy.csproj"/>
+	<Project Path="test\JDMallen.Committy.Tests\JDMallen.Committy.Tests.csproj"/>
 </Solution>

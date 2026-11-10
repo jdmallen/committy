@@ -39,7 +39,7 @@ public class ConfigSourceTests
 			new GitConfigValue("azure", "global");
 
 		ResolvedConfig resolved =
-			await Resolve(new ConfigOverrides(Provider: "openai"));
+			await Resolve(new ConfigOverrides("openai"));
 
 		Assert.Equal(Provider.OpenAI, resolved.Config.Provider);
 		Assert.Equal(
@@ -61,7 +61,10 @@ public class ConfigSourceTests
 
 	[Theory]
 	[InlineData("local\tanthropic\n", "anthropic", "local")]
-	[InlineData("global\thttp://host:8080/v1\n", "http://host:8080/v1", "global")]
+	[InlineData(
+		"global\thttp://host:8080/v1\n",
+		"http://host:8080/v1",
+		"global")]
 	[InlineData("anthropic\n", "anthropic", null)]
 	public void ParseScopedValue_SplitsScopeFromValue(
 		string output,

@@ -6,7 +6,9 @@ namespace JDMallen.Committy.Tests;
 public class InfoReportTests
 {
 	private const string SECRET = "sk-super-secret-value";
-	private const string USAGE_PATH = "/home/me/.local/share/committy/usage.json";
+
+	private const string USAGE_PATH =
+		"/home/me/.local/share/committy/usage.json";
 
 	private readonly Dictionary<string, string> _environment = [];
 	private readonly Dictionary<string, GitConfigValue> _gitConfig = [];
@@ -110,7 +112,14 @@ public class InfoReportTests
 				Requests = 4,
 				InputTokens = 10_000,
 				OutputTokens = 2_345,
-				Since = new DateTimeOffset(2026, 11, 6, 9, 0, 0, TimeSpan.Zero),
+				Since = new DateTimeOffset(
+					2026,
+					11,
+					6,
+					9,
+					0,
+					0,
+					TimeSpan.Zero),
 			});
 
 		Assert.Contains($"usage log:   {USAGE_PATH}", report);
@@ -168,7 +177,9 @@ public class InfoReportTests
 		Assert.Matches(
 			@"auth:\s+azurecli, Microsoft Entra ID via the Azure CLI \(git config --global\)",
 			report);
-		Assert.Matches(@"tenant:\s+contoso\.com \(git config --local\)", report);
+		Assert.Matches(
+			@"tenant:\s+contoso\.com \(git config --local\)",
+			report);
 		Assert.Matches(
 			$@"scope:\s+{Regex.Escape(AzureOpenAIScopes.DEFAULT)} \(default\)",
 			report);
@@ -238,8 +249,12 @@ public class InfoReportTests
 			@"auth:\s+azureidentity, Microsoft Entra ID via Azure\.Identity \(git config --global\)",
 			report);
 		Assert.Matches(@"credential:\s+interactivebrowser \(default\)", report);
-		Assert.Matches(@"tenant:\s+contoso\.com \(git config --global\)", report);
-		Assert.Matches(@"signed in:\s+yes, saved in .*auth-record\.json", report);
+		Assert.Matches(
+			@"tenant:\s+contoso\.com \(git config --global\)",
+			report);
+		Assert.Matches(
+			@"signed in:\s+yes, saved in .*auth-record\.json",
+			report);
 		Assert.DoesNotContain("az:", report);
 		Assert.DoesNotContain("api key:", report);
 		Assert.DoesNotContain("problem:", report);
@@ -260,7 +275,8 @@ public class InfoReportTests
 	}
 
 	[Fact]
-	public async Task Info_AzureIdentity_NonInteractiveCredential_HasNoSignInRow()
+	public async Task
+		Info_AzureIdentity_NonInteractiveCredential_HasNoSignInRow()
 	{
 		_gitConfig[CommittyConfigResolver.AZURE_ENDPOINT_KEY] =
 			new GitConfigValue("https://example.openai.azure.com", "global");

@@ -180,7 +180,9 @@ public class CommittyConfigResolverTests
 		_gitConfig[CommittyConfigResolver.AZURE_TENANT_KEY] = "config.com";
 
 		AzureConfig azure = (await Resolve(
-				new ConfigOverrides(AzureAuth: "azurecli", TenantId: "flag.com")))
+				new ConfigOverrides(
+					AzureAuth: "azurecli",
+					TenantId: "flag.com")))
 			.Azure!;
 
 		Assert.Equal(AzureAuth.AzureCli, azure.Auth);
@@ -235,7 +237,9 @@ public class CommittyConfigResolverTests
 	}
 
 	[Theory]
-	[InlineData("\"c1d94805-5918-40a2-a8d8-9d8452889856\"", "c1d94805-5918-40a2-a8d8-9d8452889856")]
+	[InlineData(
+		"\"c1d94805-5918-40a2-a8d8-9d8452889856\"",
+		"c1d94805-5918-40a2-a8d8-9d8452889856")]
 	[InlineData(" 'contoso.com' ", "contoso.com")]
 	[InlineData("\" spaced \"", "spaced")]
 	[InlineData("\"mismatched'", "\"mismatched'")]

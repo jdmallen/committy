@@ -193,7 +193,7 @@ public sealed class AzureCliTests : IDisposable
 			"/usr/bin/az",
 			"""{ "tenantId": "t-1", "user": { "name": "me@example.com" } }""");
 
-		string text = output.ToString();
+		var text = output.ToString();
 		Assert.Contains("az: /usr/bin/az", text);
 		Assert.Contains("Signed in as me@example.com (tenant t-1).", text);
 		Assert.Contains(AzureCli.DATA_PLANE_ROLE, text);
@@ -204,7 +204,11 @@ public sealed class AzureCliTests : IDisposable
 	{
 		using var output = new StringWriter();
 
-		AzureCli.WriteSetup(output, Config(TENANT), "/usr/bin/az", null);
+		AzureCli.WriteSetup(
+			output,
+			Config(TENANT),
+			"/usr/bin/az",
+			null);
 
 		Assert.Contains(
 			$"Not signed in. Run: az login --tenant {TENANT} --scope {AzureOpenAIScopes.DEFAULT}",
@@ -216,9 +220,13 @@ public sealed class AzureCliTests : IDisposable
 	{
 		using var output = new StringWriter();
 
-		AzureCli.WriteSetup(output, Config(), null, null);
+		AzureCli.WriteSetup(
+			output,
+			Config(),
+			null,
+			null);
 
-		string text = output.ToString();
+		var text = output.ToString();
 		Assert.Contains(CommittyConfigResolver.AZURE_AZ_PATH_KEY, text);
 		Assert.Contains("Then sign in with: az login", text);
 	}
@@ -239,7 +247,9 @@ public sealed class AzureCliTests : IDisposable
 		Assert.Equal(
 			("me@example.com", "t-1"),
 			AzureCli.ParseAccount(
-				await AzureCli.ShowAccountAsync(signedIn, CancellationToken.None)));
+				await AzureCli.ShowAccountAsync(
+					signedIn,
+					CancellationToken.None)));
 		Assert.Null(
 			await AzureCli.ShowAccountAsync(signedOut, CancellationToken.None));
 		Assert.Null(

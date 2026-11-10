@@ -77,7 +77,7 @@ public static class CommitMessageComposer
 			sb.Append('\n');
 
 			foreach (string line in suggestions.SelectMany(suggestion
-				         => NormalizeNewlines(suggestion).Split('\n')))
+						 => NormalizeNewlines(suggestion).Split('\n')))
 			{
 				sb.Append("# ").Append(line).Append('\n');
 			}

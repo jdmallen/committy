@@ -94,7 +94,7 @@ public static class GitConfigStore
 		CancellationToken cancellationToken = default)
 	{
 		// git config exits 5 when there is nothing to unset.
-		const int NOT_SET_EXIT_CODE = 5;
+		const int notSetExitCode = 5;
 		string scope = global ? "--global" : "--local";
 
 		BufferedCommandResult result = await Cli.Wrap("git")
@@ -103,7 +103,7 @@ public static class GitConfigStore
 			.ExecuteBufferedAsync(cancellationToken)
 			.ConfigureAwait(false);
 
-		if (result.ExitCode is not 0 and not NOT_SET_EXIT_CODE)
+		if (result.ExitCode is not 0 and not notSetExitCode)
 		{
 			throw new InvalidOperationException(
 				$"`git config {scope} --unset {key}` failed: {result.StandardError.Trim()}");

@@ -84,15 +84,15 @@ public static class CommittyConfigResolver
 		value?.Trim().ToLowerInvariant() switch
 		{
 			"1" or "true" or "yes" or "on" => true,
-			_                              => false,
+			_ => false,
 		};
 
 	public static Provider ParseProvider(string? name) =>
 		name?.Trim().ToLowerInvariant() switch
 		{
 			"anthropic" or "claude" => Provider.Anthropic,
-			"openai" or "local"     => Provider.OpenAI,
-			_                       => Provider.Azure,
+			"openai" or "local" => Provider.OpenAI,
+			_ => Provider.Azure,
 		};
 
 	/// <summary>
@@ -104,8 +104,8 @@ public static class CommittyConfigResolver
 		provider switch
 		{
 			Provider.Anthropic => "anthropic",
-			Provider.OpenAI    => "openai",
-			_                  => "azure",
+			Provider.OpenAI => "openai",
+			_ => "azure",
 		};
 
 	/// <summary>
@@ -115,9 +115,9 @@ public static class CommittyConfigResolver
 	public static AzureAuth? ParseAzureAuth(string? name) =>
 		name?.Trim().ToLowerInvariant() switch
 		{
-			null or "" or "apikey" or "api-key" or "key"     => AzureAuth.ApiKey,
-			"azurecli" or "azure-cli" or "az" or "cli"       => AzureAuth.AzureCli,
-			_                                                => null,
+			null or "" or "apikey" or "api-key" or "key" => AzureAuth.ApiKey,
+			"azurecli" or "azure-cli" or "az" or "cli" => AzureAuth.AzureCli,
+			_ => null,
 		};
 
 	/// <summary>
@@ -129,7 +129,7 @@ public static class CommittyConfigResolver
 		auth switch
 		{
 			AzureAuth.AzureCli => "azurecli",
-			_                  => "apikey",
+			_ => "apikey",
 		};
 
 	/// <summary>
@@ -154,9 +154,9 @@ public static class CommittyConfigResolver
 	public static string? NormalizeBool(string? value) =>
 		value?.Trim().ToLowerInvariant() switch
 		{
-			"y" or "yes" or "true" or "1" or "on"  => "true",
+			"y" or "yes" or "true" or "1" or "on" => "true",
 			"n" or "no" or "false" or "0" or "off" => "false",
-			_                                      => null,
+			_ => null,
 		};
 
 	public static Task<CommittyConfig> ResolveAsync(

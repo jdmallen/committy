@@ -240,8 +240,8 @@ public sealed class CommittyConfig
 		Provider switch
 		{
 			Provider.OpenAI => OpenAI?.MaxTokens,
-			Provider.Azure  => Azure?.EffectiveMaxTokens,
-			_               => null,
+			Provider.Azure => Azure?.EffectiveMaxTokens,
+			_ => null,
 		};
 
 	public int TimeoutSeconds =>

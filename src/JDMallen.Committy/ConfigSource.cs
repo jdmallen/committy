@@ -32,12 +32,12 @@ public sealed record ConfigSource(ConfigSourceKind Kind, string? Detail = null)
 			ConfigSourceKind.Flag => "command-line flag",
 			ConfigSourceKind.GitConfig => Detail switch
 			{
-				null      => "git config",
+				null => "git config",
 				"command" => "git -c",
-				_         => $"git config --{Detail}",
+				_ => $"git config --{Detail}",
 			},
 			ConfigSourceKind.Environment => $"${Detail}",
-			_                            => "default",
+			_ => "default",
 		};
 }
 

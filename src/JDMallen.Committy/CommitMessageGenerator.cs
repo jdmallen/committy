@@ -43,7 +43,7 @@ public sealed class CommitMessageGenerator(
 				result.Usage);
 		}
 		catch (Exception ex) when (ex is not ArgumentException
-			                           and not OperationCanceledException)
+									   and not OperationCanceledException)
 		{
 			throw new InvalidOperationException(
 				$"Failed to generate commit message suggestions: {ex.Message}",

@@ -76,12 +76,10 @@ public static class AzureCli
 		AzureConfig azure,
 		Func<string, string?> getEnvironmentVariable,
 		bool? isWindows = null)
-	{
-		return azure.Auth == AzureAuth.AzureCli
-		       && Locate(azure, getEnvironmentVariable, isWindows) is null
-			? NotFoundMessage(azure)
-			: null;
-	}
+		=> azure.Auth == AzureAuth.AzureCli
+			&& Locate(azure, getEnvironmentVariable, isWindows) is null
+				? NotFoundMessage(azure)
+				: null;
 
 	/// <summary>
 	/// That <c>az</c> is missing, and the setting or install that fixes it.
@@ -140,7 +138,9 @@ public static class AzureCli
 			BufferedCommandResult result = await Cli.Wrap(
 					viaCommandShell ? "cmd.exe" : az)
 				.WithArguments(
-					viaCommandShell ? ["/d", "/c", az, .. arguments] : arguments)
+					viaCommandShell
+						? ["/d", "/c", az, .. arguments]
+						: arguments)
 				.WithValidation(CommandResultValidation.None)
 				.ExecuteBufferedAsync(timeout.Token)
 				.ConfigureAwait(false);
@@ -176,7 +176,8 @@ public static class AzureCli
 		string? accountJson)
 	{
 		output.WriteLine();
-		output.WriteLine("Azure CLI sign-in (Microsoft Entra ID; no API key needed):");
+		output.WriteLine(
+			"Azure CLI sign-in (Microsoft Entra ID; no API key needed):");
 
 		if (az is null)
 		{

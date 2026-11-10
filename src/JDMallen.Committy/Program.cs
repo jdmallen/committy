@@ -101,8 +101,8 @@ internal class Program
 				// Checked before anything is written, so a typo leaves the
 				// config as it was.
 				if (parseResult.GetValue(tenantOption)?.Trim() is
-					    { } tenantFlag and not "-"
-				    && !AzureCli.IsValidTenant(tenantFlag))
+						{ } tenantFlag and not "-"
+					&& !AzureCli.IsValidTenant(tenantFlag))
 				{
 					throw new InvalidOperationException(
 						$"'{tenantFlag}' is not a tenant GUID or domain name.");
@@ -793,7 +793,9 @@ internal class Program
 			repository,
 			resolved,
 			new InfoReport.UsageReport(usagePath, totals, usageError),
-			azure => AzureCli.Locate(azure, Environment.GetEnvironmentVariable));
+			azure => AzureCli.Locate(
+				azure,
+				Environment.GetEnvironmentVariable));
 	}
 
 	private static string BuildVersionLine() =>
@@ -810,10 +812,10 @@ internal class Program
 		run.Add(usage);
 		string path = TokenUsageLog.DefaultPath(USAGE_APPLICATION_NAME);
 		if (!TokenUsageLog.TryRecord(
-			    path,
-			    run,
-			    DateTimeOffset.Now,
-			    out string? error))
+				path,
+				run,
+				DateTimeOffset.Now,
+				out string? error))
 		{
 			Console.Error.WriteLine(
 				$"Warning: token usage not recorded in {path}: {error}");
@@ -1025,7 +1027,7 @@ internal class Program
 	/// </summary>
 	private static string? CheckReady(CommittyConfig config) =>
 		config.Validate()
-		?? (config.Provider == Provider.Azure && config.Azure is { } azure
+		?? (config is { Provider: Provider.Azure, Azure: { } azure }
 			? AzureCli.Problem(azure, Environment.GetEnvironmentVariable)
 			: null);
 
@@ -1044,7 +1046,12 @@ internal class Program
 		string? current = await GitConfigStore.GetAsync(
 			CommittyConfigResolver.AZURE_TENANT_KEY,
 			cancellationToken);
-		string? value = Prompt(label, flagValue, current, false)?.Trim();
+		string? value = Prompt(
+				label,
+				flagValue,
+				current,
+				false)
+			?.Trim();
 
 		while (value is not null and not "-" && !AzureCli.IsValidTenant(value))
 		{
@@ -1055,19 +1062,26 @@ internal class Program
 			}
 
 			Console.WriteLine("  Please enter a tenant GUID or domain name.");
-			value = Prompt(label, null, current, false)?.Trim();
+			value = Prompt(
+					label,
+					null,
+					current,
+					false)
+				?.Trim();
 		}
 
 		if (value == "-")
 		{
-			if (current is not null)
+			if (current is null)
 			{
-				await GitConfigStore.UnsetAsync(
-					CommittyConfigResolver.AZURE_TENANT_KEY,
-					global,
-					cancellationToken);
-				written.Add((CommittyConfigResolver.AZURE_TENANT_KEY, null));
+				return;
 			}
+
+			await GitConfigStore.UnsetAsync(
+				CommittyConfigResolver.AZURE_TENANT_KEY,
+				global,
+				cancellationToken);
+			written.Add((CommittyConfigResolver.AZURE_TENANT_KEY, null));
 
 			return;
 		}
@@ -1095,6 +1109,10 @@ internal class Program
 			? null
 			: await AzureCli.ShowAccountAsync(az, cancellationToken);
 
-		AzureCli.WriteSetup(Console.Out, azure, az, accountJson);
+		AzureCli.WriteSetup(
+			Console.Out,
+			azure,
+			az,
+			accountJson);
 	}
 }

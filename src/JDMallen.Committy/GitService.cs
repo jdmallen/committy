@@ -52,7 +52,7 @@ public static class GitService
 		CancellationToken cancellationToken = default)
 	{
 		foreach (string flag in (string[])
-		         ["--show-toplevel", "--absolute-git-dir"])
+				 ["--show-toplevel", "--absolute-git-dir"])
 		{
 			BufferedCommandResult result = await Cli.Wrap("git")
 				.WithArguments(["rev-parse", flag])
@@ -83,8 +83,8 @@ public static class GitService
 			.ConfigureAwait(false);
 
 		if (result.ExitCode != 0
-		    || !result.StandardOutput.Trim()
-			    .Equals("true", StringComparison.OrdinalIgnoreCase))
+			|| !result.StandardOutput.Trim()
+				.Equals("true", StringComparison.OrdinalIgnoreCase))
 		{
 			throw new InvalidOperationException(
 				"Not a git repository. Run committy from inside a git repository.");

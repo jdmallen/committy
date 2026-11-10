@@ -167,4 +167,122 @@ public class CommitMessagePromptTests
 
 		Assert.Equal(2048, request.MaxTokens);
 	}
+
+	private const string SMALL_PATCH =
+		"diff --git a/src/App.cs b/src/App.cs\n"
+		+ "--- a/src/App.cs\n"
+		+ "+++ b/src/App.cs\n"
+		+ "@@ -1 +1 @@\n"
+		+ "-old\n"
+		+ "+new\n";
+
+	private static string LargePatch()
+	{
+		// 12 distinct files is enough to be LARGE regardless of line count.
+		var builder = new System.Text.StringBuilder();
+
+		for (int fileNumber = 0; fileNumber < 12; fileNumber++)
+		{
+			builder.Append(
+				$"diff --git a/f{fileNumber}/Code{fileNumber}.cs b/f{fileNumber}/Code{fileNumber}.cs\n"
+				+ $"--- a/f{fileNumber}/Code{fileNumber}.cs\n"
+				+ $"+++ b/f{fileNumber}/Code{fileNumber}.cs\n"
+				+ "@@ -1 +1 @@\n"
+				+ "+added\n");
+		}
+
+		return builder.ToString();
+	}
+
+	[Theory]
+	[InlineData(true)]
+	[InlineData(false)]
+	public void Build_SmallPatch_EmbedsPatchAndFileList(bool titlesOnly)
+	{
+		CompletionRequest request =
+			CommitMessagePrompt.Build(SMALL_PATCH, titlesOnly);
+
+		Assert.Contains(SMALL_PATCH, request.UserPrompt);
+		Assert.Contains(
+			"CHANGE SIZE: SMALL (1 file, +1/-1 lines)",
+			request.UserPrompt);
+		Assert.Contains("M src/App.cs (+1/-1)", request.UserPrompt);
+	}
+
+	[Fact]
+	public void Build_TitleAndBody_EndsWithSizeReminderAfterPatch()
+	{
+		CompletionRequest request =
+			CommitMessagePrompt.Build(SMALL_PATCH, false);
+
+		int patchIndex = request.UserPrompt.IndexOf(
+			SMALL_PATCH,
+			StringComparison.Ordinal);
+		int reminderIndex = request.UserPrompt.IndexOf(
+			"REMINDER: This is a SMALL change",
+			StringComparison.Ordinal);
+		Assert.True(reminderIndex > patchIndex);
+		// Escaped braces in the example survive string.Format.
+		Assert.Contains("/dead-letters/{id}/replay", request.UserPrompt);
+	}
+
+	[Theory]
+	[InlineData(false, 800)]
+	[InlineData(true, 100)]
+	public void Build_LargePatch_RaisesOnlyTheTitleAndBodyBudget(
+		bool titlesOnly,
+		int expected)
+	{
+		CompletionRequest request =
+			CommitMessagePrompt.Build(LargePatch(), titlesOnly);
+
+		Assert.Equal(expected, request.MaxTokens);
+		Assert.Contains("CHANGE SIZE: LARGE", request.UserPrompt);
+	}
+
+	[Fact]
+	public void Build_LargePatch_OverrideStillWins()
+	{
+		CompletionRequest request =
+			CommitMessagePrompt.Build(LargePatch(), false, 4096);
+
+		Assert.Equal(4096, request.MaxTokens);
+	}
+
+	[Fact]
+	public void DescribeChange_WithLockFile_ReportsMeaningfulCounts()
+	{
+		CondensedPatch condensed = PatchCondenser.Condense(
+			SMALL_PATCH
+			+ "diff --git a/pnpm-lock.yaml b/pnpm-lock.yaml\n"
+			+ "--- a/pnpm-lock.yaml\n"
+			+ "+++ b/pnpm-lock.yaml\n"
+			+ "@@ -1 +1,3 @@\n"
+			+ "+a\n+b\n+c\n");
+
+		Assert.Equal(
+			"CHANGE SIZE: SMALL (2 files, +4/-1 lines; 1 file and 2 lines after setting aside lock/generated files and repeats)",
+			CommitMessagePrompt.DescribeChange(condensed));
+	}
+
+	[Fact]
+	public void ListFiles_DescribesEachCondensing()
+	{
+		List<FileChange> files =
+		[
+			new("pnpm-lock.yaml", 'M', 10, 2, false, FileCondensing.Generated),
+			new("logo.png", 'A', 0, 0, true, FileCondensing.Generated),
+			new("S.fr.resx", 'M', 4, 0, false, FileCondensing.Repeated, "S.de.resx"),
+			new("Big.cs", 'M', 900, 0, false, FileCondensing.Truncated),
+			new("Late.cs", 'M', 3, 3, false, FileCondensing.Omitted),
+		];
+
+		Assert.Equal(
+			"M pnpm-lock.yaml (+10/-2, lock/generated file, diff omitted)\n"
+			+ "A logo.png (binary, diff omitted)\n"
+			+ "M S.fr.resx (+4/-0, same change as S.de.resx, diff omitted)\n"
+			+ "M Big.cs (+900/-0, diff truncated)\n"
+			+ "M Late.cs (+3/-3, diff omitted for length)",
+			CommitMessagePrompt.ListFiles(files));
+	}
 }

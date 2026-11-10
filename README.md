@@ -185,7 +185,9 @@ message that you can edit or accept.
 ### Output modes
 
 - **Title + body** (default): one Conventional Commits message — a short title
-  plus a body summarizing the change. Pre-filled into your commit message.
+  plus a body sized to the change: a sentence or two for a small fix, a summary
+  paragraph and bullets for a large feature. Pre-filled into your commit
+  message.
 - **Titles only** (`--titles-only` / `COMMITTY_TITLES_ONLY=1`): five title-only
   suggestions, inserted as comments at the top of the commit message; uncomment
   the one you want.
@@ -237,6 +239,27 @@ committy --provider azure \
          --endpoint "https://your-endpoint.openai.azure.com" \
          --deployment "your-deployment"
 ```
+
+### Large diffs
+
+Before the diff goes to the model, committy condenses it so a big change can't
+push the request past the model's limits:
+
+- **Lock and generated files** (`pnpm-lock.yaml`, `package-lock.json`,
+  `yarn.lock`, `Cargo.lock`, `go.sum`, `packages.lock.json`, `*.min.js`,
+  `*.map`, `*.pdf`, and similar) and binary patches are replaced by a one-line
+  note with their line counts. No more committing without the lock file and
+  amending it in afterwards.
+- **Look-alike sibling files** (three or more in one directory with the same
+  name pattern and line counts, such as `Strings.de.resx`, `Strings.fr.resx`,
+  ...) are shown once, with the others listed by name.
+- **Very long diffs** are cut at 12,000 characters per file, and the whole
+  patch is kept under 120,000 characters (about 30k tokens) by sharing that
+  budget evenly across files.
+
+The prompt always lists every staged file with its line counts, and says
+whether the change is small, medium, or large so the body matches. Large
+changes get an 800-token budget instead of 500, unless you set one yourself.
 
 ### Token usage
 
@@ -384,9 +407,9 @@ git config --global committy.azure.reasoningmodel true
 ```
 
 committy then leaves out `temperature` and raises the budget from the built-in
-100 (titles) or 500 (title + body) to `2048`. Set `committy.azure.maxtokens` to
-use a different budget, for a reasoning deployment or not. If a reasoning model
-returns an empty message, raise it.
+100 (titles) or 500/800 (title + body, small/large change) to `2048`. Set
+`committy.azure.maxtokens` to use a different budget, for a reasoning
+deployment or not. If a reasoning model returns an empty message, raise it.
 
 ### Keyless sign-in (Microsoft Entra ID)
 
@@ -484,8 +507,8 @@ because of how self-hosted models behave:
 - **`timeoutseconds` defaults to `300`**, not 30. A cold model loads its weights
   from disk before generating a single token, which can take minutes.
 - **`maxtokens` defaults to `2048`**, replacing the built-in 100 (titles) and
-  500 (title + body) budgets. A reasoning model spends most of its output on a
-  thinking block that committy discards, so a small budget truncates the
+  500/800 (title + body) budgets. A reasoning model spends most of its output
+  on a thinking block that committy discards, so a small budget truncates the
   thought and leaves no message behind.
 
 Reasoning models are supported: the thinking block is stripped whether the

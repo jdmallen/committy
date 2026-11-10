@@ -5,6 +5,24 @@ All notable changes to this project are documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [1.8.0]
+
+### Changed
+
+- Commit message bodies are sized to the change. The prompt now says whether a
+  change is small, medium, or large and lists every staged file with its line
+  counts; large changes get a summary paragraph plus specific bullets (config
+  keys and values, flags, files, dependency and version changes) instead of a
+  two-sentence summary. The title+body token budget for large changes is 800
+  (was 500); `committy.azure.maxtokens` / `committy.openai.maxtokens` still
+  override it.
+- Large diffs are condensed before they are sent. Lock and generated files
+  (`pnpm-lock.yaml`, `package-lock.json`, `Cargo.lock`, `go.sum`, `*.min.js`,
+  `*.pdf`, ...) and binary patches become one-line notes, three or more
+  look-alike sibling files (e.g. translated `.resx` files) are shown once, and
+  long diffs are truncated to 12,000 characters per file and 120,000 in total,
+  so a big lock file no longer pushes the request past the model's limits.
+
 ## [1.7.0]
 
 ### Added

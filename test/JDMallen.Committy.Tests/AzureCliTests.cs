@@ -41,7 +41,9 @@ public sealed class AzureCliTests : IDisposable
 	[InlineData("api-key", AzureAuth.ApiKey)]
 	[InlineData(null, AzureAuth.ApiKey)]
 	[InlineData("", AzureAuth.ApiKey)]
-	[InlineData("azureidentity", null)]
+	[InlineData("azureidentity", AzureAuth.AzureIdentity)]
+	[InlineData("Entra", AzureAuth.AzureIdentity)]
+	[InlineData("kerberos", null)]
 	public void ParseAzureAuth_KnownNamesCaseInsensitively_UnknownIsNull(
 		string? name,
 		AzureAuth? expected) => Assert.Equal(
@@ -51,6 +53,7 @@ public sealed class AzureCliTests : IDisposable
 	[Theory]
 	[InlineData(AzureAuth.ApiKey)]
 	[InlineData(AzureAuth.AzureCli)]
+	[InlineData(AzureAuth.AzureIdentity)]
 	public void AzureAuthName_RoundTrips(AzureAuth auth) => Assert.Equal(
 		auth,
 		CommittyConfigResolver.ParseAzureAuth(

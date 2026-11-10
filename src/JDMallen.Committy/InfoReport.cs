@@ -20,14 +20,20 @@ public static class InfoReport
 	/// Finds the <c>az</c> an Azure config would run, or null when there is
 	/// none; defaults to <see cref="AzureCli.Locate" /> on this process's PATH.
 	/// </param>
+	/// <param name="fileExists">
+	/// Whether a file exists, for the saved Azure sign-in; defaults to
+	/// <see cref="File.Exists" />.
+	/// </param>
 	/// <exception cref="ArgumentOutOfRangeException"></exception>
 	public static string Build(
 		string versionLine,
 		string? repository,
 		ResolvedConfig resolved,
 		UsageReport usage,
-		Func<AzureConfig, string?>? locateAzureCli = null)
+		Func<AzureConfig, string?>? locateAzureCli = null,
+		Func<string, bool>? fileExists = null)
 	{
+		fileExists ??= File.Exists;
 		locateAzureCli ??= azure =>
 			AzureCli.Locate(azure, Environment.GetEnvironmentVariable);
 		CommittyConfig config = resolved.Config;
@@ -162,12 +168,24 @@ public static class InfoReport
 		void AddAzureAuthRows(AzureConfig azure)
 		{
 			string authValue = azure.UnknownAuth is { } unknown
-				? $"{unknown}, unknown (expected apikey or azurecli)"
-				: azure.Auth == AzureAuth.AzureCli
-					? "azurecli, Microsoft Entra ID via the Azure CLI"
-					: "apikey";
+				? $"{unknown}, unknown (expected apikey, azurecli or azureidentity)"
+				: azure.Auth switch
+				{
+					AzureAuth.AzureCli =>
+						"azurecli, Microsoft Entra ID via the Azure CLI",
+					AzureAuth.AzureIdentity =>
+						"azureidentity, Microsoft Entra ID via Azure.Identity",
+					_ => "apikey",
+				};
 			rows.Add(
 				Row("auth", authValue, CommittyConfigResolver.AZURE_AUTH_KEY));
+
+			if (azure.UnknownAuth is null && azure.Auth == AzureAuth.AzureIdentity)
+			{
+				AddAzureIdentityRows(azure);
+
+				return;
+			}
 
 			if (azure.Auth != AzureAuth.AzureCli || azure.UnknownAuth is not null)
 			{
@@ -207,6 +225,52 @@ public static class InfoReport
 			if (az is null)
 			{
 				problem ??= AzureCli.NotFoundMessage(azure);
+			}
+		}
+
+		void AddAzureIdentityRows(AzureConfig azure)
+		{
+			rows.Add(
+				azure.UnknownCredential is { } unknown
+					? Row(
+						"credential",
+						$"{unknown}, unknown (expected {CommittyConfigResolver.AZURE_CREDENTIAL_NAMES})",
+						CommittyConfigResolver.AZURE_CREDENTIAL_KEY)
+					: Row(
+						"credential",
+						CommittyConfigResolver.AzureCredentialName(
+							azure.Credential),
+						CommittyConfigResolver.AZURE_CREDENTIAL_KEY));
+			rows.Add(
+				string.IsNullOrWhiteSpace(azure.TenantId)
+					? ("tenant",
+						$"the credential's default (not set: {CommittyConfigResolver.AZURE_TENANT_KEY})")
+					: Row(
+						"tenant",
+						azure.TenantId.Trim(),
+						CommittyConfigResolver.AZURE_TENANT_KEY));
+			rows.Add(
+				Row(
+					"scope",
+					azure.EffectiveScope,
+					CommittyConfigResolver.AZURE_SCOPE_KEY));
+
+			if (!azure.UsesInteractiveSignIn)
+			{
+				return;
+			}
+
+			bool signedIn = fileExists(azure.AuthenticationRecordPath);
+			rows.Add(
+				("signed in",
+					signedIn
+						? $"yes, saved in {azure.AuthenticationRecordPath}"
+						: "no (run `committy config`)"));
+
+			if (!signedIn)
+			{
+				problem ??=
+					"Not signed in to Azure yet. Run `committy config` to sign in.";
 			}
 		}
 

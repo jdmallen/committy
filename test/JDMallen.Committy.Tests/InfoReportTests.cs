@@ -15,7 +15,8 @@ public class InfoReportTests
 		string? repository = "/home/me/repo",
 		TokenUsageTotals? totals = null,
 		string? usageError = null,
-		string? azureCliPath = "/usr/bin/az")
+		string? azureCliPath = "/usr/bin/az",
+		bool signedIn = false)
 	{
 		CultureInfo.CurrentCulture = CultureInfo.InvariantCulture;
 		ResolvedConfig resolved =
@@ -32,7 +33,8 @@ public class InfoReportTests
 				USAGE_PATH,
 				usageError is null ? totals ?? new TokenUsageTotals() : null,
 				usageError),
-			_ => azureCliPath);
+			_ => azureCliPath,
+			_ => signedIn);
 	}
 
 	[Fact]
@@ -210,13 +212,67 @@ public class InfoReportTests
 	public async Task Info_UnknownAuth_ReportsIt()
 	{
 		_gitConfig[CommittyConfigResolver.AZURE_AUTH_KEY] =
-			new GitConfigValue("azureidentity", "global");
+			new GitConfigValue("kerberos", "global");
 
 		string report = await Build();
 
 		Assert.Matches(
-			@"auth:\s+azureidentity, unknown \(expected apikey or azurecli\)",
+			@"auth:\s+kerberos, unknown \(expected apikey, azurecli or azureidentity\)",
 			report);
-		Assert.Matches(@"problem:\s+Unknown Azure auth 'azureidentity'", report);
+		Assert.Matches(@"problem:\s+Unknown Azure auth 'kerberos'", report);
+	}
+
+	[Fact]
+	public async Task Info_AzureIdentity_ShowsCredentialTenantAndSavedSignIn()
+	{
+		_gitConfig[CommittyConfigResolver.AZURE_ENDPOINT_KEY] =
+			new GitConfigValue("https://example.openai.azure.com", "global");
+		_gitConfig[CommittyConfigResolver.AZURE_AUTH_KEY] =
+			new GitConfigValue("azureidentity", "global");
+		_gitConfig[CommittyConfigResolver.AZURE_TENANT_KEY] =
+			new GitConfigValue("contoso.com", "global");
+
+		string report = await Build(signedIn: true);
+
+		Assert.Matches(
+			@"auth:\s+azureidentity, Microsoft Entra ID via Azure\.Identity \(git config --global\)",
+			report);
+		Assert.Matches(@"credential:\s+interactivebrowser \(default\)", report);
+		Assert.Matches(@"tenant:\s+contoso\.com \(git config --global\)", report);
+		Assert.Matches(@"signed in:\s+yes, saved in .*auth-record\.json", report);
+		Assert.DoesNotContain("az:", report);
+		Assert.DoesNotContain("api key:", report);
+		Assert.DoesNotContain("problem:", report);
+	}
+
+	[Fact]
+	public async Task Info_AzureIdentity_NotSignedIn_ReportsTheProblem()
+	{
+		_gitConfig[CommittyConfigResolver.AZURE_ENDPOINT_KEY] =
+			new GitConfigValue("https://example.openai.azure.com", "global");
+		_gitConfig[CommittyConfigResolver.AZURE_AUTH_KEY] =
+			new GitConfigValue("azureidentity", "global");
+
+		string report = await Build();
+
+		Assert.Matches(@"signed in:\s+no \(run `committy config`\)", report);
+		Assert.Matches(@"problem:\s+Not signed in to Azure yet", report);
+	}
+
+	[Fact]
+	public async Task Info_AzureIdentity_NonInteractiveCredential_HasNoSignInRow()
+	{
+		_gitConfig[CommittyConfigResolver.AZURE_ENDPOINT_KEY] =
+			new GitConfigValue("https://example.openai.azure.com", "global");
+		_gitConfig[CommittyConfigResolver.AZURE_AUTH_KEY] =
+			new GitConfigValue("azureidentity", "global");
+		_gitConfig[CommittyConfigResolver.AZURE_CREDENTIAL_KEY] =
+			new GitConfigValue("default", "local");
+
+		string report = await Build();
+
+		Assert.Matches(@"credential:\s+default \(git config --local\)", report);
+		Assert.DoesNotContain("signed in:", report);
+		Assert.DoesNotContain("problem:", report);
 	}
 }

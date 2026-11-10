@@ -1,3 +1,5 @@
+using JDMallen.Toolbox.AI.Azure;
+
 namespace JDMallen.Committy;
 
 public enum Provider
@@ -18,6 +20,13 @@ public enum AzureAuth
 	/// (<c>az account get-access-token</c>).
 	/// </summary>
 	AzureCli,
+
+	/// <summary>
+	/// A Microsoft Entra ID bearer token from Azure.Identity: a browser or
+	/// device code sign-in remembered in an encrypted cache, or another
+	/// credential named by <see cref="AzureConfig.Credential" />.
+	/// </summary>
+	AzureIdentity,
 }
 
 /// <summary>
@@ -38,8 +47,41 @@ public sealed class AzureConfig
 	public string? UnknownAuth { get; init; }
 
 	/// <summary>
+	/// The Azure.Identity credential for <see cref="AzureAuth.AzureIdentity" />.
+	/// </summary>
+	public AzureCredentialKind Credential { get; init; } =
+		AzureCredentialKind.InteractiveBrowser;
+
+	/// <summary>
+	/// The configured <c>committy.azure.credential</c> value when it names no
+	/// known credential, so <see cref="Validate" /> can report it; otherwise
+	/// null.
+	/// </summary>
+	public string? UnknownCredential { get; init; }
+
+	/// <summary>
+	/// Where the browser or device code sign-in is remembered (account and
+	/// tenant ids; the tokens stay in the system keyring).
+	/// </summary>
+	public string AuthenticationRecordPath { get; init; } =
+		DefaultAuthenticationRecordPath();
+
+	/// <summary>
+	/// <c>auth-record.json</c> in committy's per-user config directory
+	/// (<c>~/.config/committy</c> on Linux and macOS, <c>%APPDATA%\committy</c>
+	/// on Windows).
+	/// </summary>
+	public static string DefaultAuthenticationRecordPath() =>
+		Path.Combine(
+			Environment.GetFolderPath(
+				Environment.SpecialFolder.ApplicationData),
+			"committy",
+			"auth-record.json");
+
+	/// <summary>
 	/// The Entra tenant (GUID or domain) to get tokens from, or null for the
-	/// tenant of the current <c>az</c> account.
+	/// tenant of the current <c>az</c> account (azurecli) or the credential's
+	/// own default (azureidentity).
 	/// </summary>
 	public string? TenantId { get; init; }
 
@@ -84,9 +126,7 @@ public sealed class AzureConfig
 	public AzureCliTokenProviderOptions TokenProviderOptions() =>
 		new()
 		{
-			Scope = string.IsNullOrWhiteSpace(Scope)
-				? AzureOpenAIScopes.DEFAULT
-				: Scope.Trim(),
+			Scope = EffectiveScope,
 			TenantId = string.IsNullOrWhiteSpace(TenantId)
 				? null
 				: TenantId.Trim(),
@@ -95,11 +135,48 @@ public sealed class AzureConfig
 				: AzPath.Trim(),
 		};
 
+	/// <summary>The token scope to request.</summary>
+	public string EffectiveScope =>
+		string.IsNullOrWhiteSpace(Scope)
+			? AzureOpenAIScopes.DEFAULT
+			: Scope.Trim();
+
+	/// <summary>
+	/// The Azure.Identity settings for this config. Pass
+	/// <paramref name="allowInteractiveAuthentication" /> false where a sign-in
+	/// prompt would be wrong, such as inside a git hook.
+	/// </summary>
+	public AzureCredentialOptions CredentialOptions(
+		bool allowInteractiveAuthentication) =>
+		new()
+		{
+			Kind = Credential,
+			TenantId = string.IsNullOrWhiteSpace(TenantId)
+				? null
+				: TenantId.Trim(),
+			CacheName = "committy",
+			AuthenticationRecordPath = AuthenticationRecordPath,
+			AllowInteractiveAuthentication = allowInteractiveAuthentication,
+		};
+
+	/// <summary>
+	/// Whether this config signs in through a browser or device code, and so
+	/// needs <c>committy config</c> to sign in before a hook can run.
+	/// </summary>
+	public bool UsesInteractiveSignIn =>
+		Auth == AzureAuth.AzureIdentity
+		&& AzureCredentialFactory.IsInteractive(Credential);
+
 	public string? Validate()
 	{
 		if (UnknownAuth is not null)
 		{
-			return $"Unknown Azure auth '{UnknownAuth}' in {CommittyConfigResolver.AZURE_AUTH_KEY} (expected apikey or azurecli).";
+			return $"Unknown Azure auth '{UnknownAuth}' in {CommittyConfigResolver.AZURE_AUTH_KEY} (expected apikey, azurecli or azureidentity).";
+		}
+
+		if (Auth == AzureAuth.AzureIdentity && UnknownCredential is not null)
+		{
+			return $"Unknown Azure credential '{UnknownCredential}' in {CommittyConfigResolver.AZURE_CREDENTIAL_KEY} (expected {CommittyConfigResolver.AZURE_CREDENTIAL_NAMES}).";
 		}
 
 		if (string.IsNullOrWhiteSpace(Endpoint))
@@ -109,7 +186,8 @@ public sealed class AzureConfig
 
 		return Auth switch
 		{
-			AzureAuth.AzureCli => ValidateTokenProviderOptions(),
+			AzureAuth.AzureCli or AzureAuth.AzureIdentity =>
+				ValidateTokenProviderOptions(),
 			_ => string.IsNullOrWhiteSpace(ApiKey)
 				? "Azure OpenAI API key is required (run `committy config` or set AZURE_OPENAI_API_KEY)."
 				: null,
@@ -119,6 +197,8 @@ public sealed class AzureConfig
 	/// <summary>
 	/// Builds the Azure CLI token provider the same way a request would, so a
 	/// bad tenant or scope is reported up front, naming the setting to fix.
+	/// Azure.Identity takes the same tenant and scope forms, so its config is
+	/// checked the same way.
 	/// </summary>
 	private string? ValidateTokenProviderOptions()
 	{

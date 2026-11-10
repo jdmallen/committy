@@ -1,3 +1,7 @@
+using Azure.Identity;
+
+using JDMallen.Toolbox.AI.Azure;
+
 namespace JDMallen.Committy;
 
 /// <summary>
@@ -8,12 +12,20 @@ namespace JDMallen.Committy;
 /// </summary>
 public sealed class ChatCompletionClientFactory(HttpClient httpClient)
 {
-	public IChatCompletionClient Create(CommittyConfig config) =>
+	/// <param name="config">The resolved configuration.</param>
+	/// <param name="allowInteractiveSignIn">
+	/// Whether an Azure browser or device code sign-in may prompt. False in a
+	/// git hook, where a missing sign-in fails with
+	/// <c>AuthenticationRequiredException</c> instead.
+	/// </param>
+	public IChatCompletionClient Create(
+		CommittyConfig config,
+		bool allowInteractiveSignIn = true) =>
 		config.Provider switch
 		{
 			Provider.Azure => new AzureOpenAIChatClient(
 				httpClient,
-				AzureOptions(config.Azure!) with
+				AzureOptions(config.Azure!, allowInteractiveSignIn) with
 				{
 					IsReasoningModel = config.Azure!.ReasoningModel,
 				}),
@@ -33,12 +45,38 @@ public sealed class ChatCompletionClientFactory(HttpClient httpClient)
 		};
 
 	/// <summary>
-	/// Key or Entra ID options for <paramref name="azure" />. No token cache:
-	/// a run makes one request, so <c>az</c> is asked for one token at most.
+	/// Whether <paramref name="exception" />, or one it wraps, says an Azure
+	/// browser or device code sign-in is needed (a hook may not prompt).
 	/// </summary>
-	private static AzureOpenAIClientOptions AzureOptions(AzureConfig azure) =>
+	public static bool IsSignInRequired(Exception? exception)
+	{
+		for (; exception is not null; exception = exception.InnerException)
+		{
+			if (exception is AuthenticationRequiredException)
+			{
+				return true;
+			}
+		}
+
+		return false;
+	}
+
+	/// <summary>
+	/// Key or Entra ID options for <paramref name="azure" />. No token cache
+	/// for azurecli: a run makes one request, so <c>az</c> is asked for one
+	/// token at most. Azure.Identity keeps its own cache.
+	/// </summary>
+	private static AzureOpenAIClientOptions AzureOptions(
+		AzureConfig azure,
+		bool allowInteractiveSignIn) =>
 		azure.Auth switch
 		{
+			AzureAuth.AzureIdentity => AzureOpenAIClientOptions.ForEntraId(
+				azure.Endpoint!,
+				azure.Deployment,
+				AzureCredentialFactory.CreateTokenProvider(
+					azure.CredentialOptions(allowInteractiveSignIn),
+					azure.EffectiveScope)),
 			AzureAuth.AzureCli => AzureOpenAIClientOptions.ForEntraId(
 				azure.Endpoint!,
 				azure.Deployment,

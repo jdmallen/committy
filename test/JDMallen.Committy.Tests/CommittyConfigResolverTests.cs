@@ -190,12 +190,12 @@ public class CommittyConfigResolverTests
 	[Fact]
 	public async Task AzureAuth_Unknown_IsKeptForValidation()
 	{
-		_gitConfig[CommittyConfigResolver.AZURE_AUTH_KEY] = "azureidentity";
+		_gitConfig[CommittyConfigResolver.AZURE_AUTH_KEY] = "kerberos";
 
 		AzureConfig azure = (await Resolve()).Azure!;
 
-		Assert.Equal("azureidentity", azure.UnknownAuth);
-		Assert.Contains("azureidentity", azure.Validate());
+		Assert.Equal("kerberos", azure.UnknownAuth);
+		Assert.Contains("kerberos", azure.Validate());
 	}
 
 	[Fact]
@@ -233,4 +233,15 @@ public class CommittyConfigResolverTests
 			ConfigSource.FromDefault,
 			resolved.Sources[CommittyConfigResolver.AZURE_SCOPE_KEY]);
 	}
+
+	[Theory]
+	[InlineData("\"c1d94805-5918-40a2-a8d8-9d8452889856\"", "c1d94805-5918-40a2-a8d8-9d8452889856")]
+	[InlineData(" 'contoso.com' ", "contoso.com")]
+	[InlineData("\" spaced \"", "spaced")]
+	[InlineData("\"mismatched'", "\"mismatched'")]
+	[InlineData("\"", "\"")]
+	[InlineData("it's", "it's")]
+	[InlineData("  plain  ", "plain")]
+	public void Unquote_StripsOneMatchingPair(string line, string expected) =>
+		Assert.Equal(expected, CommittyConfigResolver.Unquote(line));
 }

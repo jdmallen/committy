@@ -113,6 +113,11 @@ committy config --provider azure --azure-auth azurecli \
   --endpoint "https://your-endpoint.openai.azure.com" \
   --deployment "your-deployment-name"
 
+# Azure OpenAI without an API key or az (signs in through your browser)
+committy config --provider azure --azure-auth azureidentity \
+  --endpoint "https://your-endpoint.openai.azure.com" \
+  --deployment "your-deployment-name"
+
 # Anthropic (Claude), non-interactive
 committy config --provider anthropic
 
@@ -130,8 +135,8 @@ fallbacks.
 
 **5. Set your API key**
 
-(Using `--azure-auth azurecli`? There is no key: `committy config` checks your
-`az` sign-in instead. See
+(Using `--azure-auth azurecli` or `azureidentity`? There is no key:
+`committy config` checks your `az` sign-in, or signs you in, instead. See
 [Keyless sign-in (Microsoft Entra ID)](#keyless-sign-in-microsoft-entra-id).)
 
 API keys live in environment variables, not git config:
@@ -297,8 +302,9 @@ normal run.
 | `--endpoint`    | `-e`  | `AZURE_OPENAI_ENDPOINT_HOST` / `OPENAI_BASE_URL`      | —                           | Azure endpoint host URL (domain only), or the `openai` base URL including `/v1`. |
 | `--deployment`  | `-d`  | `AZURE_OPENAI_DEPLOYMENT`                             | `gpt-4.1-mini`              | Azure OpenAI deployment name.                                                   |
 | `--model`       | `-m`  | `ANTHROPIC_MODEL` / `OPENAI_MODEL`                    | `claude-haiku-4-5-20251001` | Anthropic or `openai` model name.                                               |
-| `--azure-auth`  |       |                                                       | `apikey`                    | Azure auth: `apikey`, or `azurecli` for Microsoft Entra ID via the Azure CLI.   |
-| `--tenant`      |       |                                                       | az's current tenant         | Entra tenant ID or domain for `azurecli`; with `config`, `-` clears it.         |
+| `--azure-auth`  |       |                                                       | `apikey`                    | Azure auth: `apikey`, `azurecli` (Entra ID via the Azure CLI), or `azureidentity` (Entra ID via a browser sign-in). |
+| `--tenant`      |       |                                                       | az's current tenant         | Entra tenant ID or domain for `azurecli` or `azureidentity`; with `config`, `-` clears it. |
+| `--credential`  |       |                                                       | `interactivebrowser`        | Sign-in for `azureidentity`: `interactivebrowser`, `devicecode`, `default`, `azurecli` or `azd`. |
 | `--titles-only` | `-t`  | `COMMITTY_TITLES_ONLY`                                | off                         | Generate five title-only suggestions instead of a single title + body message. |
 | `--clipboard`   | `-c`  | —                                                     | off                         | Copy the first suggestion to the clipboard.                                     |
 | `--no-git`      | —     | —                                                     | off                         | Rely solely on stdin; never call `git diff --cached` as a fallback.             |
@@ -337,9 +343,10 @@ the current repository; the default is global (`~/.gitconfig`).
 | `committy.azure.deployment`     | Azure     | Deployment name                           |
 | `committy.azure.reasoningmodel` | Azure     | `true` for a reasoning deployment         |
 | `committy.azure.maxtokens`      | Azure     | Generation budget; see below              |
-| `committy.azure.auth`           | Azure     | `apikey` (default) or `azurecli`          |
-| `committy.azure.tenant`         | Azure     | Entra tenant for `azurecli`; optional     |
-| `committy.azure.scope`          | Azure     | Token scope for `azurecli`; optional      |
+| `committy.azure.auth`           | Azure     | `apikey` (default), `azurecli`, or `azureidentity` |
+| `committy.azure.credential`     | Azure     | Sign-in for `azureidentity`; see below    |
+| `committy.azure.tenant`         | Azure     | Entra tenant; optional                    |
+| `committy.azure.scope`          | Azure     | Token scope; optional                     |
 | `committy.azure.azpath`         | Azure     | Full path to `az`, if not on the hook's `PATH` |
 | `committy.anthropic.apikey`     | Anthropic | API key; legacy, use the env var          |
 | `committy.anthropic.model`      | Anthropic | Model name                                |
@@ -426,7 +433,47 @@ Optional settings:
   the `az` that will be used.
 
 To use a different method for one run, pass `--azure-auth apikey` (or
-`azurecli`).
+`azurecli`, or `azureidentity`).
+
+#### Without the Azure CLI (`azureidentity`)
+
+`azureidentity` signs in through your browser instead, with no `az` needed.
+`committy config` does the sign-in once; committy then remembers it, so commit
+hooks run silently. Steps 1 and 2 above (the role, and the endpoint) still
+apply.
+
+```sh
+committy config --provider azure --azure-auth azureidentity \
+  --endpoint "https://your-resource.openai.azure.com" \
+  --deployment "your-deployment-name"
+```
+
+`committy config` asks which sign-in to use (`committy.azure.credential`,
+`--credential`):
+
+| Value                          | Signs in with                                                      |
+|--------------------------------|--------------------------------------------------------------------|
+| `interactivebrowser` (default) | A browser window.                                                  |
+| `devicecode`                   | A code you enter at a sign-in page on any device (no local browser needed). |
+| `default`                      | Azure.Identity's `DefaultAzureCredential`: environment variables, managed identity, then developer tools. |
+| `azurecli` / `azd`             | The signed-in Azure CLI or Azure Developer CLI.                    |
+
+Then it asks for the tenant. **A personal Microsoft account (outlook.com, or a
+gmail address added to a tenant) needs one**, or sign-in fails with "Selected
+user account does not exist in tenant 'Microsoft Services'". If `az` is
+signed in, its tenant is offered as the default.
+
+Where things are kept:
+
+- **Tokens:** in an encrypted cache in your system keyring (libsecret on
+  Linux, Keychain on macOS, DPAPI on Windows), never in plain text. Without a
+  keyring (over SSH, or in a container), use `azurecli` instead.
+- **The account and tenant ids** (no tokens): `~/.config/committy/auth-record.json`
+  (`%APPDATA%\committy\auth-record.json` on Windows).
+
+A commit hook never opens a browser. If the sign-in is missing or has expired,
+the hook adds a comment to the commit message saying to run `committy config`,
+and the commit goes ahead. `committy --info` shows whether a sign-in is saved.
 
 ### Local and other OpenAI-compatible models
 
@@ -471,6 +518,11 @@ server splits it into `reasoning_content` or inlines it as `<think>…</think>`.
   `az login` command), and give a newly granted role a few minutes to apply.
 - **Azure `403` with `azurecli`:** the token is valid but lacks access. Your
   account needs the **Cognitive Services OpenAI User** role on the resource.
+- **"not signed in to Azure"** in the commit message with `azureidentity`:
+  run `committy config` in a terminal to sign in again.
+- **"The persistent token cache needs the system keyring"** with
+  `azureidentity`: no keyring is available (common over SSH). Switch to
+  `--azure-auth azurecli`.
 - **"Azure CLI ('az') not found on PATH"** in a commit made from a desktop
   app: set `committy.azure.azpath` to the output of `command -v az` (or
   `where az` on Windows).

@@ -1,3 +1,5 @@
+using JDMallen.Toolbox.AI.Azure;
+
 namespace JDMallen.Committy;
 
 /// <summary>Optional per-invocation overrides, typically sourced from CLI flags.</summary>
@@ -8,7 +10,8 @@ public sealed record ConfigOverrides(
 	string? Deployment = null,
 	string? Model = null,
 	string? AzureAuth = null,
-	string? TenantId = null);
+	string? TenantId = null,
+	string? AzureCredential = null);
 
 /// <summary>
 /// Resolves the effective <see cref="CommittyConfig" />. Settings use CLI flag,
@@ -60,6 +63,11 @@ public static class CommittyConfigResolver
 	public const string AZURE_TENANT_KEY = "committy.azure.tenant";
 	public const string AZURE_SCOPE_KEY = "committy.azure.scope";
 	public const string AZURE_AZ_PATH_KEY = "committy.azure.azpath";
+	public const string AZURE_CREDENTIAL_KEY = "committy.azure.credential";
+
+	/// <summary>The accepted <see cref="AZURE_CREDENTIAL_KEY" /> values.</summary>
+	public const string AZURE_CREDENTIAL_NAMES =
+		"interactivebrowser, devicecode, default, azurecli or azd";
 	public const string ANTHROPIC_API_KEY_KEY = "committy.anthropic.apikey";
 	public const string ANTHROPIC_MODEL_KEY = "committy.anthropic.model";
 	public const string OPEN_AI_API_KEY_KEY = "committy.openai.apikey";
@@ -117,6 +125,8 @@ public static class CommittyConfigResolver
 		{
 			null or "" or "apikey" or "api-key" or "key" => AzureAuth.ApiKey,
 			"azurecli" or "azure-cli" or "az" or "cli" => AzureAuth.AzureCli,
+			"azureidentity" or "azure-identity" or "identity" or "entra" =>
+				AzureAuth.AzureIdentity,
 			_ => null,
 		};
 
@@ -129,7 +139,42 @@ public static class CommittyConfigResolver
 		auth switch
 		{
 			AzureAuth.AzureCli => "azurecli",
+			AzureAuth.AzureIdentity => "azureidentity",
 			_ => "apikey",
+		};
+
+	/// <summary>
+	/// Reads <c>committy.azure.credential</c>: unset means a browser sign-in;
+	/// null means the value names no known credential.
+	/// </summary>
+	public static AzureCredentialKind? ParseAzureCredential(string? name) =>
+		name?.Trim().ToLowerInvariant() switch
+		{
+			null or "" or "interactivebrowser" or "interactive-browser"
+				or "browser" => AzureCredentialKind.InteractiveBrowser,
+			"devicecode" or "device-code" or "device" =>
+				AzureCredentialKind.DeviceCode,
+			"default" or "defaultazurecredential" => AzureCredentialKind.Default,
+			"azurecli" or "azure-cli" or "az" or "cli" =>
+				AzureCredentialKind.AzureCli,
+			"azd" or "azuredevelopercli" or "azure-developer-cli" =>
+				AzureCredentialKind.AzureDeveloperCli,
+			_ => null,
+		};
+
+	/// <summary>
+	/// The canonical git config spelling for a credential, so
+	/// <c>committy config</c> writes a value <see cref="ParseAzureCredential" />
+	/// reads back identically.
+	/// </summary>
+	public static string AzureCredentialName(AzureCredentialKind kind) =>
+		kind switch
+		{
+			AzureCredentialKind.DeviceCode => "devicecode",
+			AzureCredentialKind.Default => "default",
+			AzureCredentialKind.AzureCli => "azurecli",
+			AzureCredentialKind.AzureDeveloperCli => "azd",
+			_ => "interactivebrowser",
 		};
 
 	/// <summary>
@@ -146,6 +191,22 @@ public static class CommittyConfigResolver
 		int.TryParse(value?.Trim(), out int parsed) && parsed > 0
 			? parsed
 			: null;
+
+	/// <summary>
+	/// <paramref name="line" /> trimmed, without one pair of matching
+	/// surrounding quotes, so a value pasted as <c>"abc"</c> or <c>'abc'</c>
+	/// reads as <c>abc</c>.
+	/// </summary>
+	public static string Unquote(string line)
+	{
+		string value = line.Trim();
+
+		return value.Length >= 2
+			&& value[0] is '"' or '\''
+			&& value[^1] == value[0]
+				? value[1..^1].Trim()
+				: value;
+	}
 
 	/// <summary>
 	/// Reads a yes/no answer as git config's canonical "true"/"false", or null
@@ -321,6 +382,12 @@ public static class CommittyConfigResolver
 					AZURE_AUTH_KEY)
 				.ConfigureAwait(false);
 			AzureAuth? auth = ParseAzureAuth(authName);
+			string? credentialName = await FlagOrGit(
+					overrides.AzureCredential,
+					AZURE_CREDENTIAL_KEY)
+				.ConfigureAwait(false);
+			AzureCredentialKind? credential =
+				ParseAzureCredential(credentialName);
 
 			return new CommittyConfig
 			{
@@ -330,6 +397,10 @@ public static class CommittyConfigResolver
 				{
 					Auth = auth ?? AzureAuth.ApiKey,
 					UnknownAuth = auth is null ? authName : null,
+					Credential = credential
+						?? AzureCredentialKind.InteractiveBrowser,
+					UnknownCredential =
+						credential is null ? credentialName : null,
 					TenantId = await FlagOrGit(
 							overrides.TenantId,
 							AZURE_TENANT_KEY)

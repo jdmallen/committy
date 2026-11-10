@@ -2,6 +2,10 @@ using System.CommandLine;
 using System.Globalization;
 using System.Reflection;
 
+using Azure.Identity;
+
+using JDMallen.Toolbox.AI.Azure;
+
 using JetBrains.Annotations;
 
 namespace JDMallen.Committy;
@@ -57,14 +61,20 @@ internal class Program
 		var azureAuthOption = new Option<string?>("--azure-auth")
 		{
 			Description =
-				"How to authenticate to Azure OpenAI: apikey (default) or azurecli (Microsoft Entra ID via a signed-in Azure CLI)",
+				"How to authenticate to Azure OpenAI: apikey (default), azurecli (Microsoft Entra ID via a signed-in Azure CLI), or azureidentity (Microsoft Entra ID via a browser or device code sign-in)",
 			HelpName = "method",
 		};
 		var tenantOption = new Option<string?>("--tenant")
 		{
 			Description =
-				"Microsoft Entra tenant ID or domain for azurecli auth; '-' clears it (use az's current tenant)",
+				"Microsoft Entra tenant ID or domain for azurecli or azureidentity auth; '-' clears it",
 			HelpName = "tenant",
+		};
+		var credentialOption = new Option<string?>("--credential")
+		{
+			Description =
+				$"Sign-in for azureidentity auth: {CommittyConfigResolver.AZURE_CREDENTIAL_NAMES} (default interactivebrowser)",
+			HelpName = "credential",
 		};
 		var titlesOnlyOption = new Option<bool>("--titles-only", "-t")
 		{
@@ -88,6 +98,7 @@ internal class Program
 				modelOption,
 				azureAuthOption,
 				tenantOption,
+				credentialOption,
 				titlesOnlyOption,
 				localOption,
 			};
@@ -106,6 +117,13 @@ internal class Program
 				{
 					throw new InvalidOperationException(
 						$"'{tenantFlag}' is not a tenant GUID or domain name.");
+				}
+
+				if (parseResult.GetValue(credentialOption) is { } credentialFlag
+					&& NormalizeAzureCredential(credentialFlag) is null)
+				{
+					throw new InvalidOperationException(
+						$"'{credentialFlag}' is not a credential ({CommittyConfigResolver.AZURE_CREDENTIAL_NAMES}).");
 				}
 
 				Provider provider = await ResolveProviderForConfigAsync(
@@ -182,58 +200,23 @@ internal class Program
 							CommittyConfigResolver.AZURE_MAX_TOKENS_KEY,
 							null),
 						new ConfigField(
-							"Azure auth: apikey, or azurecli for Microsoft Entra ID via az",
+							"Azure auth: apikey, azurecli (Entra ID via az), or azureidentity (Entra ID via browser sign-in)",
 							CommittyConfigResolver.AZURE_AUTH_KEY,
 							parseResult.GetValue(azureAuthOption),
 							CommittyConfigResolver.AzureAuthName(
 								AzureAuth.ApiKey),
 							Normalize: NormalizeAzureAuth,
-							RetryHint: "Please answer apikey or azurecli."),
+							RetryHint:
+							"Please answer apikey, azurecli or azureidentity."),
 					],
 				};
 
 				foreach (ConfigField field in fields)
 				{
-					string? current =
-						await GitConfigStore.GetAsync(
-							field.Key,
-							cancellationToken)
-						?? field.Default;
-					string? value = Prompt(
-						field.Label,
-						field.FlagValue,
-						current,
-						field.Secret);
-
-					if (field.Normalize is { } normalize)
-					{
-						string? normalized = normalize(value);
-						if (normalized is null && field.FlagValue is not null)
-						{
-							throw new InvalidOperationException(
-								$"'{field.FlagValue}' is not valid for {field.Key}. {field.RetryHint}");
-						}
-
-						while (normalized is null && !Console.IsInputRedirected)
-						{
-							Console.WriteLine($"  {field.RetryHint}");
-							normalized = normalize(
-								Prompt(
-									field.Label,
-									null,
-									current,
-									false));
-						}
-
-						value = normalized ?? normalize(current);
-					}
-
-					await SetAsync(
+					await ApplyFieldAsync(
 						written,
-						field.Key,
-						value,
+						field,
 						global,
-						field.Secret,
 						cancellationToken);
 				}
 
@@ -248,27 +231,57 @@ internal class Program
 						cancellationToken);
 				}
 
-				bool usesAzureCli = provider == Provider.Azure
-					&& CommittyConfigResolver.ParseAzureAuth(
+				AzureAuth? azureAuth = provider == Provider.Azure
+					? CommittyConfigResolver.ParseAzureAuth(
 						await GitConfigStore.GetAsync(
 							CommittyConfigResolver.AZURE_AUTH_KEY,
 							cancellationToken))
-					== AzureAuth.AzureCli;
+					: null;
+				bool usesAzureCli = azureAuth == AzureAuth.AzureCli;
+				bool usesAzureIdentity = azureAuth == AzureAuth.AzureIdentity;
 
-				if (usesAzureCli)
+				if (usesAzureIdentity)
+				{
+					await ApplyFieldAsync(
+						written,
+						new ConfigField(
+							$"Azure sign-in: {CommittyConfigResolver.AZURE_CREDENTIAL_NAMES}",
+							CommittyConfigResolver.AZURE_CREDENTIAL_KEY,
+							parseResult.GetValue(credentialOption),
+							CommittyConfigResolver.AzureCredentialName(
+								AzureCredentialKind.InteractiveBrowser),
+							Normalize: NormalizeAzureCredential,
+							RetryHint:
+							$"Please answer {CommittyConfigResolver.AZURE_CREDENTIAL_NAMES}."),
+						global,
+						cancellationToken);
+				}
+
+				if (usesAzureCli || usesAzureIdentity)
 				{
 					await ConfigureTenantAsync(
 						written,
 						parseResult.GetValue(tenantOption),
 						global,
+						usesAzureIdentity,
 						cancellationToken);
 				}
 
-				PrintConfigSummary(written, global, !usesAzureCli);
+				PrintConfigSummary(
+					written,
+					global,
+					!usesAzureCli && !usesAzureIdentity);
 
 				if (usesAzureCli)
 				{
 					await WriteAzureCliSetupAsync(cancellationToken);
+
+					return;
+				}
+
+				if (usesAzureIdentity)
+				{
+					await SignInWithAzureIdentityAsync(cancellationToken);
 
 					return;
 				}
@@ -419,11 +432,13 @@ internal class Program
 					return;
 				}
 
+				// A hook must never open a browser from inside `git commit`.
 				CommitSuggestions suggestions =
 					await GenerateAsync(
 						config,
 						patch,
 						config.TitlesOnly,
+						false,
 						cancellationToken);
 				RecordUsage(suggestions.Usage);
 
@@ -445,21 +460,23 @@ internal class Program
 					cancellationToken);
 			}
 			catch (Exception ex)
+				when (ChatCompletionClientFactory.IsSignInRequired(ex))
 			{
-				// Never let a hook failure abort the commit.
-				try
-				{
-					// Messages can span lines (the Azure CLI's own error is
-					// quoted on the next one); every line must stay a comment.
-					await AppendLinesAsync(
-						commitMsgFile,
-						CommitMessageComposer.CommentLines(
-							$"Committy: failed to generate AI suggestions ({ex.Message})"));
-				}
-				catch
-				{
-					// Best effort only.
-				}
+				await TryAppendLinesAsync(
+					commitMsgFile,
+					[
+						"# Committy: not signed in to Azure (or the sign-in expired).",
+						"# Run `committy config` to sign in; hooks never open a browser.",
+					]);
+			}
+			catch (Exception ex)
+			{
+				// Messages can span lines (the Azure CLI's own error is quoted
+				// on the next one); every line must stay a comment.
+				await TryAppendLinesAsync(
+					commitMsgFile,
+					CommitMessageComposer.CommentLines(
+						$"Committy: failed to generate AI suggestions ({ex.Message})"));
 			}
 		});
 
@@ -568,15 +585,36 @@ internal class Program
 	/// need minutes where a hosted one needs seconds, and a single invocation
 	/// makes exactly one completion call.
 	/// </summary>
+	/// <summary>
+	/// Appends comment lines to the commit message file. Never throws: a hook
+	/// failure must not abort the commit.
+	/// </summary>
+	private static async Task TryAppendLinesAsync(
+		string file,
+		IEnumerable<string> lines)
+	{
+		try
+		{
+			await AppendLinesAsync(file, lines);
+		}
+		catch
+		{
+			// Best effort only.
+		}
+	}
+
 	private static async Task<CommitSuggestions> GenerateAsync(
 		CommittyConfig config,
 		string patch,
 		bool titlesOnly,
+		bool allowInteractiveSignIn,
 		CancellationToken cancellationToken)
 	{
 		HttpClient http = HttpClientProvider.Create(config.TimeoutSeconds);
 		IChatCompletionClient client =
-			new ChatCompletionClientFactory(http).Create(config);
+			new ChatCompletionClientFactory(http).Create(
+				config,
+				allowInteractiveSignIn);
 		var generator = new CommitMessageGenerator(
 			client,
 			config.MaxTokensOverride);
@@ -630,14 +668,20 @@ internal class Program
 		var azureAuthOption = new Option<string?>("--azure-auth")
 		{
 			Description =
-				"Azure OpenAI auth for this run: apikey or azurecli (overrides config)",
+				"Azure OpenAI auth for this run: apikey, azurecli or azureidentity (overrides config)",
 			HelpName = "method",
 		};
 		var tenantOption = new Option<string?>("--tenant")
 		{
 			Description =
-				"Microsoft Entra tenant ID or domain for azurecli auth (overrides config)",
+				"Microsoft Entra tenant ID or domain for azurecli or azureidentity auth (overrides config)",
 			HelpName = "tenant",
+		};
+		var credentialOption = new Option<string?>("--credential")
+		{
+			Description =
+				"Sign-in for azureidentity auth this run (overrides config)",
+			HelpName = "credential",
 		};
 		var noGitOption = new Option<bool>("--no-git")
 		{
@@ -671,6 +715,7 @@ internal class Program
 				modelOption,
 				azureAuthOption,
 				tenantOption,
+				credentialOption,
 				noGitOption,
 				clipboardOption,
 				titlesOnlyOption,
@@ -689,7 +734,8 @@ internal class Program
 				parseResult.GetValue(deploymentOption),
 				parseResult.GetValue(modelOption),
 				parseResult.GetValue(azureAuthOption),
-				parseResult.GetValue(tenantOption));
+				parseResult.GetValue(tenantOption),
+				parseResult.GetValue(credentialOption));
 
 			if (parseResult.GetValue(infoOption))
 			{
@@ -740,6 +786,7 @@ internal class Program
 						config,
 						patch,
 						titlesOnly,
+						true,
 						cancellationToken);
 				RecordUsage(suggestions.Usage);
 
@@ -886,7 +933,13 @@ internal class Program
 			current is null ? string.Empty : secret ? "****" : current;
 		Console.Write(current is null ? $"{label}: " : $"{label} [{shown}]: ");
 
-		string? input = secret ? ReadSecret() : Console.ReadLine();
+		// A typed value may be pasted with quotes around it (e.g. a tenant
+		// ID); a secret is taken exactly as typed.
+		string? input = secret
+			? ReadSecret()
+			: Console.ReadLine() is { } line
+				? CommittyConfigResolver.Unquote(line)
+				: null;
 
 		return string.IsNullOrEmpty(input) ? current : input;
 	}
@@ -1016,6 +1069,64 @@ internal class Program
 		Func<string?, string?>? Normalize = null,
 		string? RetryHint = null);
 
+	/// <summary>
+	/// Prompts for one field (or takes its flag), re-asking until a field with
+	/// fixed answers gets a valid one, and writes it.
+	/// </summary>
+	private static async Task ApplyFieldAsync(
+		List<(string Key, string? Display)> written,
+		ConfigField field,
+		bool global,
+		CancellationToken cancellationToken)
+	{
+		string? current =
+			await GitConfigStore.GetAsync(
+				field.Key,
+				cancellationToken)
+			?? field.Default;
+		string? value = Prompt(
+			field.Label,
+			field.FlagValue,
+			current,
+			field.Secret);
+
+		if (field.Normalize is { } normalize)
+		{
+			string? normalized = normalize(value);
+			if (normalized is null && field.FlagValue is not null)
+			{
+				throw new InvalidOperationException(
+					$"'{field.FlagValue}' is not valid for {field.Key}. {field.RetryHint}");
+			}
+
+			while (normalized is null && !Console.IsInputRedirected)
+			{
+				Console.WriteLine($"  {field.RetryHint}");
+				normalized = normalize(
+					Prompt(
+						field.Label,
+						null,
+						current,
+						false));
+			}
+
+			value = normalized ?? normalize(current);
+		}
+
+		await SetAsync(
+			written,
+			field.Key,
+			value,
+			global,
+			field.Secret,
+			cancellationToken);
+	}
+
+	private static string? NormalizeAzureCredential(string? value) =>
+		CommittyConfigResolver.ParseAzureCredential(value) is { } kind
+			? CommittyConfigResolver.AzureCredentialName(kind)
+			: null;
+
 	private static string? NormalizeAzureAuth(string? value) =>
 		CommittyConfigResolver.ParseAzureAuth(value) is { } auth
 			? CommittyConfigResolver.AzureAuthName(auth)
@@ -1032,24 +1143,37 @@ internal class Program
 			: null);
 
 	/// <summary>
-	/// Asks for the Entra tenant (azurecli only). Blank keeps the current
-	/// value; "-" unsets it, so tokens come from az's current tenant.
+	/// Asks for the Entra tenant (azurecli and azureidentity). Blank keeps the
+	/// current value; "-" unsets it, so tokens come from az's current tenant
+	/// (azurecli) or the credential's default (azureidentity). For a browser or
+	/// device code sign-in with no tenant saved, az's current tenant is offered,
+	/// because a personal Microsoft account cannot sign in without one.
 	/// </summary>
 	private static async Task ConfigureTenantAsync(
 		List<(string Key, string? Display)> written,
 		string? flagValue,
 		bool global,
+		bool azureIdentity,
 		CancellationToken cancellationToken)
 	{
-		const string label =
-			"Azure tenant ID or domain (blank keeps; '-' for az's current tenant)";
+		string label = azureIdentity
+			? "Azure tenant ID or domain (personal Microsoft accounts need one; '-' for none)"
+			: "Azure tenant ID or domain (blank keeps; '-' for az's current tenant)";
 		string? current = await GitConfigStore.GetAsync(
 			CommittyConfigResolver.AZURE_TENANT_KEY,
 			cancellationToken);
+		string? offered = current
+			?? (azureIdentity
+				&& flagValue is null
+				&& !Console.IsInputRedirected
+				&& (await ResolveConfigAsync(null, cancellationToken)).Azure is
+					{ UsesInteractiveSignIn: true }
+					? await AzureCliTenantAsync(cancellationToken)
+					: null);
 		string? value = Prompt(
 				label,
 				flagValue,
-				current,
+				offered,
 				false)
 			?.Trim();
 
@@ -1065,7 +1189,7 @@ internal class Program
 			value = Prompt(
 					label,
 					null,
-					current,
+					offered,
 					false)
 				?.Trim();
 		}
@@ -1114,5 +1238,96 @@ internal class Program
 			azure,
 			az,
 			accountJson);
+	}
+
+	/// <summary>
+	/// The tenant of the signed-in Azure CLI (a read-only
+	/// <c>az account show</c>), or null when az is missing or signed out.
+	/// </summary>
+	private static async Task<string?> AzureCliTenantAsync(
+		CancellationToken cancellationToken)
+	{
+		string? az = AzureCli.Find(Environment.GetEnvironmentVariable);
+
+		return az is null
+			? null
+			: AzureCli.ParseAccount(
+				await AzureCli.ShowAccountAsync(az, cancellationToken))?.Tenant;
+	}
+
+	/// <summary>
+	/// In place of the API key step for azureidentity: signs in now (a browser
+	/// or device code prompt, saved for later runs), so a git hook never has
+	/// to; for the other credentials, gets one token to prove they work.
+	/// </summary>
+	private static async Task SignInWithAzureIdentityAsync(
+		CancellationToken cancellationToken)
+	{
+		AzureConfig azure =
+			(await ResolveConfigAsync(null, cancellationToken)).Azure!;
+		string credential =
+			CommittyConfigResolver.AzureCredentialName(azure.Credential);
+		string roleLine =
+			$"  The account needs the \"{AzureCli.DATA_PLANE_ROLE}\" role on the Azure OpenAI resource.";
+
+		Console.WriteLine();
+		Console.WriteLine(
+			$"Azure sign-in (Microsoft Entra ID, {credential}; no API key needed):");
+
+		if (azure.Validate() is { } problem)
+		{
+			await Console.Error.WriteLineAsync($"  {problem}");
+			Environment.Exit(1);
+		}
+
+		if (azure.UsesInteractiveSignIn && Console.IsInputRedirected)
+		{
+			Console.WriteLine(
+				"  Run `committy config` in a terminal to sign in.");
+			Console.WriteLine(roleLine);
+
+			return;
+		}
+
+		Console.WriteLine(
+			azure.Credential switch
+			{
+				AzureCredentialKind.InteractiveBrowser =>
+					"  Opening a browser to sign in...",
+				AzureCredentialKind.DeviceCode =>
+					"  Sign in with the code below:",
+				_ => $"  Getting a token from the {credential} credential...",
+			});
+
+		try
+		{
+			AzureSignInResult signedIn =
+				await AzureCredentialFactory.SignInAsync(
+					azure.CredentialOptions(true),
+					azure.EffectiveScope,
+					cancellationToken);
+
+			Console.WriteLine(
+				signedIn.Username is null
+					? "  Got a token."
+					: $"  Signed in as {signedIn.Username} (tenant {signedIn.TenantId}).");
+
+			if (azure.UsesInteractiveSignIn)
+			{
+				Console.WriteLine(
+					$"  Saved to {azure.AuthenticationRecordPath}; git hooks reuse it without prompting.");
+			}
+
+			Console.WriteLine(roleLine);
+		}
+		catch (Exception ex)
+			when (ex is AuthenticationFailedException
+				or CredentialUnavailableException)
+		{
+			await Console.Error.WriteLineAsync($"  Sign-in failed: {ex.Message}");
+			await Console.Error.WriteLineAsync(
+				"  The settings above are saved; run `committy config` again to retry.");
+			Environment.Exit(1);
+		}
 	}
 }

@@ -5,6 +5,20 @@ All notable changes to this project are documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [1.9.0]
+
+### Changed
+
+- Committy now targets .NET 11. The release binaries are still
+  self-contained, so no .NET install is needed to run them; building from
+  source requires the .NET 11 SDK (pinned in `global.json`).
+- Higher minimum CPU. .NET 11 raises the x64 baseline to x86-64-v2 on Linux,
+  macOS, and Windows, so x64 builds need a CPU with SSE4.2 and POPCNT
+  (roughly Intel Nehalem or AMD Bulldozer, 2008-2011, and newer). Windows
+  Arm64 builds need a CPU with LSE atomics. On older CPUs committy exits at
+  startup with "The current CPU is missing one or more of the baseline
+  instruction sets." Stay on 1.8.0 if that affects you.
+
 ## [1.8.0]
 
 ### Changed

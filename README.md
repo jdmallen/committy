@@ -3,7 +3,7 @@
 > AI-powered git commit messages from your staged diff, via Azure OpenAI or
 > Anthropic (Claude).
 
-Committy is a cross-platform .NET 10 console app that reads your staged changes
+Committy is a cross-platform .NET 11 console app that reads your staged changes
 and writes a Conventional Commits message for you — either a single title + body
 that it pre-fills into your editor, or five title-only suggestions to pick from.
 It installs as a `prepare-commit-msg` git hook, so suggestions appear
@@ -13,14 +13,14 @@ automatically when you run `git commit`.
 <!--
 [![Build](https://img.shields.io/badge/build-passing-brightgreen)](#)
 [![License](https://img.shields.io/badge/license-TBD-blue)](#)
-[![.NET](https://img.shields.io/badge/.NET-10-512BD4)](#)
+[![.NET](https://img.shields.io/badge/.NET-11-512BD4)](#)
 -->
 
 ## Install
 
 **Prerequisites**
 
-- .NET 10 Runtime or SDK
+- .NET 11 Runtime or SDK
 - Git
 - Access to one supported LLM provider:
   - **Azure OpenAI** — endpoint, API key, and a deployment name,

@@ -242,8 +242,7 @@ public static class CommittyConfigResolver
 		Resolve(
 			overrides,
 			Environment.GetEnvironmentVariable,
-			await GitConfigStore.ReadAllAsync(cancellationToken)
-				.ConfigureAwait(false));
+			await GitConfigStore.ReadAllAsync(cancellationToken));
 
 	/// <summary>
 	/// Resolves against injected lookups, so tests can supply environment
@@ -273,8 +272,7 @@ public static class CommittyConfigResolver
 		ResolveWithSources(
 			overrides,
 			Environment.GetEnvironmentVariable,
-			await GitConfigStore.ReadAllAsync(cancellationToken)
-				.ConfigureAwait(false));
+			await GitConfigStore.ReadAllAsync(cancellationToken));
 
 	/// <summary>
 	/// As

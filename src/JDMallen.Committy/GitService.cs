@@ -25,7 +25,7 @@ public static class GitService
 	/// </summary>
 	public static async Task<string> GetStagedDiffAsync(
 		CancellationToken cancellationToken = default)
-		=> await TryGetStagedDiffAsync(cancellationToken).ConfigureAwait(false)
+		=> await TryGetStagedDiffAsync(cancellationToken)
 			?? throw new InvalidOperationException(
 				"No staged changes found. Use 'git add' to stage files for commit.");
 
@@ -41,9 +41,8 @@ public static class GitService
 		const int usageErrorExitCode = 129;
 
 		ProcessTextOutput result = await Git.RunAsync(
-				StagedDiffArguments,
-				cancellationToken)
-			.ConfigureAwait(false);
+			StagedDiffArguments,
+			cancellationToken);
 
 		// A git older than 2.28 rejects --no-relative with the same exit code.
 		// Option names are never translated, so this check works in any locale.
@@ -81,9 +80,8 @@ public static class GitService
 				 ["--show-toplevel", "--absolute-git-dir"])
 		{
 			ProcessTextOutput result = await Git.RunAsync(
-					["rev-parse", flag],
-					cancellationToken)
-				.ConfigureAwait(false);
+				["rev-parse", flag],
+				cancellationToken);
 			string path = result.StandardOutput.Trim();
 			if (result.ExitStatus.ExitCode == 0 && path.Length > 0)
 			{

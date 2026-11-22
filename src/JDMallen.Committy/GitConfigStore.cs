@@ -16,9 +16,8 @@ public static class GitConfigStore
 		CancellationToken cancellationToken = default)
 	{
 		ProcessTextOutput result = await Git.RunAsync(
-				["config", "--get", key],
-				cancellationToken)
-			.ConfigureAwait(false);
+			["config", "--get", key],
+			cancellationToken);
 
 		if (result.ExitStatus.ExitCode != 0)
 		{
@@ -40,12 +39,11 @@ public static class GitConfigStore
 		ReadAllAsync(CancellationToken cancellationToken = default)
 	{
 		ProcessTextOutput result = await Git.RunAsync(
-				[
-					"config", "--show-scope", "--null", "--get-regexp",
-					@"^committy\.",
-				],
-				cancellationToken)
-			.ConfigureAwait(false);
+			[
+				"config", "--show-scope", "--null", "--get-regexp",
+				@"^committy\.",
+			],
+			cancellationToken);
 
 		// Exit code 1 means no committy keys are set. Anything else (an
 		// unreadable config file, or a git too old for --show-scope) is
@@ -100,9 +98,8 @@ public static class GitConfigStore
 		string scope = global ? "--global" : "--local";
 
 		ProcessTextOutput result = await Git.RunAsync(
-				["config", scope, key, value],
-				cancellationToken)
-			.ConfigureAwait(false);
+			["config", scope, key, value],
+			cancellationToken);
 
 		if (result.ExitStatus.ExitCode != 0)
 		{
@@ -125,9 +122,8 @@ public static class GitConfigStore
 		string scope = global ? "--global" : "--local";
 
 		ProcessTextOutput result = await Git.RunAsync(
-				["config", scope, "--unset", key],
-				cancellationToken)
-			.ConfigureAwait(false);
+			["config", scope, "--unset", key],
+			cancellationToken);
 
 		if (result.ExitStatus.ExitCode is not 0 and not notSetExitCode)
 		{

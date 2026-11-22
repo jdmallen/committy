@@ -53,6 +53,10 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - Dropped the CliWrap dependency. Committy now runs git and `az` with .NET
   11's built-in `Process.RunAndCaptureTextAsync`, so there is one fewer
   package to ship and keep up to date.
+- Dropped the JetBrains.Annotations and Microsoft.Extensions.Http
+  dependencies (the latter brought dependency injection, logging and options
+  packages along to build one HTTP client). Updated System.CommandLine to 3.0
+  and JDMallen.Toolbox.AI to 4.8.
 
 ### Fixed
 

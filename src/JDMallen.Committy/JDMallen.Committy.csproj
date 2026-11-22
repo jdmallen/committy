@@ -2,24 +2,16 @@
 
 	<PropertyGroup>
 		<OutputType>Exe</OutputType>
-		<TargetFramework>net11.0</TargetFramework>
-		<Nullable>enable</Nullable>
-		<ImplicitUsings>enable</ImplicitUsings>
 		<AssemblyName>committy</AssemblyName>
-		<LangVersion>latest</LangVersion>
 		<PublishSingleFile>true</PublishSingleFile>
 		<SelfContained>true</SelfContained>
-		<PublishTrimmed>false</PublishTrimmed>
-		<PublishReadyToRun>false</PublishReadyToRun>
 	</PropertyGroup>
 
 	<ItemGroup>
-		<PackageReference Include="JetBrains.Annotations" Version="2025.2.4"/>
-		<PackageReference Include="System.CommandLine" Version="2.0.1"/>
+		<PackageReference Include="System.CommandLine" Version="3.0.0"/>
 		<PackageReference Include="TextCopy" Version="6.2.1"/>
-		<PackageReference Include="Microsoft.Extensions.Http" Version="10.0.1"/>
-		<PackageReference Include="JDMallen.Toolbox.AI" Version="4.6.0"/>
-		<PackageReference Include="JDMallen.Toolbox.AI.Azure" Version="4.6.0"/>
+		<PackageReference Include="JDMallen.Toolbox.AI" Version="4.8.0"/>
+		<PackageReference Include="JDMallen.Toolbox.AI.Azure" Version="4.8.0"/>
 	</ItemGroup>
 
 	<ItemGroup>

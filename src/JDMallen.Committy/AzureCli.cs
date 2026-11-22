@@ -134,13 +134,12 @@ public static class AzureCli
 		try
 		{
 			ProcessTextOutput result = await Process.RunAndCaptureTextAsync(
-					Git.CaptureStartInfo(
-						viaCommandShell ? "cmd.exe" : az,
-						viaCommandShell
-							? ["/d", "/c", az, .. arguments]
-							: arguments),
-					timeout.Token)
-				.ConfigureAwait(false);
+				Git.CaptureStartInfo(
+					viaCommandShell ? "cmd.exe" : az,
+					viaCommandShell
+						? ["/d", "/c", az, .. arguments]
+						: arguments),
+				timeout.Token);
 
 			return result.ExitStatus.ExitCode == 0
 				? result.StandardOutput

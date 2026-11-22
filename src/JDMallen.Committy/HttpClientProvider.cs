@@ -1,47 +1,34 @@
 using System.Reflection;
 
-using Microsoft.Extensions.DependencyInjection;
-
 namespace JDMallen.Committy;
 
 /// <summary>
-/// Builds the shared <see cref="HttpClient" /> backed by
-/// <see cref="IHttpClientFactory" />. The factory owns connection pooling and
-/// handler lifetime; providers build absolute request URIs and set their own auth
-/// headers, so no per-provider base address is needed.
+/// Builds the <see cref="HttpClient" /> for a run's single completion request.
+/// A plain client is enough: <c>IHttpClientFactory</c> exists to recycle
+/// handlers in long-lived processes, and committy makes one call and exits.
+/// Providers build absolute request URIs and set their own auth headers, so no
+/// base address is needed.
 /// </summary>
 public static class HttpClientProvider
 {
-	private const string CLIENT_NAME = "committy";
-
 	/// <param name="timeoutSeconds">
 	/// Request timeout. Hosted providers answer well within the default; a
-	/// self-hosted model may need minutes, most of it spent loading weights from
-	/// disk before the first token.
+	/// self-hosted model may need minutes, most of it spent loading weights
+	/// from disk before the first token.
 	/// </param>
 	public static HttpClient Create(
 		int timeoutSeconds = CommittyConfig.DEFAULT_TIMEOUT_SECONDS)
 	{
-		var services = new ServiceCollection();
+		var client = new HttpClient
+		{
+			Timeout = TimeSpan.FromSeconds(timeoutSeconds),
+		};
+		AssemblyName assembly = typeof(HttpClientProvider).Assembly.GetName();
 
-		services.AddHttpClient(
-			CLIENT_NAME,
-			client =>
-			{
-				client.Timeout = TimeSpan.FromSeconds(timeoutSeconds);
-				client.DefaultRequestHeaders.Accept.ParseAdd(
-					"application/json");
+		client.DefaultRequestHeaders.Accept.ParseAdd("application/json");
+		client.DefaultRequestHeaders.UserAgent.ParseAdd(
+			$"{assembly.Name}/{assembly.Version}");
 
-				AssemblyName? assembly = Assembly
-					.GetAssembly(typeof(HttpClientProvider))
-					?.GetName();
-				client.DefaultRequestHeaders.UserAgent.ParseAdd(
-					$"{assembly?.Name}/{assembly?.Version?.ToString() ?? string.Empty}");
-			});
-
-		ServiceProvider provider = services.BuildServiceProvider();
-
-		return provider.GetRequiredService<IHttpClientFactory>()
-			.CreateClient(CLIENT_NAME);
+		return client;
 	}
 }

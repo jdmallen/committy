@@ -1,14 +1,11 @@
 using System.CommandLine;
 
-using JetBrains.Annotations;
-
 namespace JDMallen.Committy;
 
 /// <summary>
 /// Wires the commands together. Each command lives in its own class under
 /// <c>CLI/</c> and returns its exit code.
 /// </summary>
-[UsedImplicitly]
 internal class Program
 {
 	private static async Task<int> Main(string[] args)

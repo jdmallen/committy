@@ -160,22 +160,20 @@ public static class HookInstaller
 				["GIT_CONFIG_GLOBAL"] = globalConfigFile,
 			};
 		ProcessTextOutput current = await Git.RunAsync(
-				[
-					"config", "--global", "--type=path", "--get",
-					TEMPLATE_DIR_KEY,
-				],
-				environment,
-				cancellationToken)
-			.ConfigureAwait(false);
+			[
+				"config", "--global", "--type=path", "--get",
+				TEMPLATE_DIR_KEY,
+			],
+			environment,
+			cancellationToken);
 
 		// Exit code 1 means the key is unset; anything else is a real error,
 		// such as an unreadable config file.
 		if (current.ExitStatus.ExitCode is not (0 or 1))
 		{
 			await output.WriteLineAsync(
-					$"Error: Could not read {TEMPLATE_DIR_KEY}: {current.StandardError.Trim()}",
-					cancellationToken)
-				.ConfigureAwait(false);
+				$"Error: Could not read {TEMPLATE_DIR_KEY}: {current.StandardError.Trim()}",
+				cancellationToken);
 
 			return 1;
 		}
@@ -190,17 +188,15 @@ public static class HookInstaller
 		if (existing.Length > 0)
 		{
 			await output.WriteLineAsync(
-					$"Using the existing {TEMPLATE_DIR_KEY}: {templateDir}",
-					cancellationToken)
-				.ConfigureAwait(false);
+				$"Using the existing {TEMPLATE_DIR_KEY}: {templateDir}",
+				cancellationToken);
 		}
 
 		if (!await WriteHookAsync(
 					Path.Combine(templateDir, "hooks"),
 					force,
 					output,
-					cancellationToken)
-				.ConfigureAwait(false))
+					cancellationToken))
 		{
 			return 1;
 		}
@@ -208,30 +204,26 @@ public static class HookInstaller
 		if (existing.Length == 0)
 		{
 			ProcessTextOutput set = await Git.RunAsync(
-					["config", "--global", TEMPLATE_DIR_KEY, templateDir],
-					environment,
-					cancellationToken)
-				.ConfigureAwait(false);
+				["config", "--global", TEMPLATE_DIR_KEY, templateDir],
+				environment,
+				cancellationToken);
 
 			if (set.ExitStatus.ExitCode != 0)
 			{
 				await output.WriteLineAsync(
-						$"Error: Could not set {TEMPLATE_DIR_KEY}: {set.StandardError.Trim()}",
-						cancellationToken)
-					.ConfigureAwait(false);
+					$"Error: Could not set {TEMPLATE_DIR_KEY}: {set.StandardError.Trim()}",
+					cancellationToken);
 
 				return 1;
 			}
 		}
 
 		await output.WriteLineAsync(
-				"Global hook template installed. New repositories will include this hook automatically;",
-				cancellationToken)
-			.ConfigureAwait(false);
+			"Global hook template installed. New repositories will include this hook automatically;",
+			cancellationToken);
 		await output.WriteLineAsync(
-				"for existing repositories, run `git init` in each or `committy install-hook <repo>`.",
-				cancellationToken)
-			.ConfigureAwait(false);
+			"for existing repositories, run `git init` in each or `committy install-hook <repo>`.",
+			cancellationToken);
 
 		return 0;
 	}
@@ -248,22 +240,19 @@ public static class HookInstaller
 		if (!Directory.Exists(repo))
 		{
 			await output.WriteLineAsync(
-					$"Error: Repository path does not exist: {repo}",
-					cancellationToken)
-				.ConfigureAwait(false);
+				$"Error: Repository path does not exist: {repo}",
+				cancellationToken);
 
 			return 1;
 		}
 
-		string? gitDir = await TryGetGitDirAsync(repo, cancellationToken)
-			.ConfigureAwait(false);
+		string? gitDir = await TryGetGitDirAsync(repo, cancellationToken);
 
 		if (gitDir is null)
 		{
 			await output.WriteLineAsync(
-					$"Error: Not a valid git repository: {repo}",
-					cancellationToken)
-				.ConfigureAwait(false);
+				$"Error: Not a valid git repository: {repo}",
+				cancellationToken);
 
 			return 1;
 		}
@@ -279,33 +268,29 @@ public static class HookInstaller
 		// never looks in <gitdir>/hooks once that's set, so writing there would
 		// silently install a hook that never runs.
 		string hooksDir = await TryGetHooksDirAsync(repo, cancellationToken)
-				.ConfigureAwait(false)
 			?? defaultHooksDir;
 
 		if (!PathsEqual(hooksDir, defaultHooksDir))
 		{
 			await output.WriteLineAsync(
-					$"Note: {repo} uses a custom core.hooksPath ({hooksDir}). "
-					+ "If that directory is tracked by git, this hook will be visible to "
-					+ "other contributors too.",
-					cancellationToken)
-				.ConfigureAwait(false);
+				$"Note: {repo} uses a custom core.hooksPath ({hooksDir}). "
+				+ "If that directory is tracked by git, this hook will be visible to "
+				+ "other contributors too.",
+				cancellationToken);
 		}
 
 		if (!await WriteHookAsync(
 					hooksDir,
 					force,
 					output,
-					cancellationToken)
-				.ConfigureAwait(false))
+					cancellationToken))
 		{
 			return 1;
 		}
 
 		await output.WriteLineAsync(
-				"Hook installed for the repository. AI suggestions will appear when you run `git commit`.",
-				cancellationToken)
-			.ConfigureAwait(false);
+			"Hook installed for the repository. AI suggestions will appear when you run `git commit`.",
+			cancellationToken);
 
 		return 0;
 	}
@@ -327,16 +312,14 @@ public static class HookInstaller
 
 		if (File.Exists(hookPath))
 		{
-			string content = await File
-				.ReadAllTextAsync(hookPath, cancellationToken)
-				.ConfigureAwait(false);
+			string content =
+				await File.ReadAllTextAsync(hookPath, cancellationToken);
 
 			if (IsCurrentTrampoline(content))
 			{
 				await output.WriteLineAsync(
-						$"✓ Hook already up to date: {hookPath}",
-						cancellationToken)
-					.ConfigureAwait(false);
+					$"✓ Hook already up to date: {hookPath}",
+					cancellationToken);
 
 				return true;
 			}
@@ -346,27 +329,23 @@ public static class HookInstaller
 				if (!force)
 				{
 					await output.WriteLineAsync(
-							$"Error: {hookPath} already exists and was not written by committy. "
-							+ "Re-run with --force to replace it; the old hook is backed up first.",
-							cancellationToken)
-						.ConfigureAwait(false);
+						$"Error: {hookPath} already exists and was not written by committy. "
+						+ "Re-run with --force to replace it; the old hook is backed up first.",
+						cancellationToken);
 
 					return false;
 				}
 			}
 
 			await output.WriteLineAsync(
-					$"Backed up the existing hook to {BackUpHook(hookPath)}",
-					cancellationToken)
-				.ConfigureAwait(false);
+				$"Backed up the existing hook to {BackUpHook(hookPath)}",
+				cancellationToken);
 		}
 
-		await WriteTrampolineAsync(hooksDir, cancellationToken)
-			.ConfigureAwait(false);
+		await WriteTrampolineAsync(hooksDir, cancellationToken);
 		await output.WriteLineAsync(
-				$"✓ Hook installed: {hookPath}",
-				cancellationToken)
-			.ConfigureAwait(false);
+			$"✓ Hook installed: {hookPath}",
+			cancellationToken);
 
 		return true;
 	}
@@ -500,9 +479,8 @@ public static class HookInstaller
 		CancellationToken cancellationToken)
 	{
 		ProcessTextOutput result = await Git.RunAsync(
-				["-C", repo, "rev-parse", "--git-dir"],
-				cancellationToken)
-			.ConfigureAwait(false);
+			["-C", repo, "rev-parse", "--git-dir"],
+			cancellationToken);
 
 		return result.ExitStatus.ExitCode == 0
 			&& !string.IsNullOrWhiteSpace(result.StandardOutput)
@@ -519,9 +497,8 @@ public static class HookInstaller
 		CancellationToken cancellationToken = default)
 	{
 		ProcessTextOutput result = await Git.RunAsync(
-				["-C", repo, "rev-parse", "--git-path", "hooks"],
-				cancellationToken)
-			.ConfigureAwait(false);
+			["-C", repo, "rev-parse", "--git-path", "hooks"],
+			cancellationToken);
 
 		if (result.ExitStatus.ExitCode != 0)
 		{
@@ -556,8 +533,7 @@ public static class HookInstaller
 		// dotfiles repo) is replaced instead of written through. Callers back
 		// the old hook up first.
 		File.Delete(hookPath);
-		await File.WriteAllTextAsync(hookPath, Trampoline, cancellationToken)
-			.ConfigureAwait(false);
+		await File.WriteAllTextAsync(hookPath, Trampoline, cancellationToken);
 		MakeExecutable(hookPath);
 	}
 }

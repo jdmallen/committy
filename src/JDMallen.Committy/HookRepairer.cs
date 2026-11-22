@@ -49,9 +49,8 @@ public static class HookRepairer
 		if (scanRoots.Count == 0 && gitDirs.Count == 0)
 		{
 			string? top = await GetTopLevelAsync(
-					Directory.GetCurrentDirectory(),
-					cancellationToken)
-				.ConfigureAwait(false);
+				Directory.GetCurrentDirectory(),
+				cancellationToken);
 
 			if (top is not null)
 			{
@@ -66,9 +65,8 @@ public static class HookRepairer
 			if (!Directory.Exists(full))
 			{
 				await output.WriteLineAsync(
-						$"Skipping {full}: directory does not exist.",
-						cancellationToken)
-					.ConfigureAwait(false);
+					$"Skipping {full}: directory does not exist.",
+					cancellationToken);
 
 				continue;
 			}
@@ -85,21 +83,17 @@ public static class HookRepairer
 			if (!Directory.Exists(full))
 			{
 				await output.WriteLineAsync(
-						$"Skipping {full}: directory does not exist.",
-						cancellationToken)
-					.ConfigureAwait(false);
+					$"Skipping {full}: directory does not exist.",
+					cancellationToken);
 
 				continue;
 			}
 
-			if (!await IsGitDirAsync(full, cancellationToken)
-					.ConfigureAwait(false))
+			if (!await IsGitDirAsync(full, cancellationToken))
 			{
-				await output
-					.WriteLineAsync(
-						$"Skipping {full}: not a git directory.",
-						cancellationToken)
-					.ConfigureAwait(false);
+				await output.WriteLineAsync(
+					$"Skipping {full}: not a git directory.",
+					cancellationToken);
 
 				continue;
 			}
@@ -120,9 +114,8 @@ public static class HookRepairer
 		CancellationToken cancellationToken)
 	{
 		ProcessTextOutput result = await Git.RunAsync(
-				["-C", path, "rev-parse", "--git-dir"],
-				cancellationToken)
-			.ConfigureAwait(false);
+			["-C", path, "rev-parse", "--git-dir"],
+			cancellationToken);
 
 		return result.ExitStatus.ExitCode == 0;
 	}
@@ -168,9 +161,8 @@ public static class HookRepairer
 		CancellationToken cancellationToken)
 	{
 		ProcessTextOutput result = await Git.RunAsync(
-				["-C", repo, "config", "--get", key],
-				cancellationToken)
-			.ConfigureAwait(false);
+			["-C", repo, "config", "--get", key],
+			cancellationToken);
 
 		string value = result.StandardOutput.Trim();
 
@@ -184,9 +176,8 @@ public static class HookRepairer
 		CancellationToken cancellationToken)
 	{
 		ProcessTextOutput result = await Git.RunAsync(
-				["-C", dir, "rev-parse", "--show-toplevel"],
-				cancellationToken)
-			.ConfigureAwait(false);
+			["-C", dir, "rev-parse", "--show-toplevel"],
+			cancellationToken);
 
 		return result.ExitStatus.ExitCode == 0
 			&& !string.IsNullOrWhiteSpace(result.StandardOutput)
@@ -200,10 +191,9 @@ public static class HookRepairer
 		CancellationToken cancellationToken = default)
 	{
 		string? customHooksPath = await GetConfigAsync(
-				repo,
-				"core.hooksPath",
-				cancellationToken)
-			.ConfigureAwait(false);
+			repo,
+			"core.hooksPath",
+			cancellationToken);
 
 		if (!string.IsNullOrEmpty(customHooksPath))
 		{
@@ -215,8 +205,7 @@ public static class HookRepairer
 		}
 
 		string? hooksDir = await HookInstaller
-			.TryGetHooksDirAsync(repo, cancellationToken)
-			.ConfigureAwait(false);
+			.TryGetHooksDirAsync(repo, cancellationToken);
 
 		if (hooksDir is null)
 		{
@@ -238,8 +227,7 @@ public static class HookRepairer
 		}
 
 		string content = await File
-			.ReadAllTextAsync(hookPath, cancellationToken)
-			.ConfigureAwait(false);
+			.ReadAllTextAsync(hookPath, cancellationToken);
 
 		if (HookInstaller.IsCurrentTrampoline(content))
 		{
@@ -268,8 +256,7 @@ public static class HookRepairer
 
 		HookInstaller.BackUpHook(hookPath);
 
-		await HookInstaller.WriteTrampolineAsync(hooksDir, cancellationToken)
-			.ConfigureAwait(false);
+		await HookInstaller.WriteTrampolineAsync(hooksDir, cancellationToken);
 
 		return new HookRepairResult(repo, hookPath, HookRepairOutcome.Updated);
 	}
@@ -286,20 +273,17 @@ public static class HookRepairer
 			switch (result.Outcome)
 			{
 				case HookRepairOutcome.Updated:
-					await output.WriteLineAsync($"  ✓ {verb}: {result.Repo}")
-						.ConfigureAwait(false);
+					await output.WriteLineAsync($"  ✓ {verb}: {result.Repo}");
 
 					break;
 				case HookRepairOutcome.SkippedForeign:
 					await output.WriteLineAsync(
-							$"  — skipped (foreign): {result.Repo} [{result.Detail}]")
-						.ConfigureAwait(false);
+						$"  — skipped (foreign): {result.Repo} [{result.Detail}]");
 
 					break;
 				case HookRepairOutcome.Error:
 					await output.WriteLineAsync(
-							$"  ! error: {result.Repo} [{result.Detail}]")
-						.ConfigureAwait(false);
+						$"  ! error: {result.Repo} [{result.Detail}]");
 
 					break;
 				case HookRepairOutcome.AlreadyCurrent:
@@ -325,8 +309,7 @@ public static class HookRepairer
 		int errors = results.Count(r => r.Outcome == HookRepairOutcome.Error);
 
 		await output.WriteLineAsync(
-				$"\n{verb}: {updated}, already current: {current}, skipped: {foreign}, no hook: {none}, errors: {errors}")
-			.ConfigureAwait(false);
+			$"\n{verb}: {updated}, already current: {current}, skipped: {foreign}, no hook: {none}, errors: {errors}");
 	}
 
 	public static async Task<int> RunAsync(
@@ -338,11 +321,10 @@ public static class HookRepairer
 		CancellationToken cancellationToken = default)
 	{
 		List<string> repos = await CollectReposAsync(
-				scanRoots,
-				gitDirs,
-				output,
-				cancellationToken)
-			.ConfigureAwait(false);
+			scanRoots,
+			gitDirs,
+			output,
+			cancellationToken);
 
 		if (repos.Count == 0)
 		{
@@ -351,17 +333,15 @@ public static class HookRepairer
 				&& currentRepoRequired)
 			{
 				await output.WriteLineAsync(
-						"Error: not inside a git repository. Run from a repo, or pass --scan <dir> to sweep, --git-dir <dir> for a headless repo, or --global.",
-						cancellationToken)
-					.ConfigureAwait(false);
+					"Error: not inside a git repository. Run from a repo, or pass --scan <dir> to sweep, --git-dir <dir> for a headless repo, or --global.",
+					cancellationToken);
 
 				return 1;
 			}
 
 			await output.WriteLineAsync(
-					"No repositories to repair.",
-					cancellationToken)
-				.ConfigureAwait(false);
+				"No repositories to repair.",
+				cancellationToken);
 
 			return 0;
 		}
@@ -372,13 +352,12 @@ public static class HookRepairer
 		{
 			results.Add(
 				await RepairRepoAsync(
-						repo,
-						dryRun,
-						cancellationToken)
-					.ConfigureAwait(false));
+					repo,
+					dryRun,
+					cancellationToken));
 		}
 
-		await ReportAsync(results, dryRun, output).ConfigureAwait(false);
+		await ReportAsync(results, dryRun, output);
 
 		return 0;
 	}

@@ -35,8 +35,7 @@ public sealed class CommitMessageGenerator(
 				titlesOnly,
 				maxTokensOverride);
 			CompletionResult result = await client
-				.GetCompletionAsync(request, cancellationToken)
-				.ConfigureAwait(false);
+				.GetCompletionAsync(request, cancellationToken);
 
 			return new CommitSuggestions(
 				CommitMessageParser.Parse(result.Text, titlesOnly),

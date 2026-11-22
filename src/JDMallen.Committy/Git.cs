@@ -49,8 +49,7 @@ public static class Git
 		try
 		{
 			return await Process
-				.RunAndCaptureTextAsync(startInfo, cancellationToken)
-				.ConfigureAwait(false);
+				.RunAndCaptureTextAsync(startInfo, cancellationToken);
 		}
 		catch (Win32Exception exception)
 		{

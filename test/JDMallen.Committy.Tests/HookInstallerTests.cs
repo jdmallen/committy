@@ -212,7 +212,7 @@ public class HookInstallerTests
 	}
 
 	[Fact]
-	public async Task InstallAsync_StaleCommittyHook_ReplacesWithoutBackup()
+	public async Task InstallAsync_StaleCommittyHook_ReplacesAndBacksUp()
 	{
 		string repo = CreateTempDir();
 		try
@@ -220,7 +220,7 @@ public class HookInstallerTests
 			await GitInitAsync(repo);
 			string hookPath = await WriteLocalHookAsync(
 				repo,
-				"#!/bin/sh\n# old committy hook\ncommitty prepare-commit-msg \"$1\"\n");
+				LegacyHooks.UNSTAMPED_TRAMPOLINE);
 			var output = new StringWriter();
 
 			int code = await HookInstaller.InstallAsync(false, repo, output);
@@ -229,7 +229,33 @@ public class HookInstallerTests
 			Assert.True(
 				HookInstaller.IsCurrentTrampoline(
 					await File.ReadAllTextAsync(hookPath)));
-			Assert.False(File.Exists(hookPath + ".bak"));
+			Assert.Equal(
+				LegacyHooks.UNSTAMPED_TRAMPOLINE,
+				await File.ReadAllTextAsync(hookPath + ".bak"));
+		}
+		finally
+		{
+			Directory.Delete(repo, true);
+		}
+	}
+
+	[Fact]
+	public async Task InstallAsync_HandWrittenHookCallingCommitty_Refuses()
+	{
+		const string handWritten =
+			"#!/bin/sh\n./scripts/lint-message.sh \"$1\"\n"
+			+ "committy prepare-commit-msg \"$1\"\n";
+		string repo = CreateTempDir();
+		try
+		{
+			await GitInitAsync(repo);
+			string hookPath = await WriteLocalHookAsync(repo, handWritten);
+			var output = new StringWriter();
+
+			int code = await HookInstaller.InstallAsync(false, repo, output);
+
+			Assert.Equal(1, code);
+			Assert.Equal(handWritten, await File.ReadAllTextAsync(hookPath));
 		}
 		finally
 		{

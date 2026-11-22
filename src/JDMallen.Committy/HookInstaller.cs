@@ -1,4 +1,7 @@
 using System.Diagnostics;
+using System.Globalization;
+using System.Security.Cryptography;
+using System.Text;
 
 namespace JDMallen.Committy;
 
@@ -43,8 +46,52 @@ public static class HookInstaller
 		exit 0
 		""";
 
-	/// <summary>The current trampoline text, with normalized newlines.</summary>
-	public static string Trampoline => TRAMPOLINE_SCRIPT.Replace("\r\n", "\n");
+	/// <summary>
+	/// Starts the line, just after the shebang, that records the SHA-256 of
+	/// the rest of the hook, so an installed hook can later prove it is still
+	/// exactly what committy wrote.
+	/// </summary>
+	private const string CHECKSUM_PREFIX = "# committy-hook-sha256: ";
+
+	/// <summary>
+	/// SHA-256 of every hook text committy shipped before hooks carried a
+	/// checksum line, as <see cref="Normalize" />d. Only an exact match is
+	/// treated as committy's, so a hand-written hook that happens to call
+	/// committy is never mistaken for one. Frozen: hooks written from now on
+	/// carry <see cref="CHECKSUM_PREFIX" /> instead.
+	/// </summary>
+	private static readonly HashSet<string> LegacyHookHashes =
+	[
+		// install-git-hook.sh, 7ade510 (2025-12-15)
+		"dd058daf01bd8be8fcfee7544b374a2a91832468121c41ca3f6bfbe5f30fb184",
+		// install-git-hook.sh, 978d162 (2025-12-15)
+		"05cb1a93a5c8be0d7961dc00da799df3debcb8fb3af6ae12f2f082f894ea42d8",
+		// install-git-hook.sh, f8f196a (2025-12-15)
+		"4b94fb0801411b63c4deb244fbeee1268a2051d5b6522656d8409791b167d72d",
+		// install-git-hook.ps1, 9abd999 (2025-12-15)
+		"fe4e8cc35e14cffc39286984c124987c54897c4095d8070851bd75a53a685f37",
+		// install-git-hook.sh, f6b7f07 (2025-12-17)
+		"35de5b922156e036b1142271ef258efbb9a9ebb11c799fb730b447f6e46aa3ab",
+		// hooks/prepare-commit-msg, bb6dd04 (2025-12-17)
+		"8511ef131d92d37f3faf6cfb2fb6cee816c6753db6e07cc7c6fc032efcc548a2",
+		// hooks/prepare-commit-msg, 7b5fd30 (2025-12-17)
+		"625768dc0f5f114b3356f36204c768494c601a19077717f1a71fb82e3046bb11",
+		// hooks/prepare-commit-msg, 1fa40e3 (2025-12-17)
+		"750512082f3a5f937b2008da7220f2b4f50d094b92e1ccb0ddb6dd3170467e92",
+		// hooks/prepare-commit-msg, f52cab3 (2026-05-15)
+		"9ddab3f9ab1e6d137f50e295b5275fa1c741e2cd506deffb4f878efc6a37538e",
+		// hooks/prepare-commit-msg, 7d6ffd7 (2026-06-03)
+		"152110055adc0a625f752ac31834e056c5ffc17c6cfd7dd72ba04dc02bc56fab",
+		// The trampoline without a checksum line, 7d6ffd7 (2026-06-03) to 1.9.0
+		"e60a55e23dc41fb43ed79342582a582f82fd62675f814d6eb671494f109f4434",
+	];
+
+	/// <summary>
+	/// The current trampoline text, with normalized newlines and its checksum
+	/// line.
+	/// </summary>
+	public static string Trampoline { get; } =
+		WithChecksum(TRAMPOLINE_SCRIPT.Replace("\r\n", "\n"));
 
 	/// <summary>
 	/// Installs the hook either globally (as a git template) or into a single
@@ -266,8 +313,8 @@ public static class HookInstaller
 	/// <summary>
 	/// Writes the trampoline into <paramref name="hooksDir" /> unless a hook
 	/// committy did not write is already there. A stale committy hook is
-	/// replaced; a foreign one only with <paramref name="force" />, after
-	/// copying it to <c>.bak</c>.
+	/// replaced; a foreign one only with <paramref name="force" />. Either way
+	/// the old hook is backed up first (<see cref="BackUpHook" />).
 	/// </summary>
 	/// <returns>False when a foreign hook was left in place.</returns>
 	private static async Task<bool> WriteHookAsync(
@@ -300,23 +347,18 @@ public static class HookInstaller
 				{
 					await output.WriteLineAsync(
 							$"Error: {hookPath} already exists and was not written by committy. "
-							+ $"Re-run with --force to replace it; the old hook is kept as {HOOK_NAME}.bak.",
+							+ "Re-run with --force to replace it; the old hook is backed up first.",
 							cancellationToken)
 						.ConfigureAwait(false);
 
 					return false;
 				}
-
-				File.Copy(hookPath, hookPath + ".bak", true);
-
-				// Delete rather than overwrite, so a symlinked hook (e.g. into
-				// a dotfiles repo) is replaced instead of written through.
-				File.Delete(hookPath);
-				await output.WriteLineAsync(
-						$"Backed up the existing hook to {hookPath}.bak",
-						cancellationToken)
-					.ConfigureAwait(false);
 			}
+
+			await output.WriteLineAsync(
+					$"Backed up the existing hook to {BackUpHook(hookPath)}",
+					cancellationToken)
+				.ConfigureAwait(false);
 		}
 
 		await WriteTrampolineAsync(hooksDir, cancellationToken)
@@ -330,19 +372,29 @@ public static class HookInstaller
 	}
 
 	/// <summary>
-	/// True when the content looks like a committy-managed hook of any version. Used
-	/// to
-	/// decide whether <c>repair-hooks</c> may safely overwrite it; foreign hooks (no
-	/// committy signature) are always left alone.
+	/// True when the content is a hook committy wrote and nobody has edited
+	/// since: either its checksum line still matches the rest of the hook, or
+	/// (for hooks older than checksum lines) it is exactly one of the texts
+	/// committy shipped. Anything else, including a hand-written hook that
+	/// calls committy, is foreign and is not replaced without consent.
 	/// </summary>
 	public static bool IsCommittyManaged(string content)
 	{
-		string lower = content.ToLowerInvariant();
+		string normalized = Normalize(content);
+		string[] lines = normalized.Split('\n');
+		string? checksumLine = lines.FirstOrDefault(line
+			=> line.StartsWith(CHECKSUM_PREFIX, StringComparison.Ordinal));
 
-		return lower.Contains("committy")
-			&& (lower.Contains("prepare-commit-msg")
-				|| lower.Contains("--no-git")
-				|| lower.Contains("ai-powered commit message hook"));
+		if (checksumLine is null)
+		{
+			return LegacyHookHashes.Contains(Sha256(normalized));
+		}
+
+		string rest = string.Join(
+			'\n',
+			lines.Where(line => !ReferenceEquals(line, checksumLine)));
+
+		return checksumLine[CHECKSUM_PREFIX.Length..].Trim() == Sha256(rest);
 	}
 
 	/// <summary>
@@ -350,7 +402,71 @@ public static class HookInstaller
 	/// needed).
 	/// </summary>
 	public static bool IsCurrentTrampoline(string content) =>
-		content.Replace("\r\n", "\n").Trim() == Trampoline.Trim();
+		Normalize(content) == Normalize(Trampoline);
+
+	/// <summary>
+	/// Copies the hook at <paramref name="hookPath" /> aside before it is
+	/// replaced, to <c>prepare-commit-msg.bak</c>. When that file already
+	/// holds a different backup, a timestamped
+	/// <c>prepare-commit-msg-saved_YYYYMMDDThhmmss.bak</c> is used instead,
+	/// so an earlier backup is never overwritten. git only runs a hook with
+	/// the exact name, so neither copy runs.
+	/// </summary>
+	/// <returns>The backup's path.</returns>
+	public static string BackUpHook(string hookPath)
+	{
+		string backupPath = hookPath + ".bak";
+
+		if (File.Exists(backupPath))
+		{
+			if (File.ReadAllBytes(backupPath)
+				.AsSpan()
+				.SequenceEqual(File.ReadAllBytes(hookPath)))
+			{
+				return backupPath;
+			}
+
+			backupPath = string.Create(
+				CultureInfo.InvariantCulture,
+				$"{hookPath}-saved_{DateTime.Now:yyyyMMdd'T'HHmmss}.bak");
+		}
+
+		File.Copy(hookPath, backupPath);
+
+		return backupPath;
+	}
+
+	/// <summary>
+	/// Inserts the checksum line after the shebang. The checksum covers the
+	/// <see cref="Normalize" />d hook without that line.
+	/// </summary>
+	private static string WithChecksum(string hook)
+	{
+		int shebangEnd = hook.IndexOf('\n');
+
+		return string.Concat(
+			hook.AsSpan(0, shebangEnd + 1),
+			CHECKSUM_PREFIX,
+			Sha256(Normalize(hook)),
+			hook.AsSpan(shebangEnd));
+	}
+
+	/// <summary>
+	/// The hook text as compared and hashed: no byte order mark (Windows
+	/// PowerShell 5 wrote one), LF line endings, no trailing spaces on any
+	/// line, and no blank lines at either end.
+	/// </summary>
+	private static string Normalize(string content) =>
+		string.Join(
+				'\n',
+				content.TrimStart('\uFEFF')
+					.Replace("\r\n", "\n")
+					.Split('\n')
+					.Select(line => line.TrimEnd()))
+			.Trim();
+
+	private static string Sha256(string text) =>
+		Convert.ToHexStringLower(SHA256.HashData(Encoding.UTF8.GetBytes(text)));
 
 	private static bool PathsEqual(string a, string b) =>
 		string.Equals(
@@ -436,6 +552,10 @@ public static class HookInstaller
 
 		string hookPath = Path.Combine(hooksDir, HOOK_NAME);
 
+		// Delete rather than overwrite, so a symlinked hook (e.g. into a
+		// dotfiles repo) is replaced instead of written through. Callers back
+		// the old hook up first.
+		File.Delete(hookPath);
 		await File.WriteAllTextAsync(hookPath, Trampoline, cancellationToken)
 			.ConfigureAwait(false);
 		MakeExecutable(hookPath);

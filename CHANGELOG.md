@@ -10,8 +10,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ### Added
 
 - `committy install-hook --force` (`-f`) replaces an existing
-  `prepare-commit-msg` hook that committy didn't write, keeping the old one as
-  `prepare-commit-msg.bak`.
+  `prepare-commit-msg` hook that committy didn't write, backing up the old one
+  first.
 
 ### Changed
 
@@ -19,6 +19,18 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   that committy didn't write. It leaves the hook in place and exits with an
   error that names the file; pass `--force` to replace it. Older committy
   hooks are still upgraded without asking.
+- Committy only treats a hook as its own if the hook is exactly a version it
+  installed. Hooks now carry a `# committy-hook-sha256:` line that proves they
+  haven't been edited; older hooks must match one of the texts earlier
+  releases shipped. A hook you wrote or edited, even one that calls
+  committy, is no longer replaced by `install-hook` or `repair-hooks`.
+- `install-hook` and `repair-hooks` now always back up a hook before
+  replacing it, as `prepare-commit-msg.bak`, or as
+  `prepare-commit-msg-saved_<timestamp>.bak` if a different backup is already
+  there. `repair-hooks --backup` is no longer needed and is ignored.
+- Requires git 2.28 or newer. On older git, committy now says "Your git is
+  too old" instead of failing with a misleading error. A corrupt git config
+  file is now reported as an error instead of being read as "nothing set".
 - `committy install-hook --global` now installs into your existing
   `init.templateDir` if one is set, instead of pointing it at
   `~/.git-templates`. `~/.git-templates` is only created and configured when

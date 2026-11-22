@@ -527,10 +527,12 @@ internal class Program
 		{
 			Description = "Report what would change without modifying anything",
 		};
+		// Replaced hooks are always backed up now; the flag stays accepted
+		// so existing scripts that pass it keep working.
 		var backupOption = new Option<bool>("--backup")
 		{
-			Description =
-				"Save the previous hook as prepare-commit-msg.bak before replacing it",
+			Description = "No longer needed: replaced hooks are always backed up",
+			Hidden = true,
 		};
 
 		var command = new Command(
@@ -550,7 +552,6 @@ internal class Program
 			string[] scan = parseResult.GetValue(scanOption) ?? [];
 			string[] gitDirs = parseResult.GetValue(gitDirOption) ?? [];
 			bool dryRun = parseResult.GetValue(dryRunOption);
-			bool backup = parseResult.GetValue(backupOption);
 
 			var templateExitCode = 0;
 
@@ -576,7 +577,6 @@ internal class Program
 				scan,
 				gitDirs,
 				dryRun,
-				backup,
 				!global,
 				Console.Out,
 				cancellationToken);
@@ -750,16 +750,18 @@ internal class Program
 				parseResult.GetValue(tenantOption),
 				parseResult.GetValue(credentialOption));
 
-			if (parseResult.GetValue(infoOption))
-			{
-				Console.WriteLine(
-					await BuildInfoReportAsync(overrides, cancellationToken));
-
-				return;
-			}
-
 			try
 			{
+				if (parseResult.GetValue(infoOption))
+				{
+					Console.WriteLine(
+						await BuildInfoReportAsync(
+							overrides,
+							cancellationToken));
+
+					return;
+				}
+
 				CommittyConfig config = await ResolveConfigAsync(
 					overrides,
 					cancellationToken);

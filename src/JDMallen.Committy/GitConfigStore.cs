@@ -48,12 +48,22 @@ public static class GitConfigStore
 				cancellationToken)
 			.ConfigureAwait(false);
 
-		// Exit code 1 means no committy keys are set. Any other failure (such
-		// as an unreadable config file) reads as "nothing set", as --get does.
-		return result.ExitStatus.ExitCode == 0
-			? ParseAll(result.StandardOutput)
-			: new Dictionary<string, GitConfigValue>(
-				StringComparer.OrdinalIgnoreCase);
+		// Exit code 1 means no committy keys are set. Anything else (an
+		// unreadable config file, or a git too old for --show-scope) is
+		// reported, rather than read as "nothing set" and blamed on a missing
+		// setting.
+		return result.ExitStatus.ExitCode switch
+		{
+			0 => ParseAll(result.StandardOutput),
+			1 => new Dictionary<string, GitConfigValue>(
+				StringComparer.OrdinalIgnoreCase),
+			_ => throw new InvalidOperationException(
+				result.StandardError.Contains(
+					"show-scope",
+					StringComparison.Ordinal)
+					? Git.TOO_OLD_MESSAGE
+					: $"Could not read git config: {result.StandardError.Trim()}"),
+		};
 	}
 
 	/// <summary>

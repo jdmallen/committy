@@ -199,7 +199,6 @@ public static class HookRepairer
 	public static async Task<HookRepairResult> RepairRepoAsync(
 		string repo,
 		bool dryRun,
-		bool backup,
 		CancellationToken cancellationToken = default)
 	{
 		string? customHooksPath = await GetConfigAsync(
@@ -269,10 +268,7 @@ public static class HookRepairer
 				HookRepairOutcome.Updated);
 		}
 
-		if (backup)
-		{
-			File.Copy(hookPath, hookPath + ".bak", true);
-		}
+		HookInstaller.BackUpHook(hookPath);
 
 		await HookInstaller.WriteTrampolineAsync(hooksDir, cancellationToken)
 			.ConfigureAwait(false);
@@ -339,7 +335,6 @@ public static class HookRepairer
 		IReadOnlyList<string> scanRoots,
 		IReadOnlyList<string> gitDirs,
 		bool dryRun,
-		bool backup,
 		bool currentRepoRequired,
 		TextWriter output,
 		CancellationToken cancellationToken = default)
@@ -381,7 +376,6 @@ public static class HookRepairer
 				await RepairRepoAsync(
 						repo,
 						dryRun,
-						backup,
 						cancellationToken)
 					.ConfigureAwait(false));
 		}

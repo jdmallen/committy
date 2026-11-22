@@ -21,7 +21,7 @@ automatically when you run `git commit`.
 **Prerequisites**
 
 - .NET 11 Runtime or SDK
-- Git
+- Git 2.28 or newer
 - Access to one supported LLM provider:
   - **Azure OpenAI** — endpoint, API key, and a deployment name,
   - **Anthropic (Claude)** — an API key, or
@@ -66,7 +66,12 @@ committy install-hook --global      # template for all future repositories
 
 If a `prepare-commit-msg` hook that committy didn't write is already there,
 `install-hook` leaves it alone and exits with an error. Pass `--force` to
-replace it; the old hook is kept as `prepare-commit-msg.bak`. With `--global`,
+replace it. A hook counts as committy's only if it is exactly a version
+committy installed, so a hook you wrote or edited is never replaced by
+accident, even one that calls committy. Whenever a hook is replaced, the old
+one is saved as `prepare-commit-msg.bak` first (or as
+`prepare-commit-msg-saved_<timestamp>.bak` if a different backup is already
+there). With `--global`,
 committy installs into your existing `init.templateDir` if you have one, and
 only creates `~/.git-templates` (and points `init.templateDir` at it) if not.
 
@@ -97,8 +102,8 @@ PowerShell, Command Prompt, and Git Bash.
 > (`committy install-hook ~/.cfg`) or repair their hooks.
 >
 > Only hooks it recognizes as committy-managed are touched; hooks you wrote
-> yourself are reported and left untouched. Add `--backup` to keep the previous
-> hook as `prepare-commit-msg.bak`.
+> or edited yourself are reported and left untouched. The previous hook is
+> always saved as `prepare-commit-msg.bak` first.
 
 **4. Configure a provider**
 
@@ -340,11 +345,11 @@ normal run.
 | `--info`        |       |                                                       | off                         | Show the configuration in effect here, its sources, and lifetime token usage.  |
 | `--local`       | —     | —                                                     | off                         | (`config` only) Write to the current repo's git config instead of global.       |
 | `--global`      | `-g`  | —                                                     | off                         | (`install-hook` / `repair-hooks`) Target the global hook template.              |
-| `--force`       | `-f`  |                                                       | off                         | (`install-hook` only) Replace a hook committy didn't write, keeping it as `prepare-commit-msg.bak`. |
+| `--force`       | `-f`  |                                                       | off                         | (`install-hook` only) Replace a hook committy didn't write; the old hook is backed up first. |
 | `--scan <dir>`  | —     | —                                                     | current repo                | (`repair-hooks` only) Recursively sweep a directory for repos; repeatable.      |
 | `--git-dir <dir>` | —   | —                                                     | current repo                | (`repair-hooks` only) Target a headless git directory directly (e.g. `~/.cfg`); repeatable. |
 | `--dry-run`     | —     | —                                                     | off                         | (`repair-hooks` only) Report what would change without modifying anything.      |
-| `--backup`      | —     | —                                                     | off                         | (`repair-hooks` only) Save the previous hook as `prepare-commit-msg.bak`.       |
+| `--backup`      | —     | —                                                     | off                         | (`repair-hooks` only) No longer needed: replaced hooks are always backed up.     |
 
 Settings are taken from the **flag, then git config, then the environment
 variable, then the default**. API keys are the exception: **flag, then

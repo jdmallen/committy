@@ -46,10 +46,16 @@ public static class GitService
 				cancellationToken)
 			.ConfigureAwait(false);
 
+		// A git older than 2.28 rejects --no-relative with the same exit code.
+		// Option names are never translated, so this check works in any locale.
 		if (result.ExitStatus.ExitCode == usageErrorExitCode)
 		{
 			throw new InvalidOperationException(
-				"Not a git repository. Run committy from inside a git repository.");
+				result.StandardError.Contains(
+					"no-relative",
+					StringComparison.Ordinal)
+					? Git.TOO_OLD_MESSAGE
+					: "Not a git repository. Run committy from inside a git repository.");
 		}
 
 		if (result.ExitStatus.ExitCode != 0)

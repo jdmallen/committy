@@ -11,6 +11,13 @@ namespace JDMallen.Committy;
 /// </summary>
 public static class Git
 {
+	/// <summary>
+	/// What committy says when git rejects an option it relies on:
+	/// <c>--show-scope</c> needs git 2.26 and <c>diff --no-relative</c> 2.28.
+	/// </summary>
+	public const string TOO_OLD_MESSAGE =
+		"Your git is too old: committy needs git 2.28 or newer.";
+
 	public static Task<ProcessTextOutput> RunAsync(
 		IEnumerable<string> arguments,
 		CancellationToken cancellationToken = default) =>

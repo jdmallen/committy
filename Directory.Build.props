@@ -7,7 +7,7 @@
 				 read this value (overridable via -v on scripts/publish.sh) to stamp
 				 published binaries and name release archives.
 		-->
-		<Version>1.10.0</Version>
+		<Version>1.11.0</Version>
 
 		<!-- Shared by the app and the tests, so a framework bump is one line. -->
 		<TargetFramework>net11.0</TargetFramework>

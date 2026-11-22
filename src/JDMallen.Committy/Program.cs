@@ -17,16 +17,18 @@ internal abstract class Program
 		rootCommand.Subcommands.Add(RepairHooksCommand.Build());
 		rootCommand.Subcommands.Add(ConfigCommand.Build());
 
-		if (!OperatingSystem.IsWindows())
+		// Windows consoles default to an OEM code page, which turns ✓, —,
+		// arrows and typographic quotes into '?'. Only when stdout is the
+		// console itself: whatever reads a pipe or redirect (clip, PowerShell)
+		// decodes it with that same code page, so UTF-8 there turns é into ├⌐.
+		if (!OperatingSystem.IsWindows() || Console.IsOutputRedirected)
 		{
 			return await rootCommand.Parse(args).InvokeAsync();
 		}
 
-		// Windows consoles default to an OEM code page, which turns ✓, —,
-		// arrows and typographic quotes in output (and in generated messages
-		// piped to clip or a file) into '?'. No byte order mark, so redirected
-		// output stays plain UTF-8. Setting it changes the console's code page,
-		// which outlives this process, so the original is put back.
+		// No byte order mark, so stderr redirected on its own stays plain
+		// UTF-8. Setting it changes the console's code page, which outlives
+		// this process, so the original is put back.
 		Encoding originalEncoding = Console.OutputEncoding;
 		Console.OutputEncoding = new UTF8Encoding(false);
 		try

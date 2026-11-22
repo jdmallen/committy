@@ -571,6 +571,12 @@ server splits it into `reasoning_content` or inlines it as `<think>…</think>`.
 - **"Azure CLI ('az') not found on PATH"** in a commit made from a desktop
   app: set `committy.azure.azpath` to the output of `command -v az` (or
   `where az` on Windows).
+- **`—`, `✓` or emoji turn into `?` when piped on Windows** (e.g.
+  `committy | clip`): piped output uses the console's code page, which can't
+  hold them. Use `committy --clipboard` instead, or switch the console to
+  UTF-8: `chcp 65001` in cmd, or add
+  `[Console]::OutputEncoding = [Text.UTF8Encoding]::new()` to your PowerShell
+  `$PROFILE`.
 - **Hook not running** — confirm you're in a git repo with staged changes
   (`git diff --cached`); re-run `committy install-hook` if needed.
 - **Old/odd hook behavior after upgrading** — run `committy repair-hooks` (add

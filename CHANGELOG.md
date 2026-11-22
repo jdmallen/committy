@@ -5,7 +5,7 @@ All notable changes to this project are documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
-## [Unreleased]
+## [1.11.0]
 
 ### Added
 
@@ -60,9 +60,11 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   800 for a large change, and the root command's `--model` and `--endpoint`
   help mention the openai provider.
 - On Windows, committy writes UTF-8 to the console, so `✓`, `—` and
-  non-ASCII characters in generated messages no longer print as `?`,
-  including when piped (`committy | clip`) or redirected to a file. The
-  console's code page is restored on exit. (Not yet verified on Windows.)
+  non-ASCII characters in generated messages no longer print as `?`. The
+  console's code page is restored on exit. Piped or redirected output
+  (`committy | clip`) still uses the console's code page, because that is
+  how clip and PowerShell decode it; use `committy --clipboard` or a UTF-8
+  console for `—`, `✓` and emoji (see README, Troubleshooting).
 - `committy config` shows current values from the scope it writes to. Before,
   `committy config --local` offered the global values and pressing Enter
   copied them into the repository, where they shadowed later global changes;

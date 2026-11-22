@@ -15,6 +15,10 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Fixed
 
+- The README now lists ICU as a Linux requirement. Release binaries have
+  always needed it, and stop at startup on images without it (slim
+  containers, minimal servers). Install the distro's ICU package, or set
+  `DOTNET_SYSTEM_GLOBALIZATION_INVARIANT=1` to run without it.
 - When the provider takes longer than the HTTP timeout, `committy` now prints
   an error naming the timeout (and, for the openai provider, the
   `committy.openai.timeoutseconds` setting) and exits 1. It used to exit 130

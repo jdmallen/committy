@@ -26,7 +26,13 @@ automatically when you run `git commit`.
   macOS, or Visual Studio's "Desktop development with C++" workload on
   Windows.
 - Linux release binaries need glibc 2.35 or newer (Ubuntu 22.04, Debian 12,
-  RHEL 9, or later).
+  RHEL 9, or later) and ICU. Desktop distros ship ICU already; slim
+  containers and minimal server images often do not, and committy then stops
+  at startup with "Couldn't find a valid ICU package installed on the
+  system". Install it (`libicu72` on Debian 12, `libicu70` on Ubuntu 22.04,
+  `libicu` on RHEL or Fedora), or set
+  `DOTNET_SYSTEM_GLOBALIZATION_INVARIANT=1` to run without it. Without ICU,
+  numbers such as token counts always use the `1,234` format.
 - Git 2.28 or newer
 - Access to one supported LLM provider:
   - **Azure OpenAI** — endpoint, API key, and a deployment name,

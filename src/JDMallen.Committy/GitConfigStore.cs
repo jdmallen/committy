@@ -76,7 +76,7 @@ public static class GitConfigStore
 			StringComparer.OrdinalIgnoreCase);
 		string[] fields = output.Split('\0');
 
-		for (int index = 0; index + 1 < fields.Length; index += 2)
+		for (var index = 0; index + 1 < fields.Length; index += 2)
 		{
 			string scope = fields[index];
 			string entry = fields[index + 1];

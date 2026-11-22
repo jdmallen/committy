@@ -51,6 +51,8 @@ public closed class ProviderConfig
 	/// The HTTP timeout. The hosted providers answer in seconds; only the
 	/// self-hosted path sets it.
 	/// </summary>
+
+	// ReSharper disable once AutoPropertyCanBeMadeGetOnly.Global
 	public virtual int TimeoutSeconds { get; init; } =
 		CommittyConfig.DEFAULT_TIMEOUT_SECONDS;
 

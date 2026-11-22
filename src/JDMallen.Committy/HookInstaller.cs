@@ -64,24 +64,34 @@ public static class HookInstaller
 	[
 		// install-git-hook.sh, 7ade510 (2025-12-15)
 		"dd058daf01bd8be8fcfee7544b374a2a91832468121c41ca3f6bfbe5f30fb184",
+
 		// install-git-hook.sh, 978d162 (2025-12-15)
 		"05cb1a93a5c8be0d7961dc00da799df3debcb8fb3af6ae12f2f082f894ea42d8",
+
 		// install-git-hook.sh, f8f196a (2025-12-15)
 		"4b94fb0801411b63c4deb244fbeee1268a2051d5b6522656d8409791b167d72d",
+
 		// install-git-hook.ps1, 9abd999 (2025-12-15)
 		"fe4e8cc35e14cffc39286984c124987c54897c4095d8070851bd75a53a685f37",
+
 		// install-git-hook.sh, f6b7f07 (2025-12-17)
 		"35de5b922156e036b1142271ef258efbb9a9ebb11c799fb730b447f6e46aa3ab",
+
 		// hooks/prepare-commit-msg, bb6dd04 (2025-12-17)
 		"8511ef131d92d37f3faf6cfb2fb6cee816c6753db6e07cc7c6fc032efcc548a2",
+
 		// hooks/prepare-commit-msg, 7b5fd30 (2025-12-17)
 		"625768dc0f5f114b3356f36204c768494c601a19077717f1a71fb82e3046bb11",
+
 		// hooks/prepare-commit-msg, 1fa40e3 (2025-12-17)
 		"750512082f3a5f937b2008da7220f2b4f50d094b92e1ccb0ddb6dd3170467e92",
+
 		// hooks/prepare-commit-msg, f52cab3 (2026-05-15)
 		"9ddab3f9ab1e6d137f50e295b5275fa1c741e2cd506deffb4f878efc6a37538e",
+
 		// hooks/prepare-commit-msg, 7d6ffd7 (2026-06-03)
 		"152110055adc0a625f752ac31834e056c5ffc17c6cfd7dd72ba04dc02bc56fab",
+
 		// The trampoline without a checksum line, 7d6ffd7 (2026-06-03) to 1.9.0
 		"e60a55e23dc41fb43ed79342582a582f82fd62675f814d6eb671494f109f4434",
 	];
@@ -193,10 +203,10 @@ public static class HookInstaller
 		}
 
 		if (!await WriteHookAsync(
-					Path.Combine(templateDir, "hooks"),
-					force,
-					output,
-					cancellationToken))
+				Path.Combine(templateDir, "hooks"),
+				force,
+				output,
+				cancellationToken))
 		{
 			return 1;
 		}
@@ -280,10 +290,10 @@ public static class HookInstaller
 		}
 
 		if (!await WriteHookAsync(
-					hooksDir,
-					force,
-					output,
-					cancellationToken))
+				hooksDir,
+				force,
+				output,
+				cancellationToken))
 		{
 			return 1;
 		}

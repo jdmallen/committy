@@ -6,7 +6,7 @@ namespace JDMallen.Committy;
 /// Wires the commands together. Each command lives in its own class under
 /// <c>CLI/</c> and returns its exit code.
 /// </summary>
-internal class Program
+internal abstract class Program
 {
 	private static async Task<int> Main(string[] args)
 	{

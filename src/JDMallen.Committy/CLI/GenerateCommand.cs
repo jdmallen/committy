@@ -81,22 +81,22 @@ public static class GenerateCommand
 					parseResult.GetValue(tenantOption),
 					parseResult.GetValue(credentialOption));
 
-				if (parseResult.GetValue(infoOption))
+				if (!parseResult.GetValue(infoOption))
 				{
-					Console.WriteLine(
-						await BuildInfoReportAsync(
-							overrides,
-							cancellationToken));
-
-					return 0;
+					return await GenerateAndPrintAsync(
+						overrides,
+						parseResult.GetValue(titlesOnlyOption),
+						parseResult.GetValue(noGitOption),
+						parseResult.GetValue(clipboardOption),
+						cancellationToken);
 				}
 
-				return await GenerateAndPrintAsync(
-					overrides,
-					parseResult.GetValue(titlesOnlyOption),
-					parseResult.GetValue(noGitOption),
-					parseResult.GetValue(clipboardOption),
-					cancellationToken);
+				Console.WriteLine(
+					await BuildInfoReportAsync(
+						overrides,
+						cancellationToken));
+
+				return 0;
 			}));
 
 		return rootCommand;

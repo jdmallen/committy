@@ -42,7 +42,8 @@ public static class RepairHooksCommand
 		// so existing scripts that pass it keep working.
 		var backupOption = new Option<bool>("--backup")
 		{
-			Description = "No longer needed: replaced hooks are always backed up",
+			Description =
+				"No longer needed: replaced hooks are always backed up",
 			Hidden = true,
 		};
 

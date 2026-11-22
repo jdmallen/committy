@@ -13,30 +13,40 @@ public class InfoReportTests
 	private readonly Dictionary<string, string> _environment = [];
 	private readonly Dictionary<string, GitConfigValue> _gitConfig = [];
 
-	private async Task<string> Build(
+	private Task<string> Build(
 		string? repository = "/home/me/repo",
 		TokenUsageTotals? totals = null,
 		string? usageError = null,
 		string? azureCliPath = "/usr/bin/az",
 		bool signedIn = false)
 	{
-		CultureInfo.CurrentCulture = CultureInfo.InvariantCulture;
-		ResolvedConfig resolved =
-			CommittyConfigResolver.ResolveWithSources(
-				null,
-				name => _environment.GetValueOrDefault(name),
-				_gitConfig);
+		try
+		{
+			CultureInfo.CurrentCulture = CultureInfo.InvariantCulture;
+			ResolvedConfig resolved =
+				CommittyConfigResolver.ResolveWithSources(
+					null,
+					name => _environment.GetValueOrDefault(name),
+					_gitConfig);
 
-		return InfoReport.Build(
-			"committy 9.9.9",
-			repository,
-			resolved,
-			new InfoReport.UsageReport(
-				USAGE_PATH,
-				usageError is null ? totals ?? new TokenUsageTotals() : null,
-				usageError),
-			_ => azureCliPath,
-			_ => signedIn);
+			return Task.FromResult(
+				InfoReport.Build(
+					"committy 9.9.9",
+					repository,
+					resolved,
+					new InfoReport.UsageReport(
+						USAGE_PATH,
+						usageError is null
+							? totals ?? new TokenUsageTotals()
+							: null,
+						usageError),
+					_ => azureCliPath,
+					_ => signedIn));
+		}
+		catch (Exception exception)
+		{
+			return Task.FromException<string>(exception);
+		}
 	}
 
 	[Fact]

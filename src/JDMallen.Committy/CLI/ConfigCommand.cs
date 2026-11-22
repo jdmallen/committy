@@ -306,8 +306,8 @@ public static class ConfigCommand
 				CommittyConfigResolver.AZURE_API_KEY_KEY),
 		};
 		string? storedGitKey = await GitConfigStore.GetAsync(
-				apiKeyGitKey,
-				cancellationToken) is null
+			apiKeyGitKey,
+			cancellationToken) is null
 			? null
 			: apiKeyGitKey;
 		var apiKeySetup = new ApiKeySetup(
@@ -566,9 +566,9 @@ public static class ConfigCommand
 				&& flagValue is null
 				&& !Console.IsInputRedirected
 				&& (await CommittyConfigResolver.ResolveAsync(
-						null,
-						cancellationToken))
-					.Provider is AzureConfig { UsesInteractiveSignIn: true }
+					null,
+					cancellationToken))
+				.Provider is AzureConfig { UsesInteractiveSignIn: true }
 					? await AzureCliTenantAsync(cancellationToken)
 					: null);
 		string? value =

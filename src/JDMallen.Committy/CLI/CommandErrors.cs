@@ -8,7 +8,7 @@ namespace JDMallen.Committy;
 public static class CommandErrors
 {
 	/// <summary>The usual exit code for a run stopped by Ctrl+C.</summary>
-	public const int CANCELED_EXIT_CODE = 130;
+	private const int CANCELED_EXIT_CODE = 130;
 
 	/// <summary>
 	/// Returns the body's exit code; <see cref="CANCELED_EXIT_CODE" /> when it

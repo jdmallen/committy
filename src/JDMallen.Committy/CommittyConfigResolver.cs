@@ -258,7 +258,11 @@ public static class CommittyConfigResolver
 		ConfigOverrides? overrides,
 		Func<string, string?> getEnvironmentVariable,
 		IReadOnlyDictionary<string, GitConfigValue> gitConfig) =>
-		Resolve(overrides, getEnvironmentVariable, gitConfig, null);
+		Resolve(
+			overrides,
+			getEnvironmentVariable,
+			gitConfig,
+			null);
 
 	/// <summary>
 	/// Resolves the configuration as

@@ -42,8 +42,12 @@ public class CommittyConfigResolverTests
 		CommittyConfig config = await Resolve();
 
 		Assert.Equal(Provider.OpenAI, config.Provider.Kind);
-		Assert.Equal("http://env/v1", Assert.IsType<OpenAIConfig>(config.Provider).BaseUrl);
-		Assert.Equal("env-model", Assert.IsType<OpenAIConfig>(config.Provider).Model);
+		Assert.Equal(
+			"http://env/v1",
+			Assert.IsType<OpenAIConfig>(config.Provider).BaseUrl);
+		Assert.Equal(
+			"env-model",
+			Assert.IsType<OpenAIConfig>(config.Provider).Model);
 	}
 
 	[Fact]
@@ -55,7 +59,9 @@ public class CommittyConfigResolverTests
 		CommittyConfig config =
 			await Resolve(new ConfigOverrides(Model: "flag-model"));
 
-		Assert.Equal("flag-model", Assert.IsType<AnthropicConfig>(config.Provider).Model);
+		Assert.Equal(
+			"flag-model",
+			Assert.IsType<AnthropicConfig>(config.Provider).Model);
 	}
 
 	[Fact]
@@ -67,7 +73,9 @@ public class CommittyConfigResolverTests
 
 		CommittyConfig config = await Resolve();
 
-		Assert.Equal("env-model", Assert.IsType<AnthropicConfig>(config.Provider).Model);
+		Assert.Equal(
+			"env-model",
+			Assert.IsType<AnthropicConfig>(config.Provider).Model);
 	}
 
 	[Theory]
@@ -252,29 +260,39 @@ public class CommittyConfigResolverTests
 	}
 
 	[Fact]
-	public async Task AzureAuth_Sources_AreRecorded()
+	public Task AzureAuth_Sources_AreRecorded()
 	{
-		var gitConfig = new Dictionary<string, GitConfigValue>
+		try
 		{
-			[CommittyConfigResolver.AZURE_AUTH_KEY] =
-				new("azurecli", "global"),
-		};
+			var gitConfig = new Dictionary<string, GitConfigValue>
+			{
+				[CommittyConfigResolver.AZURE_AUTH_KEY] =
+					new("azurecli", "global"),
+			};
 
-		ResolvedConfig resolved =
-			CommittyConfigResolver.ResolveWithSources(
-				new ConfigOverrides(TenantId: "flag.com"),
-				_ => null,
-				gitConfig);
+			ResolvedConfig resolved =
+				CommittyConfigResolver.ResolveWithSources(
+					new ConfigOverrides(TenantId: "flag.com"),
+					_ => null,
+					gitConfig);
 
-		Assert.Equal(
-			"git config --global",
-			resolved.Sources[CommittyConfigResolver.AZURE_AUTH_KEY].ToString());
-		Assert.Equal(
-			ConfigSource.FromFlag,
-			resolved.Sources[CommittyConfigResolver.AZURE_TENANT_KEY]);
-		Assert.Equal(
-			ConfigSource.FromDefault,
-			resolved.Sources[CommittyConfigResolver.AZURE_SCOPE_KEY]);
+			Assert.Equal(
+				"git config --global",
+				resolved.Sources[CommittyConfigResolver.AZURE_AUTH_KEY]
+					.ToString());
+			Assert.Equal(
+				ConfigSource.FromFlag,
+				resolved.Sources[CommittyConfigResolver.AZURE_TENANT_KEY]);
+			Assert.Equal(
+				ConfigSource.FromDefault,
+				resolved.Sources[CommittyConfigResolver.AZURE_SCOPE_KEY]);
+
+			return Task.CompletedTask;
+		}
+		catch (Exception exception)
+		{
+			return Task.FromException(exception);
+		}
 	}
 
 	[Theory]

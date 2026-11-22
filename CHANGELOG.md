@@ -5,6 +5,18 @@ All notable changes to this project are documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [Unreleased]
+
+### Changed
+
+- Release binaries are now Native AOT compiled: about 15 MB instead of about
+  80 MB, with no first-run unpacking, so committy starts several times faster.
+  Most noticeable on quick runs such as `--version`, `--info`, or the hook
+  with nothing staged.
+- Linux release binaries need glibc 2.35 or newer (Ubuntu 22.04, Debian 12,
+  RHEL 9, or later).
+- Building from source needs the platform's C toolchain (see the README).
+
 ## [1.9.0]
 
 ### Added

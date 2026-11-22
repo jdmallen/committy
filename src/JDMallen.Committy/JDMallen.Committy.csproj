@@ -3,8 +3,10 @@
 	<PropertyGroup>
 		<OutputType>Exe</OutputType>
 		<AssemblyName>committy</AssemblyName>
-		<PublishSingleFile>true</PublishSingleFile>
 		<SelfContained>true</SelfContained>
+		<PublishAot>true</PublishAot>
+		<!-- Runs the trim and AOT analyzers in every build, not just publish. -->
+		<IsAotCompatible>true</IsAotCompatible>
 	</PropertyGroup>
 
 	<ItemGroup>

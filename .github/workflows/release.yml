@@ -1,12 +1,14 @@
 # Releases a new version whenever a commit lands on main (e.g. a merged PR)
 # with a <Version> in Directory.Build.props that hasn't been tagged yet:
 #   1. runs the test suite, so a failing commit never ships,
-#   2. builds the release archives with scripts/publish.sh (default runtimes),
+#   2. builds the Native AOT release archives with scripts/publish.sh, each on
+#      a runner of its own OS (AOT cannot cross-compile between operating
+#      systems, nor between architectures on Linux),
 #   3. tags the pushed commit with the raw semver (no 'v' prefix), and
 #   4. creates a GitHub release whose notes are that version's CHANGELOG.md
 #      section, with the archives and a SHA256SUMS.txt attached.
 # (Tagging and release creation are one atomic gh call, ordered after the
-# tests and build so a failed run never leaves a dangling tag.)
+# tests and builds so a failed run never leaves a dangling tag.)
 # If the version's tag already exists, the run is a no-op, so routine merges
 # that don't bump <Version> never re-release.
 name: Release
@@ -21,8 +23,11 @@ permissions:
   contents: write
 
 jobs:
-  release:
+  check:
     runs-on: ubuntu-latest
+    outputs:
+      version: ${{ steps.version.outputs.version }}
+      exists: ${{ steps.tag_check.outputs.exists }}
     steps:
       - name: Check out repository
         uses: actions/checkout@v4
@@ -61,21 +66,74 @@ jobs:
         if: steps.tag_check.outputs.exists == 'false'
         run: dotnet test --configuration Release
 
+  # The Linux builds run on ubuntu-22.04 on purpose: an AOT binary needs at
+  # least the glibc it was linked against, so this image (glibc 2.35) sets the
+  # oldest distro users can run. Don't move them to ubuntu-latest.
+  build:
+    needs: check
+    if: needs.check.outputs.exists == 'false'
+    strategy:
+      fail-fast: true
+      matrix:
+        include:
+          - runner: ubuntu-22.04
+            runtimes: linux-x64
+          - runner: ubuntu-22.04-arm
+            runtimes: linux-arm64
+          - runner: windows-latest
+            runtimes: win-x64 win-arm64
+          - runner: macos-latest
+            runtimes: osx-x64 osx-arm64
+    runs-on: ${{ matrix.runner }}
+    steps:
+      - name: Check out repository
+        uses: actions/checkout@v4
+
+      - name: Set up .NET SDK
+        uses: actions/setup-dotnet@v4
+        with:
+          global-json-file: global.json
+
+      - name: Install Native AOT prerequisites
+        if: runner.os == 'Linux'
+        run: sudo apt-get install -y --no-install-recommends clang zlib1g-dev
+
       - name: Publish release binaries
-        if: steps.tag_check.outputs.exists == 'false'
-        run: ./scripts/publish.sh
+        shell: bash
+        run: ./scripts/publish.sh ${{ matrix.runtimes }}
+
+      - name: Upload archives
+        uses: actions/upload-artifact@v4
+        with:
+          name: archives-${{ matrix.runner }}
+          path: |
+            dist/*.tar.gz
+            dist/*.zip
+          if-no-files-found: error
+
+  release:
+    needs: [check, build]
+    runs-on: ubuntu-latest
+    steps:
+      - name: Check out repository
+        uses: actions/checkout@v4
+
+      - name: Download archives
+        uses: actions/download-artifact@v4
+        with:
+          pattern: archives-*
+          path: dist
+          merge-multiple: true
 
       - name: Generate checksums
-        if: steps.tag_check.outputs.exists == 'false'
         run: |
           cd dist
           sha256sum *.tar.gz *.zip > SHA256SUMS.txt
           cat SHA256SUMS.txt
 
       - name: Extract changelog section for this version
-        if: steps.tag_check.outputs.exists == 'false'
         env:
-          VERSION: ${{ steps.version.outputs.version }}
+          VERSION: ${{ needs.check.outputs.version }}
         run: |
           awk -v ver="$VERSION" '
             $0 ~ "^## \\[" ver "\\]" { in_section = 1; next }
@@ -90,13 +148,12 @@ jobs:
           cat release_notes.md
 
       # Creating the release also creates the tag (raw semver, no 'v' prefix)
-      # on the pushed commit. Tagging happens here, after a successful build,
-      # so a failed publish never leaves a tag without a release.
+      # on the pushed commit. Tagging happens here, after every build
+      # succeeded, so a failed publish never leaves a tag without a release.
       - name: Create GitHub release and tag
-        if: steps.tag_check.outputs.exists == 'false'
         env:
           GH_TOKEN: ${{ github.token }}
-          VERSION: ${{ steps.version.outputs.version }}
+          VERSION: ${{ needs.check.outputs.version }}
         run: |
           gh release create "$VERSION" \
             --target "$GITHUB_SHA" \

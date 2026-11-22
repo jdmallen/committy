@@ -21,17 +21,29 @@ jobs:
       - name: Test
         run: dotnet test --configuration Release --no-build --verbosity normal
 
-  # committy publishes single-file and untrimmed (not Native AOT), so there are
-  # no trim warnings to gate on; this just proves the release publish still
-  # succeeds before a PR reaches main and the release workflow.
+  # Native AOT publish for linux-x64, on the same image the release builds on
+  # (its glibc is the floor for users). Fails on any trim/AOT (IL) warning,
+  # then runs the binary, since a clean publish is not proof it starts.
   publish:
-    runs-on: ubuntu-latest
+    runs-on: ubuntu-22.04
     steps:
       - uses: actions/checkout@v4
       - uses: actions/setup-dotnet@v4
         with:
           global-json-file: global.json
-      - name: Publish single-file (linux-x64)
+      - name: Install Native AOT prerequisites
+        run: sudo apt-get install -y --no-install-recommends clang zlib1g-dev
+      - name: Publish Native AOT (linux-x64)
         run: |
+          set -o pipefail
           dotnet publish src/JDMallen.Committy/JDMallen.Committy.csproj \
-            -c Release -r linux-x64 -o publish-out
+            -c Release -r linux-x64 -o publish-out \
+            -p:TreatWarningsAsErrors=true 2>&1 | tee publish.log
+          if grep -q "warning IL" publish.log; then
+            echo "::error::Native AOT publish produced IL warnings." >&2
+            exit 1
+          fi
+      - name: Smoke test
+        run: |
+          ./publish-out/committy --version
+          ./publish-out/committy --info

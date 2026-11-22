@@ -1,7 +1,8 @@
 #!/usr/bin/env bash
 # Shared publish engine for JDMallen .NET apps. Publishes self-contained,
-# single-file binaries for one or more runtimes, then bundles each into a
-# release archive (zip for Windows, tar.gz otherwise).
+# single-file binaries (or Native AOT binaries, with aot=true) for one or more
+# runtimes, then bundles each into a release archive (zip for Windows, tar.gz
+# otherwise).
 #
 # This script is not run directly. Each app keeps a thin publish.sh wrapper
 # that sets the variables below and then sources this file, e.g.:
@@ -36,6 +37,13 @@
 #   extra_unix_files    Array of extra files (relative to repo root) staged
 #                       into non-Windows archives alongside the executable.
 #   extra_publish_args  Array of additional arguments for `dotnet publish`.
+#   aot                 "true" to publish Native AOT instead of single-file.
+#                       Native AOT cannot cross-compile between operating
+#                       systems, nor (without a cross toolchain) between
+#                       architectures on Linux, so only runtimes this machine
+#                       can build are published: unbuildable defaults are
+#                       skipped, and an unbuildable runtime named on the CLI
+#                       is an error. CI builds each on a matching runner.
 #   output_dir          Output directory. Defaults to "dist".
 #   version             Defaults to <Version> in the csproj; override with -v.
 #
@@ -66,19 +74,55 @@ fi
 
 if [[ -z "${extra_unix_files+x}" ]]; then extra_unix_files=(); fi
 if [[ -z "${extra_publish_args+x}" ]]; then extra_publish_args=(); fi
+aot="${aot:-false}"
 output_dir="${output_dir:-dist}"
 repo_root="${repo_root:-$PWD}"
 
 # Pull the default version straight from the project file so the csproj remains
 # the single source of truth.
 if [[ -z "${version:-}" ]]; then
-	version="$(grep -oP '(?<=<Version>)[^<]+' "$project" | head -n1 || true)"
+	# sed, not `grep -P`: macOS ships BSD grep, which has no -P.
+	version="$(sed -n 's:.*<Version>\([^<]*\)</Version>.*:\1:p' "$project" \
+		| head -n1 || true)"
 fi
+
+# The OS and architecture of this machine, in RID terms.
+host_os() {
+	case "$(uname -s)" in
+		Linux) echo "linux" ;;
+		Darwin) echo "osx" ;;
+		MINGW* | MSYS* | CYGWIN*) echo "win" ;;
+		*) echo "unknown" ;;
+	esac
+}
+
+host_arch() {
+	case "$(uname -m)" in
+		x86_64 | amd64) echo "x64" ;;
+		aarch64 | arm64) echo "arm64" ;;
+		armv7l) echo "arm" ;;
+		*) echo "unknown" ;;
+	esac
+}
+
+# Whether this machine can Native AOT compile for a RID: same OS, and on Linux
+# the same architecture too. macOS (Xcode) and Windows (with Visual Studio's
+# ARM64 build tools) build every architecture of their own OS.
+can_build_aot() {
+	local runtime="$1"
+	local os="${runtime%%-*}"
+	local arch="${runtime##*-}"
+	[[ "$os" == "$(host_os)" ]] || return 1
+	[[ "$os" != "linux" || "$arch" == "$(host_arch)" ]]
+}
 
 print_help() {
 	echo "Usage: $0 [-v|--version <version>] [runtime ...]"
 	echo ""
 	echo "Publishes self-contained binaries for the given runtime identifiers (RIDs)."
+	if [[ "$aot" == "true" ]]; then
+		echo "Native AOT: only runtimes this machine can build ($(host_os)-$(host_arch))."
+	fi
 	echo ""
 	echo "Known runtimes:"
 	printf '  %s\n' "${known_runtimes[@]}"
@@ -112,6 +156,7 @@ while [[ $# -gt 0 ]]; do
 	esac
 done
 
+runtimes_given=$([[ ${#runtimes[@]} -gt 0 ]] && echo "yes" || echo "")
 if [[ ${#runtimes[@]} -eq 0 ]]; then
 	runtimes=("${default_runtimes[@]}")
 fi
@@ -134,6 +179,32 @@ for runtime in "${runtimes[@]}"; do
 	fi
 done
 
+if [[ "$aot" == "true" ]]; then
+	buildable=()
+	for runtime in "${runtimes[@]}"; do
+		if can_build_aot "$runtime"; then
+			buildable+=("$runtime")
+		elif [[ -n "$runtimes_given" ]]; then
+			echo "Error: cannot Native AOT compile $runtime on $(host_os)-$(host_arch)." >&2
+			echo "Build it on a matching machine or CI runner." >&2
+			exit 1
+		else
+			echo "Skipping $runtime: Native AOT needs a matching machine."
+		fi
+	done
+	if [[ ${#buildable[@]} -eq 0 ]]; then
+		echo "Error: none of the runtimes can be Native AOT compiled here." >&2
+		exit 1
+	fi
+	runtimes=("${buildable[@]}")
+	publish_mode_args=(-p:PublishAot=true)
+else
+	publish_mode_args=(
+		-p:PublishSingleFile=true
+		-p:IncludeNativeLibrariesForSelfExtract=true
+	)
+fi
+
 rm -rf "$output_dir"
 mkdir -p "$output_dir"
 
@@ -150,20 +221,31 @@ for runtime in "${runtimes[@]}"; do
 		--self-contained true \
 		--output "$runtime_dir" \
 		-p:Version="$version" \
-		-p:PublishSingleFile=true \
-		-p:IncludeNativeLibrariesForSelfExtract=true \
-		"${extra_publish_args[@]}" \
+		"${publish_mode_args[@]}" \
+		${extra_publish_args[@]+"${extra_publish_args[@]}"} \
 		--nologo \
 		--verbosity minimal
 
 	# Bundle the executable (plus any extras) into an archive named version+RID.
 	if [[ "$runtime" == win-* ]]; then
 		archive="$output_dir/$exe_name-$version-$runtime.zip"
-		(cd "$runtime_dir" && zip -q "$repo_root/$archive" "$exe_name.exe")
+		# Git Bash on Windows (as on GitHub's runners) has no zip; fall back
+		# to 7-Zip, then to PowerShell.
+		if command -v zip > /dev/null; then
+			(cd "$runtime_dir" && zip -q "$repo_root/$archive" "$exe_name.exe")
+		elif command -v 7z > /dev/null; then
+			(cd "$runtime_dir" \
+				&& 7z a -tzip -bso0 "$repo_root/$archive" "$exe_name.exe")
+		else
+			powershell.exe -NoProfile -Command \
+				"Compress-Archive -Path '$runtime_dir/$exe_name.exe' -DestinationPath '$archive'"
+		fi
 	else
 		chmod +x "$runtime_dir/$exe_name"
 		stage_files=("$exe_name")
-		for extra in "${extra_unix_files[@]}"; do
+		# The ${a[@]+...} form keeps an empty array legal under `set -u` in
+		# bash 3.2, which macOS ships.
+		for extra in ${extra_unix_files[@]+"${extra_unix_files[@]}"}; do
 			cp "$extra" "$runtime_dir/"
 			stage_files+=("$(basename "$extra")")
 		done

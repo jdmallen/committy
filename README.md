@@ -20,7 +20,13 @@ automatically when you run `git commit`.
 
 **Prerequisites**
 
-- .NET 11 Runtime or SDK
+- .NET 11 SDK to build. The binary is Native AOT compiled, so running it
+  needs no .NET install. Building also needs the platform's C toolchain:
+  `clang` and `zlib1g-dev` on Debian or Ubuntu, Xcode command line tools on
+  macOS, or Visual Studio's "Desktop development with C++" workload on
+  Windows.
+- Linux release binaries need glibc 2.35 or newer (Ubuntu 22.04, Debian 12,
+  RHEL 9, or later).
 - Git 2.28 or newer
 - Access to one supported LLM provider:
   - **Azure OpenAI** — endpoint, API key, and a deployment name,
@@ -32,11 +38,14 @@ automatically when you run `git commit`.
 
 **1. Build the executable**
 
-Publish a self-contained binary for your platform (output lands in
-`dist/<runtime>/`):
+Publish a native binary for your platform (output lands in
+`dist/<runtime>/`). Native AOT cannot cross-compile between operating systems,
+so the script builds only the runtimes this machine can (on macOS, both
+architectures):
 
 ```bash
-./scripts/publish.sh          # builds linux-x64, win-x64, osx-x64, osx-arm64
+./scripts/publish.sh          # every runtime this machine can build
+./scripts/publish.sh osx-arm64
 ```
 
 Or build a single runtime directly:

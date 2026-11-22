@@ -7,6 +7,12 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Added
+
+- `committy config --no-titles-only` turns titles-only mode back off, and the
+  interactive `committy config` now asks whether titles-only should be the
+  default.
+
 ### Changed
 
 - Provider errors read "provider request failed: ..." instead of "Failed to
@@ -22,6 +28,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   silently ignored.
 - Azure max tokens can be cleared from `committy config` by answering `-`,
   which restores the default.
+- The "Equivalent manual commands" that `committy config` prints quote values
+  containing spaces, so they paste correctly.
 - `repair-hooks` now repairs stale committy hooks in a custom
   `core.hooksPath` directory instead of skipping every repo that sets it.
   Hooks committy did not write are still left alone. The report marks these

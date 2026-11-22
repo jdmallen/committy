@@ -215,7 +215,8 @@ message that you can edit or accept.
 To make titles-only the default, set `COMMITTY_TITLES_ONLY=1` (accepted truthy
 values: `1`, `true`, `yes`, `on`, case-insensitive) or run
 `committy config --titles-only`, which persists `committy.titlesonly=true` in
-git config.
+git config. `committy config --no-titles-only` turns it back off, and the
+interactive `committy config` asks for it too.
 
 ### Manual usage
 

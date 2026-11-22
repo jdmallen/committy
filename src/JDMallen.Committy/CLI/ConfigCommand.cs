@@ -37,6 +37,11 @@ public static class ConfigCommand
 			$"Sign-in for azureidentity auth: {CommittyConfigResolver.AZURE_CREDENTIAL_NAMES} (default interactivebrowser)");
 		Option<bool> titlesOnlyOption =
 			SharedOptions.TitlesOnly("Make titles-only mode the default");
+		var noTitlesOnlyOption = new Option<bool>("--no-titles-only")
+		{
+			Description =
+				"Make full title-and-body messages the default (turns titles-only off)",
+		};
 		var localOption = new Option<bool>("--local")
 		{
 			Description =
@@ -56,6 +61,7 @@ public static class ConfigCommand
 			tenantOption,
 			credentialOption,
 			titlesOnlyOption,
+			noTitlesOnlyOption,
 			localOption,
 		};
 
@@ -72,6 +78,7 @@ public static class ConfigCommand
 						parseResult.GetValue(tenantOption),
 						parseResult.GetValue(credentialOption),
 						parseResult.GetValue(titlesOnlyOption),
+						parseResult.GetValue(noTitlesOnlyOption),
 						!parseResult.GetValue(localOption)),
 					cancellationToken),
 				cancellationToken));
@@ -90,6 +97,12 @@ public static class ConfigCommand
 		{
 			throw new InvalidOperationException(
 				$"'{tenantFlag}' is not a tenant GUID or domain name.");
+		}
+
+		if (flags.TitlesOnly && flags.NoTitlesOnly)
+		{
+			throw new InvalidOperationException(
+				"--titles-only and --no-titles-only cannot be used together.");
 		}
 
 		if (flags.Credential is { } credentialFlag
@@ -259,15 +272,21 @@ public static class ConfigCommand
 				cancellationToken);
 		}
 
-		if (flags.TitlesOnly)
-		{
-			await SetAsync(
-				written,
+		await ApplyFieldAsync(
+			written,
+			new ConfigField(
+				"Titles-only by default, suggesting several titles instead of a full message (y/n)",
 				CommittyConfigResolver.TITLES_ONLY_KEY,
-				"true",
-				flags.Global,
-				cancellationToken);
-		}
+				flags.TitlesOnly
+					? "true"
+					: flags.NoTitlesOnly
+						? "false"
+						: null,
+				"false",
+				CommittyConfigResolver.NormalizeBool,
+				"Please answer y or n."),
+			flags.Global,
+			cancellationToken);
 
 		return provider;
 	}
@@ -376,7 +395,7 @@ public static class ConfigCommand
 			Console.WriteLine(
 				display is null
 					? $"  git config --{scope} --unset {key}"
-					: $"  git config --{scope} {key} {display}");
+					: $"  git config --{scope} {key} {QuoteForShell(display)}");
 		}
 
 		Console.WriteLine(
@@ -392,6 +411,14 @@ public static class ConfigCommand
 	/// <paramref name="current" /> (the stored value in the scope being
 	/// written) as the default.
 	/// </summary>
+	/// <summary>
+	/// <paramref name="value" /> in double quotes when it contains whitespace,
+	/// so a printed command pastes as one argument in POSIX shells,
+	/// PowerShell and cmd alike.
+	/// </summary>
+	private static string QuoteForShell(string value) =>
+		value.Any(char.IsWhiteSpace) ? $"\"{value}\"" : value;
+
 	private static Provider ResolveProvider(string? flag, string? current)
 	{
 		if (flag is not null)
@@ -511,6 +538,7 @@ public static class ConfigCommand
 		string? Tenant,
 		string? Credential,
 		bool TitlesOnly,
+		bool NoTitlesOnly,
 		bool Global);
 
 	/// <summary>

@@ -113,10 +113,11 @@ public class HookInstallerTests
 			Path.GetTempPath(),
 			Path.GetRandomFileName());
 
-		int code = await HookInstaller.InstallAsync(false, missing, output);
+		var exception = await Assert.ThrowsAsync<InvalidOperationException>(
+			() => HookInstaller.InstallAsync(false, missing, output));
 
-		Assert.Equal(1, code);
-		Assert.Contains("does not exist", output.ToString());
+		Assert.Contains("does not exist", exception.Message);
+		Assert.DoesNotContain("Error", output.ToString());
 	}
 
 	[Fact]
@@ -127,10 +128,11 @@ public class HookInstallerTests
 		{
 			var output = new StringWriter();
 
-			int code = await HookInstaller.InstallAsync(false, dir, output);
+			var exception =
+				await Assert.ThrowsAsync<InvalidOperationException>(() =>
+					HookInstaller.InstallAsync(false, dir, output));
 
-			Assert.Equal(1, code);
-			Assert.Contains("Not a valid git repository", output.ToString());
+			Assert.Contains("Not a valid git repository", exception.Message);
 		}
 		finally
 		{
@@ -168,12 +170,13 @@ public class HookInstallerTests
 			string hookPath = await WriteLocalHookAsync(repo, FOREIGN_HOOK);
 			var output = new StringWriter();
 
-			int code = await HookInstaller.InstallAsync(false, repo, output);
+			var exception =
+				await Assert.ThrowsAsync<InvalidOperationException>(() =>
+					HookInstaller.InstallAsync(false, repo, output));
 
-			Assert.Equal(1, code);
 			Assert.Equal(FOREIGN_HOOK, await File.ReadAllTextAsync(hookPath));
 			Assert.False(File.Exists(hookPath + ".bak"));
-			Assert.Contains("--force", output.ToString());
+			Assert.Contains("--force", exception.Message);
 		}
 		finally
 		{
@@ -252,9 +255,9 @@ public class HookInstallerTests
 			string hookPath = await WriteLocalHookAsync(repo, handWritten);
 			var output = new StringWriter();
 
-			int code = await HookInstaller.InstallAsync(false, repo, output);
+			await Assert.ThrowsAsync<InvalidOperationException>(() =>
+				HookInstaller.InstallAsync(false, repo, output));
 
-			Assert.Equal(1, code);
 			Assert.Equal(handWritten, await File.ReadAllTextAsync(hookPath));
 		}
 		finally

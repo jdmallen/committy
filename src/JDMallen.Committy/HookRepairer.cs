@@ -352,11 +352,8 @@ public static class HookRepairer
 				&& gitDirs.Count == 0
 				&& currentRepoRequired)
 			{
-				await output.WriteLineAsync(
-					"Error: not inside a git repository. Run from a repo, or pass --scan <dir> to sweep, --git-dir <dir> for a headless repo, or --global.",
-					cancellationToken);
-
-				return 1;
+				throw new InvalidOperationException(
+					"Not inside a git repository. Run from a repo, or pass --scan <dir> to sweep, --git-dir <dir> for a headless repo, or --global.");
 			}
 
 			await output.WriteLineAsync(

@@ -19,6 +19,9 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   `!` only when users, scripts, or dependent code must change (a removed CLI
   flag, config key, or library API, a changed default or format), not for a
   renamed public method inside an application, a refactor, or a bug fix.
+- `install-hook` and `repair-hooks` report errors (a missing path, not a git
+  repository, a hook committy did not write) on stderr like every other
+  command, instead of on stdout. The exit code is still 1.
 - Provider errors read "provider request failed: ..." instead of "Failed to
   generate commit message suggestions: ...", in both `committy` and the git
   hook's comment.

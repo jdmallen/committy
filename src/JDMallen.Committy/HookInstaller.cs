@@ -95,7 +95,11 @@ public static class HookInstaller
 	/// Replace a hook committy did not write, keeping it as <c>.bak</c>.
 	/// </param>
 	/// <param name="cancellationToken">A token to cancel the operation.</param>
-	/// <returns>0 on success; non-zero on failure.</returns>
+	/// <returns>0 on success.</returns>
+	/// <exception cref="InvalidOperationException">
+	/// The install failed; the message says why. <see cref="CommandErrors" />
+	/// prints it to stderr and exits 1.
+	/// </exception>
 	public static Task<int> InstallAsync(
 		bool global,
 		string? repoPath,
@@ -159,11 +163,8 @@ public static class HookInstaller
 		// such as an unreadable config file.
 		if (current.ExitStatus.ExitCode is not (0 or 1))
 		{
-			await output.WriteLineAsync(
-				$"Error: Could not read {TEMPLATE_DIR_KEY}: {current.StandardError.Trim()}",
-				cancellationToken);
-
-			return 1;
+			throw new InvalidOperationException(
+				$"Could not read {TEMPLATE_DIR_KEY}: {current.StandardError.Trim()}");
 		}
 
 		string existing = current.ExitStatus.ExitCode == 0
@@ -180,14 +181,11 @@ public static class HookInstaller
 				cancellationToken);
 		}
 
-		if (!await WriteHookAsync(
-				Path.Combine(templateDir, "hooks"),
-				force,
-				output,
-				cancellationToken))
-		{
-			return 1;
-		}
+		await WriteHookAsync(
+			Path.Combine(templateDir, "hooks"),
+			force,
+			output,
+			cancellationToken);
 
 		if (existing.Length == 0)
 		{
@@ -198,11 +196,8 @@ public static class HookInstaller
 
 			if (set.ExitStatus.ExitCode != 0)
 			{
-				await output.WriteLineAsync(
-					$"Error: Could not set {TEMPLATE_DIR_KEY}: {set.StandardError.Trim()}",
-					cancellationToken);
-
-				return 1;
+				throw new InvalidOperationException(
+					$"Could not set {TEMPLATE_DIR_KEY}: {set.StandardError.Trim()}");
 			}
 		}
 
@@ -227,22 +222,16 @@ public static class HookInstaller
 
 		if (!Directory.Exists(repo))
 		{
-			await output.WriteLineAsync(
-				$"Error: Repository path does not exist: {repo}",
-				cancellationToken);
-
-			return 1;
+			throw new InvalidOperationException(
+				$"Repository path does not exist: {repo}");
 		}
 
 		string? gitDir = await TryGetGitDirAsync(repo, cancellationToken);
 
 		if (gitDir is null)
 		{
-			await output.WriteLineAsync(
-				$"Error: Not a valid git repository: {repo}",
-				cancellationToken);
-
-			return 1;
+			throw new InvalidOperationException(
+				$"Not a valid git repository: {repo}");
 		}
 
 		if (!Path.IsPathRooted(gitDir))
@@ -267,14 +256,11 @@ public static class HookInstaller
 				cancellationToken);
 		}
 
-		if (!await WriteHookAsync(
-				hooksDir,
-				force,
-				output,
-				cancellationToken))
-		{
-			return 1;
-		}
+		await WriteHookAsync(
+			hooksDir,
+			force,
+			output,
+			cancellationToken);
 
 		await output.WriteLineAsync(
 			"Hook installed for the repository. AI suggestions will appear when you run `git commit`.",
@@ -289,8 +275,11 @@ public static class HookInstaller
 	/// replaced; a foreign one only with <paramref name="force" />. Either way
 	/// the old hook is backed up first (<see cref="BackUpHook" />).
 	/// </summary>
-	/// <returns>False when a foreign hook was left in place.</returns>
-	private static async Task<bool> WriteHookAsync(
+	/// <exception cref="InvalidOperationException">
+	/// A hook committy did not write is there and <paramref name="force" /> is
+	/// false; it is left in place.
+	/// </exception>
+	private static async Task WriteHookAsync(
 		string hooksDir,
 		bool force,
 		TextWriter output,
@@ -309,19 +298,16 @@ public static class HookInstaller
 					$"✓ Hook already up to date: {hookPath}",
 					cancellationToken);
 
-				return true;
+				return;
 			}
 
 			if (!IsCommittyManaged(content))
 			{
 				if (!force)
 				{
-					await output.WriteLineAsync(
-						$"Error: {hookPath} already exists and was not written by committy. "
-						+ "Re-run with --force to replace it; the old hook is backed up first.",
-						cancellationToken);
-
-					return false;
+					throw new InvalidOperationException(
+						$"{hookPath} already exists and was not written by committy. "
+						+ "Re-run with --force to replace it; the old hook is backed up first.");
 				}
 			}
 
@@ -334,8 +320,6 @@ public static class HookInstaller
 		await output.WriteLineAsync(
 			$"✓ Hook installed: {hookPath}",
 			cancellationToken);
-
-		return true;
 	}
 
 	/// <summary>

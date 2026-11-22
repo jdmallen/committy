@@ -53,6 +53,21 @@ public class AzureProviderTests
 		CommittyConfigResolver.NormalizeBool(input));
 
 	[Theory]
+	[InlineData("2048", "2048")]
+	[InlineData(" 300 ", "300")]
+	[InlineData("0", null)]
+	[InlineData("-5", null)]
+	[InlineData("abc", null)]
+	[InlineData("1.5", null)]
+	[InlineData("-", null)]
+	[InlineData(null, null)]
+	public void NormalizePositiveInt_AcceptsOnlyWholeNumbersAboveZero(
+		string? input,
+		string? expected) => Assert.Equal(
+		expected,
+		CommittyConfigResolver.NormalizePositiveInt(input));
+
+	[Theory]
 	[InlineData("2048", 2048)]
 	[InlineData(" 512 ", 512)]
 	[InlineData("0", null)]

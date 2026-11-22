@@ -17,6 +17,11 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   you press Enter on a setting that is not set; the prompt still shows the
   default, and a future change to it reaches you. Settings whose value did not
   change are not rewritten, and the summary lists only what was written.
+- `committy config` asks again when the timeout or a max tokens setting is not
+  a whole number greater than 0, instead of saving a value that was then
+  silently ignored.
+- Azure max tokens can be cleared from `committy config` by answering `-`,
+  which restores the default.
 - `repair-hooks` now repairs stale committy hooks in a custom
   `core.hooksPath` directory instead of skipping every repo that sets it.
   Hooks committy did not write are still left alone. The report marks these

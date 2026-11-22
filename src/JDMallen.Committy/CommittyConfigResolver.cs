@@ -1,3 +1,5 @@
+using System.Globalization;
+
 using JDMallen.Toolbox.AI.Azure;
 
 namespace JDMallen.Committy;
@@ -212,6 +214,15 @@ public static class CommittyConfigResolver
 			"n" or "no" or "false" or "0" or "off" => "false",
 			_                                      => null,
 		};
+
+	/// <summary>
+	/// Reads a whole number greater than zero in git config's canonical form,
+	/// or null when it is not one, so <c>committy config</c> can ask again
+	/// instead of writing a value the resolver would silently ignore.
+	/// </summary>
+	public static string? NormalizePositiveInt(string? value) =>
+		ParseOptionalPositiveInt(value)
+			?.ToString(CultureInfo.InvariantCulture);
 
 	/// <summary>
 	/// Resolves the configuration from CLI overrides, git config (read once,

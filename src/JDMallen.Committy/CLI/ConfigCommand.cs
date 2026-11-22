@@ -15,6 +15,9 @@ namespace JDMallen.Committy;
 /// </summary>
 public static class ConfigCommand
 {
+	private const string POSITIVE_INT_HINT =
+		"Please enter a whole number greater than 0.";
+
 	public static Command Build()
 	{
 		Option<string?> providerOption = SharedOptions.Provider(
@@ -197,13 +200,17 @@ public static class ConfigCommand
 					null,
 					CommittyConfigResolver
 						.DEFAULT_OPEN_AI_TIMEOUT_SECONDS.ToString(
-							CultureInfo.CurrentCulture)),
+							CultureInfo.CurrentCulture),
+					CommittyConfigResolver.NormalizePositiveInt,
+					POSITIVE_INT_HINT),
 				new ConfigField(
 					"OpenAI max tokens",
 					CommittyConfigResolver.OPEN_AI_MAX_TOKENS_KEY,
 					null,
 					CommittyConfigResolver.DEFAULT_OPEN_AI_MAX_TOKENS
-						.ToString(CultureInfo.CurrentCulture)),
+						.ToString(CultureInfo.CurrentCulture),
+					CommittyConfigResolver.NormalizePositiveInt,
+					POSITIVE_INT_HINT),
 			],
 			_ =>
 			[
@@ -224,12 +231,15 @@ public static class ConfigCommand
 					CommittyConfigResolver.NormalizeBool,
 					"Please answer y or n."),
 
-				// Blank keeps the prompt's own budget, or 2048 for a
+				// Unset means the prompt's own budget, or 2048 for a
 				// reasoning deployment.
 				new ConfigField(
-					$"Azure max tokens (blank for the default; {CommittyConfigResolver.DEFAULT_AZURE_REASONING_MAX_TOKENS} for reasoning models)",
+					$"Azure max tokens ('-' for the default: the prompt's own budget, or {CommittyConfigResolver.DEFAULT_AZURE_REASONING_MAX_TOKENS} for reasoning models)",
 					CommittyConfigResolver.AZURE_MAX_TOKENS_KEY,
-					null),
+					null,
+					Normalize: CommittyConfigResolver.NormalizePositiveInt,
+					RetryHint: POSITIVE_INT_HINT,
+					DashUnsets: true),
 				new ConfigField(
 					"Azure auth: apikey, azurecli (Entra ID via az), or azureidentity (Entra ID via browser sign-in)",
 					CommittyConfigResolver.AZURE_AUTH_KEY,
@@ -473,13 +483,19 @@ public static class ConfigCommand
 	/// to read an answer as its canonical value (null when it is not one) and
 	/// what to say before asking again.
 	/// </summary>
+	/// <param name="DashUnsets">
+	/// True when "-" removes the key from this scope, for a field whose
+	/// built-in default can otherwise not be restored from the prompt.
+	/// </param>
 	private sealed record ConfigField(
 		string Label,
 		string Key,
 		string? FlagValue,
 		string? Default = null,
 		Func<string?, string?>? Normalize = null,
-		string? RetryHint = null);
+		string? RetryHint = null,
+		bool DashUnsets = false);
+
 
 	/// <summary>The <c>committy config</c> flags, as parsed.</summary>
 	/// <param name="Global">
@@ -516,6 +532,20 @@ public static class ConfigCommand
 			field.FlagValue,
 			stored,
 			field.Default);
+
+		if (field.DashUnsets && value?.Trim() == "-")
+		{
+			if (stored is not null)
+			{
+				await GitConfigStore.UnsetAsync(
+					field.Key,
+					global,
+					cancellationToken);
+				written.Add((field.Key, null));
+			}
+
+			return;
+		}
 
 		if (value is not null && field.Normalize is { } normalize)
 		{

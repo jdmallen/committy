@@ -33,6 +33,11 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   Arm64 builds need a CPU with LSE atomics. On older CPUs committy exits at
   startup with "The current CPU is missing one or more of the baseline
   instruction sets." Stay on 1.8.0 if that affects you.
+- Faster startup, mostly noticeable on Windows. Committy now reads all of
+  its `committy.*` settings with a single `git config` call instead of one
+  call per setting, and no longer runs a separate git check before reading
+  the staged diff. A commit now starts 2 git processes, where an Azure
+  OpenAI setup used to start more than a dozen.
 - Dropped the CliWrap dependency. Committy now runs git and `az` with .NET
   11's built-in `Process.RunAndCaptureTextAsync`, so there is one fewer
   package to ship and keep up to date.

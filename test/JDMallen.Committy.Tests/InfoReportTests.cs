@@ -22,10 +22,10 @@ public class InfoReportTests
 	{
 		CultureInfo.CurrentCulture = CultureInfo.InvariantCulture;
 		ResolvedConfig resolved =
-			await CommittyConfigResolver.ResolveWithSourcesAsync(
+			CommittyConfigResolver.ResolveWithSources(
 				null,
 				name => _environment.GetValueOrDefault(name),
-				(key, _) => Task.FromResult(_gitConfig.GetValueOrDefault(key)));
+				_gitConfig);
 
 		return InfoReport.Build(
 			"committy 9.9.9",

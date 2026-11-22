@@ -1,3 +1,5 @@
+using System.Text;
+
 using TextCopy;
 
 namespace JDMallen.Committy;
@@ -45,9 +47,12 @@ public static class CommittyService
 				"No input data available. Please pipe git patch data to stdin.");
 		}
 
+		// A piped patch comes from git, which writes UTF-8; the console's code
+		// page (often not UTF-8 on Windows) would garble non-ASCII text. A
+		// UTF-16 byte order mark, as Windows PowerShell can send, still wins.
 		using var reader = new StreamReader(
 			Console.OpenStandardInput(),
-			Console.InputEncoding);
+			Encoding.UTF8);
 
 		return await reader.ReadToEndAsync(cancellationToken)
 			.ConfigureAwait(false);

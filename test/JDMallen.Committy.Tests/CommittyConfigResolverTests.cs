@@ -6,10 +6,13 @@ public class CommittyConfigResolverTests
 	private readonly Dictionary<string, string> _gitConfig = [];
 
 	private Task<CommittyConfig> Resolve(ConfigOverrides? overrides = null) =>
-		CommittyConfigResolver.ResolveAsync(
-			overrides,
-			name => _environment.GetValueOrDefault(name),
-			(key, _) => Task.FromResult(_gitConfig.GetValueOrDefault(key)));
+		Task.FromResult(
+			CommittyConfigResolver.Resolve(
+				overrides,
+				name => _environment.GetValueOrDefault(name),
+				_gitConfig.ToDictionary(
+					entry => entry.Key,
+					entry => new GitConfigValue(entry.Value, null))));
 
 	[Fact]
 	public async Task Settings_GitConfigBeatsEnvironment()
@@ -254,10 +257,10 @@ public class CommittyConfigResolverTests
 		};
 
 		ResolvedConfig resolved =
-			await CommittyConfigResolver.ResolveWithSourcesAsync(
+			CommittyConfigResolver.ResolveWithSources(
 				new ConfigOverrides(TenantId: "flag.com"),
 				_ => null,
-				(key, _) => Task.FromResult(gitConfig.GetValueOrDefault(key)));
+				gitConfig);
 
 		Assert.Equal(
 			"git config --global",

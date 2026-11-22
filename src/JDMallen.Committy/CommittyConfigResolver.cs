@@ -232,35 +232,34 @@ public static class CommittyConfigResolver
 			_                                      => null,
 		};
 
-	public static Task<CommittyConfig> ResolveAsync(
+	/// <summary>
+	/// Resolves the configuration from CLI overrides, git config (read once,
+	/// in a single git process) and the environment.
+	/// </summary>
+	public static async Task<CommittyConfig> ResolveAsync(
 		ConfigOverrides? overrides = null,
 		CancellationToken cancellationToken = default) =>
-		ResolveAsync(
+		Resolve(
 			overrides,
 			Environment.GetEnvironmentVariable,
-			GitConfigStore.GetAsync,
-			cancellationToken);
+			await GitConfigStore.ReadAllAsync(cancellationToken)
+				.ConfigureAwait(false));
 
 	/// <summary>
 	/// Resolves against injected lookups, so tests can supply environment
 	/// variables and git config without touching the real ones.
 	/// </summary>
-	public static Task<CommittyConfig> ResolveAsync(
+	/// <param name="overrides">Per-invocation overrides from CLI flags.</param>
+	/// <param name="getEnvironmentVariable">Reads an environment variable.</param>
+	/// <param name="gitConfig">
+	/// The <c>committy.*</c> git config, as
+	/// <see cref="GitConfigStore.ReadAllAsync" /> returns it.
+	/// </param>
+	public static CommittyConfig Resolve(
 		ConfigOverrides? overrides,
 		Func<string, string?> getEnvironmentVariable,
-		Func<string, CancellationToken, Task<string?>> getGitConfig,
-		CancellationToken cancellationToken = default) =>
-		ResolveAsync(
-			overrides,
-			getEnvironmentVariable,
-			async (key, token) =>
-				await getGitConfig(key, token).ConfigureAwait(false) is
-				{
-				} value
-					? new GitConfigValue(value, null)
-					: null,
-			null,
-			cancellationToken);
+		IReadOnlyDictionary<string, GitConfigValue> gitConfig) =>
+		Resolve(overrides, getEnvironmentVariable, gitConfig, null);
 
 	/// <summary>
 	/// Resolves the configuration as
@@ -268,65 +267,58 @@ public static class CommittyConfigResolver
 	/// and also reports where each setting came from, including the git
 	/// config scope. Run from inside a repository, a local value shows as such.
 	/// </summary>
-	public static Task<ResolvedConfig> ResolveWithSourcesAsync(
+	public static async Task<ResolvedConfig> ResolveWithSourcesAsync(
 		ConfigOverrides? overrides = null,
 		CancellationToken cancellationToken = default) =>
-		ResolveWithSourcesAsync(
+		ResolveWithSources(
 			overrides,
 			Environment.GetEnvironmentVariable,
-			GitConfigStore.GetWithScopeAsync,
-			cancellationToken);
+			await GitConfigStore.ReadAllAsync(cancellationToken)
+				.ConfigureAwait(false));
 
 	/// <summary>
 	/// As
 	/// <see cref="ResolveWithSourcesAsync(ConfigOverrides?, CancellationToken)" />,
 	/// against injected lookups.
 	/// </summary>
-	public static async Task<ResolvedConfig> ResolveWithSourcesAsync(
+	public static ResolvedConfig ResolveWithSources(
 		ConfigOverrides? overrides,
 		Func<string, string?> getEnvironmentVariable,
-		Func<string, CancellationToken, Task<GitConfigValue?>> getGitConfig,
-		CancellationToken cancellationToken = default)
+		IReadOnlyDictionary<string, GitConfigValue> gitConfig)
 	{
 		var sources = new Dictionary<string, ConfigSource>();
-		CommittyConfig config = await ResolveAsync(
-				overrides,
-				getEnvironmentVariable,
-				getGitConfig,
-				sources,
-				cancellationToken)
-			.ConfigureAwait(false);
+		CommittyConfig config = Resolve(
+			overrides,
+			getEnvironmentVariable,
+			gitConfig,
+			sources);
 
 		return new ResolvedConfig(config, sources);
 	}
 
-	/// <param name="getGitConfig"></param>
+	/// <param name="overrides">Per-invocation overrides from CLI flags.</param>
+	/// <param name="getEnvironmentVariable">Reads an environment variable.</param>
+	/// <param name="gitConfig">The <c>committy.*</c> git config.</param>
 	/// <param name="sources">
 	/// When set, receives where each setting came from, keyed by git config
 	/// key.
 	/// </param>
-	/// <param name="overrides"></param>
-	/// <param name="getEnvironmentVariable"></param>
-	/// <param name="cancellationToken"></param>
-	private static async Task<CommittyConfig> ResolveAsync(
+	private static CommittyConfig Resolve(
 		ConfigOverrides? overrides,
 		Func<string, string?> getEnvironmentVariable,
-		Func<string, CancellationToken, Task<GitConfigValue?>> getGitConfig,
-		Dictionary<string, ConfigSource>? sources,
-		CancellationToken cancellationToken)
+		IReadOnlyDictionary<string, GitConfigValue> gitConfig,
+		Dictionary<string, ConfigSource>? sources)
 	{
 		overrides ??= new ConfigOverrides();
 
-		string? providerName = await Setting(
-				overrides.Provider,
-				PROVIDER_KEY,
-				PROVIDER_ENV)
-			.ConfigureAwait(false);
+		string? providerName = Setting(
+			overrides.Provider,
+			PROVIDER_KEY,
+			PROVIDER_ENV);
 		Provider? provider = ParseProvider(providerName);
 
 		bool titlesOnly = IsTruthy(
-			await Setting(null, TITLES_ONLY_KEY, TITLES_ONLY_ENV)
-				.ConfigureAwait(false));
+			Setting(null, TITLES_ONLY_KEY, TITLES_ONLY_ENV));
 
 		return provider switch
 		{
@@ -336,16 +328,14 @@ public static class CommittyConfigResolver
 				TitlesOnly = titlesOnly,
 				Anthropic = new AnthropicConfig
 				{
-					ApiKey = await Key(
-							overrides.ApiKey,
-							ANTHROPIC_API_KEY_ENV,
-							ANTHROPIC_API_KEY_KEY)
-						.ConfigureAwait(false),
-					Model = await Setting(
-								overrides.Model,
-								ANTHROPIC_MODEL_KEY,
-								ANTHROPIC_MODEL_ENV)
-							.ConfigureAwait(false)
+					ApiKey = Key(
+						overrides.ApiKey,
+						ANTHROPIC_API_KEY_ENV,
+						ANTHROPIC_API_KEY_KEY),
+					Model = Setting(
+							overrides.Model,
+							ANTHROPIC_MODEL_KEY,
+							ANTHROPIC_MODEL_ENV)
 						?? DEFAULT_ANTHROPIC_MODEL,
 				},
 			},
@@ -357,53 +347,45 @@ public static class CommittyConfigResolver
 				{
 					// Optional: self-hosted runners generally accept anonymous
 					// requests, so a missing key is not a misconfiguration.
-					ApiKey = await Key(
-							overrides.ApiKey,
-							OPENAI_API_KEY_ENV,
-							OPEN_AI_API_KEY_KEY)
-						.ConfigureAwait(false),
+					ApiKey = Key(
+						overrides.ApiKey,
+						OPENAI_API_KEY_ENV,
+						OPEN_AI_API_KEY_KEY),
 
 					// --endpoint doubles as the base URL; the two mean the same
 					// thing to the user and it keeps the flag surface small.
-					BaseUrl = await Setting(
-							overrides.Endpoint,
-							OPEN_AI_BASE_URL_KEY,
-							OPENAI_BASE_URL_ENV)
-						.ConfigureAwait(false),
-					Model = await Setting(
-								overrides.Model,
-								OPEN_AI_MODEL_KEY,
-								OPENAI_MODEL_ENV)
-							.ConfigureAwait(false)
+					BaseUrl = Setting(
+						overrides.Endpoint,
+						OPEN_AI_BASE_URL_KEY,
+						OPENAI_BASE_URL_ENV),
+					Model = Setting(
+							overrides.Model,
+							OPEN_AI_MODEL_KEY,
+							OPENAI_MODEL_ENV)
 						?? string.Empty,
 					TimeoutSeconds = ParsePositiveInt(
-						await GitOnly(OPEN_AI_TIMEOUT_KEY)
-							.ConfigureAwait(false),
+						GitOnly(OPEN_AI_TIMEOUT_KEY),
 						DEFAULT_OPEN_AI_TIMEOUT_SECONDS),
 					MaxTokens = ParsePositiveInt(
-						await GitOnly(OPEN_AI_MAX_TOKENS_KEY)
-							.ConfigureAwait(false),
+						GitOnly(OPEN_AI_MAX_TOKENS_KEY),
 						DEFAULT_OPEN_AI_MAX_TOKENS),
 				},
 			},
 
 			// An unknown name still resolves as Azure, the default, but is kept
 			// so Validate() reports the typo instead of a missing Azure endpoint.
-			_ => await ResolveAzureAsync(provider is null ? providerName : null)
-				.ConfigureAwait(false),
+			_ => ResolveAzure(provider is null ? providerName : null),
 		};
 
-		async Task<CommittyConfig> ResolveAzureAsync(string? unknownProvider)
+		CommittyConfig ResolveAzure(string? unknownProvider)
 		{
-			string? authName = await FlagOrGit(
-					overrides.AzureAuth,
-					AZURE_AUTH_KEY)
-				.ConfigureAwait(false);
+			string? authName = FlagOrGit(
+				overrides.AzureAuth,
+				AZURE_AUTH_KEY);
 			AzureAuth? auth = ParseAzureAuth(authName);
-			string? credentialName = await FlagOrGit(
-					overrides.AzureCredential,
-					AZURE_CREDENTIAL_KEY)
-				.ConfigureAwait(false);
+			string? credentialName = FlagOrGit(
+				overrides.AzureCredential,
+				AZURE_CREDENTIAL_KEY);
 			AzureCredentialKind? credential =
 				ParseAzureCredential(credentialName);
 
@@ -420,64 +402,56 @@ public static class CommittyConfigResolver
 						?? AzureCredentialKind.InteractiveBrowser,
 					UnknownCredential =
 						credential is null ? credentialName : null,
-					TenantId = await FlagOrGit(
-							overrides.TenantId,
-							AZURE_TENANT_KEY)
-						.ConfigureAwait(false),
-					Scope = await GitOnly(AZURE_SCOPE_KEY)
-						.ConfigureAwait(false),
-					AzPath = await GitOnly(AZURE_AZ_PATH_KEY)
-						.ConfigureAwait(false),
-					ApiKey = await Key(
-							overrides.ApiKey,
-							AZURE_API_KEY_ENV,
-							AZURE_API_KEY_KEY)
-						.ConfigureAwait(false),
-					Endpoint = await Setting(
-							overrides.Endpoint,
-							AZURE_ENDPOINT_KEY,
-							AZURE_ENDPOINT_ENV)
-						.ConfigureAwait(false),
-					Deployment = await Setting(
-								overrides.Deployment,
-								AZURE_DEPLOYMENT_KEY,
-								AZURE_DEPLOYMENT_ENV)
-							.ConfigureAwait(false)
+					TenantId = FlagOrGit(
+						overrides.TenantId,
+						AZURE_TENANT_KEY),
+					Scope = GitOnly(AZURE_SCOPE_KEY),
+					AzPath = GitOnly(AZURE_AZ_PATH_KEY),
+					ApiKey = Key(
+						overrides.ApiKey,
+						AZURE_API_KEY_ENV,
+						AZURE_API_KEY_KEY),
+					Endpoint = Setting(
+						overrides.Endpoint,
+						AZURE_ENDPOINT_KEY,
+						AZURE_ENDPOINT_ENV),
+					Deployment = Setting(
+							overrides.Deployment,
+							AZURE_DEPLOYMENT_KEY,
+							AZURE_DEPLOYMENT_ENV)
 						?? DEFAULT_DEPLOYMENT,
 					ReasoningModel = NormalizeBool(
-							await GitOnly(AZURE_REASONING_MODEL_KEY)
-								.ConfigureAwait(false))
+							GitOnly(AZURE_REASONING_MODEL_KEY))
 						== "true",
 					MaxTokens = ParseOptionalPositiveInt(
-						await GitOnly(AZURE_MAX_TOKENS_KEY)
-							.ConfigureAwait(false)),
+						GitOnly(AZURE_MAX_TOKENS_KEY)),
 				},
 			};
 		}
 
-		async Task<string?> GitOnly(string gitKey) =>
-			await FromGit(gitKey).ConfigureAwait(false)
+		string? GitOnly(string gitKey) =>
+			FromGit(gitKey)
 			?? Default(gitKey);
 
-		async Task<string?> FlagOrGit(string? flag, string gitKey) =>
+		string? FlagOrGit(string? flag, string gitKey) =>
 			FromFlag(flag, gitKey)
-			?? await FromGit(gitKey).ConfigureAwait(false)
+			?? FromGit(gitKey)
 			?? Default(gitKey);
 
 		// API keys: flag, then the environment variable, then git config, so a
 		// secret can live in the shell (or a CI secret) instead of ~/.gitconfig.
-		async Task<string?> Key(string? flag, string envVar, string gitKey) =>
+		string? Key(string? flag, string envVar, string gitKey) =>
 			FromFlag(flag, gitKey)
 			?? FromEnvironment(envVar, gitKey)
-			?? await FromGit(gitKey).ConfigureAwait(false)
+			?? FromGit(gitKey)
 			?? Default(gitKey);
 
 		// Settings: flag, then git config, then the environment variable as a
 		// fallback, so a stray shell export never silently beats `committy config`.
-		async Task<string?> Setting(string? flag, string gitKey, string envVar)
+		string? Setting(string? flag, string gitKey, string envVar)
 			=>
 				FromFlag(flag, gitKey)
-				?? await FromGit(gitKey).ConfigureAwait(false)
+				?? FromGit(gitKey)
 				?? FromEnvironment(envVar, gitKey)
 				?? Default(gitKey);
 
@@ -490,11 +464,9 @@ public static class CommittyConfigResolver
 				gitKey,
 				new ConfigSource(ConfigSourceKind.Environment, envVar));
 
-		async Task<string?> FromGit(string gitKey)
+		string? FromGit(string gitKey)
 		{
-			GitConfigValue? found =
-				await getGitConfig(gitKey, cancellationToken)
-					.ConfigureAwait(false);
+			GitConfigValue? found = gitConfig.GetValueOrDefault(gitKey);
 
 			return Record(
 				NullIfBlank(found?.Value),

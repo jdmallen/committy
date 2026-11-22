@@ -6,10 +6,11 @@ public class ConfigSourceTests
 	private readonly Dictionary<string, GitConfigValue> _gitConfig = [];
 
 	private Task<ResolvedConfig> Resolve(ConfigOverrides? overrides = null) =>
-		CommittyConfigResolver.ResolveWithSourcesAsync(
-			overrides,
-			name => _environment.GetValueOrDefault(name),
-			(key, _) => Task.FromResult(_gitConfig.GetValueOrDefault(key)));
+		Task.FromResult(
+			CommittyConfigResolver.ResolveWithSources(
+				overrides,
+				name => _environment.GetValueOrDefault(name),
+				_gitConfig));
 
 	[Fact]
 	public async Task Sources_NameTheGitScopeTheEnvironmentAndDefaults()
@@ -59,24 +60,67 @@ public class ConfigSourceTests
 			Source(resolved, CommittyConfigResolver.PROVIDER_KEY));
 	}
 
-	[Theory]
-	[InlineData("local\tanthropic\n", "anthropic", "local")]
-	[InlineData(
-		"global\thttp://host:8080/v1\n",
-		"http://host:8080/v1",
-		"global")]
-	[InlineData("anthropic\n", "anthropic", null)]
-	public void ParseScopedValue_SplitsScopeFromValue(
-		string output,
-		string value,
-		string? scope) =>
+	[Fact]
+	public void ParseAll_ReadsScopeKeyAndValue()
+	{
+		IReadOnlyDictionary<string, GitConfigValue> values =
+			GitConfigStore.ParseAll(
+				"global\0committy.openai.baseurl\nhttp://host:8080/v1\0");
+
 		Assert.Equal(
-			new GitConfigValue(value, scope),
-			GitConfigStore.ParseScopedValue(output));
+			new GitConfigValue("http://host:8080/v1", "global"),
+			values[CommittyConfigResolver.OPEN_AI_BASE_URL_KEY]);
+	}
 
 	[Fact]
-	public void ParseScopedValue_BlankValueIsNull() =>
-		Assert.Null(GitConfigStore.ParseScopedValue("local\t\n"));
+	public void ParseAll_LaterScopeWins()
+	{
+		IReadOnlyDictionary<string, GitConfigValue> values =
+			GitConfigStore.ParseAll(
+				"global\0committy.provider\nopenai\0"
+				+ "local\0committy.provider\nanthropic\0");
+
+		Assert.Equal(
+			new GitConfigValue("anthropic", "local"),
+			values[CommittyConfigResolver.PROVIDER_KEY]);
+	}
+
+	[Fact]
+	public void ParseAll_KeepsNewlinesInsideAValue()
+	{
+		IReadOnlyDictionary<string, GitConfigValue> values =
+			GitConfigStore.ParseAll(
+				"local\0committy.openai.model\nline1\nline2\0");
+
+		Assert.Equal(
+			"line1\nline2",
+			values[CommittyConfigResolver.OPEN_AI_MODEL_KEY].Value);
+	}
+
+	[Fact]
+	public void ParseAll_KeyWithoutValueIsEmpty()
+	{
+		IReadOnlyDictionary<string, GitConfigValue> values =
+			GitConfigStore.ParseAll("local\0committy.titlesonly\0");
+
+		Assert.Equal(
+			string.Empty,
+			values[CommittyConfigResolver.TITLES_ONLY_KEY].Value);
+	}
+
+	[Fact]
+	public void ParseAll_KeysAreCaseInsensitive()
+	{
+		IReadOnlyDictionary<string, GitConfigValue> values =
+			GitConfigStore.ParseAll("global\0committy.azure.apiKey\nk\0");
+
+		Assert.True(
+			values.ContainsKey(CommittyConfigResolver.AZURE_API_KEY_KEY));
+	}
+
+	[Fact]
+	public void ParseAll_EmptyOutputIsEmpty() =>
+		Assert.Empty(GitConfigStore.ParseAll(string.Empty));
 
 	[Theory]
 	[InlineData("worktree", "git config --worktree")]

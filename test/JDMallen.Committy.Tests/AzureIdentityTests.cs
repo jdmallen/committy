@@ -9,10 +9,13 @@ public class AzureIdentityTests
 	private readonly Dictionary<string, string> _gitConfig = [];
 
 	private Task<CommittyConfig> Resolve(ConfigOverrides? overrides = null) =>
-		CommittyConfigResolver.ResolveAsync(
-			overrides,
-			_ => null,
-			(key, _) => Task.FromResult(_gitConfig.GetValueOrDefault(key)));
+		Task.FromResult(
+			CommittyConfigResolver.Resolve(
+				overrides,
+				_ => null,
+				_gitConfig.ToDictionary(
+					entry => entry.Key,
+					entry => new GitConfigValue(entry.Value, null))));
 
 	private static AzureConfig IdentityConfig(
 		AzureCredentialKind credential = AzureCredentialKind.InteractiveBrowser,

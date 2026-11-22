@@ -32,32 +32,54 @@ public static class GitConfigStore
 	}
 
 	/// <summary>
-	/// As <see cref="GetAsync" />, but also says which scope (local, global,
-	/// system, worktree or command) the winning value came from.
+	/// Every <c>committy.*</c> setting git can see from here, keyed by name
+	/// (case-insensitive), with the scope each value came from. One process
+	/// instead of one per key. When a key is set in more than one scope, the
+	/// value that <c>git config --get</c> would return wins.
 	/// </summary>
-	public static async Task<GitConfigValue?> GetWithScopeAsync(
-		string key,
-		CancellationToken cancellationToken = default)
+	public static async Task<IReadOnlyDictionary<string, GitConfigValue>>
+		ReadAllAsync(CancellationToken cancellationToken = default)
 	{
 		ProcessTextOutput result = await Git.RunAsync(
-				["config", "--show-scope", "--get", key],
+				[
+					"config", "--show-scope", "--null", "--get-regexp",
+					@"^committy\.",
+				],
 				cancellationToken)
 			.ConfigureAwait(false);
 
+		// Exit code 1 means no committy keys are set. Any other failure (such
+		// as an unreadable config file) reads as "nothing set", as --get does.
 		return result.ExitStatus.ExitCode == 0
-			? ParseScopedValue(result.StandardOutput)
-			: null;
+			? ParseAll(result.StandardOutput)
+			: new Dictionary<string, GitConfigValue>(
+				StringComparer.OrdinalIgnoreCase);
 	}
 
-	/// <summary>Parses <c>--show-scope</c> output: "scope\tvalue".</summary>
-	public static GitConfigValue? ParseScopedValue(string output)
+	/// <summary>
+	/// Parses <c>git config --show-scope --null --get-regexp</c> output: a
+	/// repeating "scope\0key\nvalue\0", where the value may itself contain
+	/// newlines and a key set with no <c>=</c> has no "\nvalue" at all. git
+	/// lists scopes from system to command, so a later entry wins.
+	/// </summary>
+	public static IReadOnlyDictionary<string, GitConfigValue> ParseAll(
+		string output)
 	{
-		string line = output.TrimEnd('\r', '\n');
-		int tab = line.IndexOf('\t');
-		string? scope = tab < 0 ? null : line[..tab];
-		string value = (tab < 0 ? line : line[(tab + 1)..]).Trim();
+		var values = new Dictionary<string, GitConfigValue>(
+			StringComparer.OrdinalIgnoreCase);
+		string[] fields = output.Split('\0');
 
-		return value.Length == 0 ? null : new GitConfigValue(value, scope);
+		for (int index = 0; index + 1 < fields.Length; index += 2)
+		{
+			string scope = fields[index];
+			string entry = fields[index + 1];
+			int newline = entry.IndexOf('\n');
+			string key = newline < 0 ? entry : entry[..newline];
+			string value = newline < 0 ? string.Empty : entry[(newline + 1)..];
+			values[key] = new GitConfigValue(value, scope);
+		}
+
+		return values;
 	}
 
 	public static async Task SetAsync(

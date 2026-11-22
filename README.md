@@ -44,14 +44,8 @@ so the script builds only the runtimes this machine can (on macOS, both
 architectures):
 
 ```bash
-./scripts/publish.sh          # every runtime this machine can build
-./scripts/publish.sh osx-arm64
-```
-
-Or build a single runtime directly:
-
-```bash
-dotnet publish -c Release -r linux-x64 -o ./dist/linux-x64
+./scripts/publish.sh            # every runtime this machine can build
+./scripts/publish.sh linux-x64  # or just one runtime
 ```
 
 **2. Put `committy` on your `PATH`**

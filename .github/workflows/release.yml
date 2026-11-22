@@ -29,8 +29,18 @@ on:
         type: boolean
         default: false
 
+# Read-only by default; only the release job, which creates the tag and the
+# GitHub release, can write.
 permissions:
-  contents: write
+  contents: read
+
+# One release run per branch at a time. Two quick pushes that bump the version
+# would otherwise race, and the second would fail at `gh release create`
+# because the tag exists. Queued, not cancelled, so a started release always
+# finishes.
+concurrency:
+  group: release-${{ github.ref }}
+  cancel-in-progress: false
 
 jobs:
   check:
@@ -40,7 +50,7 @@ jobs:
       build: ${{ steps.tag_check.outputs.build }}
     steps:
       - name: Check out repository
-        uses: actions/checkout@v7
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
 
       - name: Read version from Directory.Build.props
         id: version
@@ -72,7 +82,7 @@ jobs:
 
       - name: Set up .NET SDK
         if: steps.tag_check.outputs.build == 'true'
-        uses: actions/setup-dotnet@v6
+        uses: actions/setup-dotnet@0f4a354dd5547a28c70b7853dbd95d5b67886e73 # v6.1.0
         with:
           global-json-file: global.json
 
@@ -101,10 +111,10 @@ jobs:
     runs-on: ${{ matrix.runner }}
     steps:
       - name: Check out repository
-        uses: actions/checkout@v7
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
 
       - name: Set up .NET SDK
-        uses: actions/setup-dotnet@v6
+        uses: actions/setup-dotnet@0f4a354dd5547a28c70b7853dbd95d5b67886e73 # v6.1.0
         with:
           global-json-file: global.json
 
@@ -117,7 +127,7 @@ jobs:
         run: ./scripts/publish.sh ${{ matrix.runtimes }}
 
       - name: Upload archives
-        uses: actions/upload-artifact@v7
+        uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
         with:
           name: archives-${{ matrix.runner }}
           path: |
@@ -132,12 +142,14 @@ jobs:
     needs: [ check, build ]
     if: ${{ !inputs.build_only && github.ref == 'refs/heads/main' }}
     runs-on: ubuntu-latest
+    permissions:
+      contents: write
     steps:
       - name: Check out repository
-        uses: actions/checkout@v7
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
 
       - name: Download archives
-        uses: actions/download-artifact@v8
+        uses: actions/download-artifact@9000827ccba6bdab643e8b6fd33ac0654aef8333 # v8.0.2
         with:
           pattern: archives-*
           path: dist

@@ -11,6 +11,11 @@
 # tests and builds so a failed run never leaves a dangling tag.)
 # If the version's tag already exists, the run is a no-op, so routine merges
 # that don't bump <Version> never re-release.
+#
+# Build only: `gh workflow run release.yml --ref <branch> -f build_only=true`
+# runs the tests and builds every archive (attached to the run as artifacts
+# for 7 days) whether or not the version is tagged, and never tags or
+# releases. Releases only ever come from main.
 name: Release
 
 on:
@@ -18,6 +23,11 @@ on:
     branches:
       - main
   workflow_dispatch:
+    inputs:
+      build_only:
+        description: Build the archives as run artifacts; don't tag or release
+        type: boolean
+        default: false
 
 permissions:
   contents: write
@@ -27,7 +37,7 @@ jobs:
     runs-on: ubuntu-latest
     outputs:
       version: ${{ steps.version.outputs.version }}
-      exists: ${{ steps.tag_check.outputs.exists }}
+      build: ${{ steps.tag_check.outputs.build }}
     steps:
       - name: Check out repository
         uses: actions/checkout@v7
@@ -44,26 +54,30 @@ jobs:
           echo "version=$version" >> "$GITHUB_OUTPUT"
           echo "Version: $version"
 
-      - name: Skip if tag already exists
+      - name: Decide whether to build
         id: tag_check
         env:
           VERSION: ${{ steps.version.outputs.version }}
+          BUILD_ONLY: ${{ inputs.build_only }}
         run: |
-          if git ls-remote --exit-code --tags origin "refs/tags/$VERSION" > /dev/null; then
+          if [[ "$BUILD_ONLY" == "true" ]]; then
+            echo "Build only: archives become run artifacts; no release."
+            echo "build=true" >> "$GITHUB_OUTPUT"
+          elif git ls-remote --exit-code --tags origin "refs/tags/$VERSION" > /dev/null; then
             echo "Tag $VERSION already exists; skipping release."
-            echo "exists=true" >> "$GITHUB_OUTPUT"
+            echo "build=false" >> "$GITHUB_OUTPUT"
           else
-            echo "exists=false" >> "$GITHUB_OUTPUT"
+            echo "build=true" >> "$GITHUB_OUTPUT"
           fi
 
       - name: Set up .NET SDK
-        if: steps.tag_check.outputs.exists == 'false'
+        if: steps.tag_check.outputs.build == 'true'
         uses: actions/setup-dotnet@v6
         with:
           global-json-file: global.json
 
       - name: Run tests
-        if: steps.tag_check.outputs.exists == 'false'
+        if: steps.tag_check.outputs.build == 'true'
         run: dotnet test --configuration Release
 
   # The Linux builds run on ubuntu-22.04 on purpose: an AOT binary needs at
@@ -71,7 +85,7 @@ jobs:
   # oldest distro users can run. Don't move them to ubuntu-latest.
   build:
     needs: check
-    if: needs.check.outputs.exists == 'false'
+    if: needs.check.outputs.build == 'true'
     strategy:
       fail-fast: true
       matrix:
@@ -110,9 +124,13 @@ jobs:
             dist/*.tar.gz
             dist/*.zip
           if-no-files-found: error
+          retention-days: ${{ inputs.build_only && 7 || 90 }}
 
+  # Skipped for a build-only run, and anywhere but main, so a manual run on
+  # another branch can never tag or release it.
   release:
     needs: [check, build]
+    if: ${{ !inputs.build_only && github.ref == 'refs/heads/main' }}
     runs-on: ubuntu-latest
     steps:
       - name: Check out repository

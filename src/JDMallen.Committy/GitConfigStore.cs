@@ -11,12 +11,28 @@ namespace JDMallen.Committy;
 /// </summary>
 public static class GitConfigStore
 {
+	/// <summary>One setting's value, or null when it is not set.</summary>
+	/// <param name="key">The git config key.</param>
+	/// <param name="global">
+	/// True to read only the global config, false for only the repository's
+	/// (<c>--local</c>), null for the value in effect here (local over global
+	/// over system). <c>committy config</c> reads the scope it is about to
+	/// write, so a value from another scope is never copied across.
+	/// </param>
+	/// <param name="cancellationToken">Cancels the git run.</param>
 	public static async Task<string?> GetAsync(
 		string key,
+		bool? global = null,
 		CancellationToken cancellationToken = default)
 	{
+		string[] arguments = global switch
+		{
+			true  => ["config", "--global", "--get", key],
+			false => ["config", "--local", "--get", key],
+			null  => ["config", "--get", key],
+		};
 		ProcessTextOutput result = await Git.RunAsync(
-			["config", "--get", key],
+			arguments,
 			cancellationToken);
 
 		if (result.ExitStatus.ExitCode != 0)

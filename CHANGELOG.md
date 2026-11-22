@@ -20,6 +20,11 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Fixed
 
+- `committy config` shows current values from the scope it writes to. Before,
+  `committy config --local` offered the global values and pressing Enter
+  copied them into the repository, where they shadowed later global changes;
+  plain `committy config` inside a repository did the reverse, copying local
+  overrides into the global config.
 - `repair-hooks --scan` no longer stops at the first repo whose hook it cannot
   read or write. That repo is reported as an error, the sweep continues, and
   the command exits 1 when any repo failed (it used to exit 0).

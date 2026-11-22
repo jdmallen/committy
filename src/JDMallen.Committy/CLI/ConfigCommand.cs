@@ -106,6 +106,7 @@ public static class ConfigCommand
 			? CommittyConfigResolver.ParseAzureAuth(
 				await GitConfigStore.GetAsync(
 					CommittyConfigResolver.AZURE_AUTH_KEY,
+					flags.Global,
 					cancellationToken))
 			: null;
 		bool usesAzureCli = azureAuth == AzureAuth.AzureCli;
@@ -152,6 +153,7 @@ public static class ConfigCommand
 	{
 		Provider provider = await ResolveProviderAsync(
 			flags.Provider,
+			flags.Global,
 			cancellationToken);
 
 		await SetAsync(
@@ -308,7 +310,7 @@ public static class ConfigCommand
 		};
 		string? storedGitKey = await GitConfigStore.GetAsync(
 			apiKeyGitKey,
-			cancellationToken) is null
+			cancellationToken: cancellationToken) is null
 			? null
 			: apiKeyGitKey;
 		var apiKeySetup = new ApiKeySetup(
@@ -369,6 +371,7 @@ public static class ConfigCommand
 
 	private static async Task<Provider> ResolveProviderAsync(
 		string? flag,
+		bool global,
 		CancellationToken cancellationToken)
 	{
 		if (flag is not null)
@@ -379,6 +382,7 @@ public static class ConfigCommand
 
 		string? current = await GitConfigStore.GetAsync(
 			CommittyConfigResolver.PROVIDER_KEY,
+			global,
 			cancellationToken);
 		Provider? currentProvider =
 			CommittyConfigResolver.ParseProvider(current);
@@ -498,7 +502,7 @@ public static class ConfigCommand
 		CancellationToken cancellationToken)
 	{
 		string? current =
-			await GitConfigStore.GetAsync(field.Key, cancellationToken)
+			await GitConfigStore.GetAsync(field.Key, global, cancellationToken)
 			?? field.Default;
 		string? value = ConsolePrompts.Prompt(
 			field.Label,
@@ -561,6 +565,7 @@ public static class ConfigCommand
 			: "Azure tenant ID or domain (blank keeps; '-' for az's current tenant)";
 		string? current = await GitConfigStore.GetAsync(
 			CommittyConfigResolver.AZURE_TENANT_KEY,
+			global,
 			cancellationToken);
 		string? offered = current
 			?? (azureIdentity

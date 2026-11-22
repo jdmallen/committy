@@ -18,7 +18,6 @@
 		<PackageReference Include="System.CommandLine" Version="2.0.1"/>
 		<PackageReference Include="TextCopy" Version="6.2.1"/>
 		<PackageReference Include="Microsoft.Extensions.Http" Version="10.0.1"/>
-		<PackageReference Include="CliWrap" Version="3.10.0"/>
 		<PackageReference Include="JDMallen.Toolbox.AI" Version="4.6.0"/>
 		<PackageReference Include="JDMallen.Toolbox.AI.Azure" Version="4.6.0"/>
 	</ItemGroup>

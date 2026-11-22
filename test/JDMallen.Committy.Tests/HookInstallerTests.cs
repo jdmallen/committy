@@ -1,5 +1,4 @@
-using CliWrap;
-using CliWrap.Buffered;
+using System.Diagnostics;
 
 namespace JDMallen.Committy.Tests;
 
@@ -20,9 +19,11 @@ public class HookInstallerTests
 		// "--template=" (empty) opts out of any global init.templateDir, so a developer
 		// machine with its own committy template installed doesn't pollute these repos
 		// with a pre-existing hook before HookInstaller ever runs.
-		await Cli.Wrap("git")
-			.WithArguments(["-C", repo, "init", "--template="])
-			.ExecuteBufferedAsync();
+		await TestGit.RunAsync(
+			"-C",
+			repo,
+			"init",
+			"--template=");
 
 	[Fact]
 	public async Task InstallAsync_LocalRepo_WritesTrampolineHook()
@@ -71,10 +72,12 @@ public class HookInstallerTests
 			string customHooksDir = Path.Combine(repo, ".githooks");
 			Directory.CreateDirectory(customHooksDir);
 
-			await Cli.Wrap("git")
-				.WithArguments(
-					["-C", repo, "config", "core.hooksPath", ".githooks"])
-				.ExecuteBufferedAsync();
+			await TestGit.RunAsync(
+				"-C",
+				repo,
+				"config",
+				"core.hooksPath",
+				".githooks");
 
 			var output = new StringWriter();
 
@@ -261,13 +264,12 @@ public class HookInstallerTests
 	private static async Task<string?> GetGlobalTemplateDirAsync(
 		string configFile)
 	{
-		BufferedCommandResult result = await Cli.Wrap("git")
-			.WithArguments(
-				["config", "--file", configFile, "--get", "init.templateDir"])
-			.WithValidation(CommandResultValidation.None)
-			.ExecuteBufferedAsync();
+		ProcessTextOutput result = await Git.RunAsync(
+			["config", "--file", configFile, "--get", "init.templateDir"]);
 
-		return result.ExitCode == 0 ? result.StandardOutput.Trim() : null;
+		return result.ExitStatus.ExitCode == 0
+			? result.StandardOutput.Trim()
+			: null;
 	}
 
 	[Fact]

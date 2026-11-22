@@ -1,5 +1,4 @@
-using CliWrap;
-using CliWrap.Buffered;
+using System.Diagnostics;
 
 namespace JDMallen.Committy;
 
@@ -122,13 +121,12 @@ public static class HookRepairer
 		string path,
 		CancellationToken cancellationToken)
 	{
-		BufferedCommandResult result = await Cli.Wrap("git")
-			.WithArguments(["-C", path, "rev-parse", "--git-dir"])
-			.WithValidation(CommandResultValidation.None)
-			.ExecuteBufferedAsync(cancellationToken)
+		ProcessTextOutput result = await Git.RunAsync(
+				["-C", path, "rev-parse", "--git-dir"],
+				cancellationToken)
 			.ConfigureAwait(false);
 
-		return result.ExitCode == 0;
+		return result.ExitStatus.ExitCode == 0;
 	}
 
 	private static IEnumerable<string> FindRepos(string root)
@@ -171,15 +169,14 @@ public static class HookRepairer
 		string key,
 		CancellationToken cancellationToken)
 	{
-		BufferedCommandResult result = await Cli.Wrap("git")
-			.WithArguments(["-C", repo, "config", "--get", key])
-			.WithValidation(CommandResultValidation.None)
-			.ExecuteBufferedAsync(cancellationToken)
+		ProcessTextOutput result = await Git.RunAsync(
+				["-C", repo, "config", "--get", key],
+				cancellationToken)
 			.ConfigureAwait(false);
 
 		string value = result.StandardOutput.Trim();
 
-		return result.ExitCode == 0 && !string.IsNullOrEmpty(value)
+		return result.ExitStatus.ExitCode == 0 && !string.IsNullOrEmpty(value)
 			? value
 			: null;
 	}
@@ -188,13 +185,12 @@ public static class HookRepairer
 		string dir,
 		CancellationToken cancellationToken)
 	{
-		BufferedCommandResult result = await Cli.Wrap("git")
-			.WithArguments(["-C", dir, "rev-parse", "--show-toplevel"])
-			.WithValidation(CommandResultValidation.None)
-			.ExecuteBufferedAsync(cancellationToken)
+		ProcessTextOutput result = await Git.RunAsync(
+				["-C", dir, "rev-parse", "--show-toplevel"],
+				cancellationToken)
 			.ConfigureAwait(false);
 
-		return result.ExitCode == 0
+		return result.ExitStatus.ExitCode == 0
 			&& !string.IsNullOrWhiteSpace(result.StandardOutput)
 				? result.StandardOutput.Trim()
 				: null;

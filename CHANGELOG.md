@@ -33,6 +33,9 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   Arm64 builds need a CPU with LSE atomics. On older CPUs committy exits at
   startup with "The current CPU is missing one or more of the baseline
   instruction sets." Stay on 1.8.0 if that affects you.
+- Dropped the CliWrap dependency. Committy now runs git and `az` with .NET
+  11's built-in `Process.RunAndCaptureTextAsync`, so there is one fewer
+  package to ship and keep up to date.
 
 ### Fixed
 
@@ -45,6 +48,10 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   `diff.noprefix`, `diff.mnemonicPrefix`, `diff.external`, `color.diff` and
   `diff.relative` no longer break the file list, send color codes or another
   tool's output to the model, or hide files outside the current directory.
+- Git output is now always read as UTF-8, rather than in the console's code
+  page, so non-ASCII text in a staged diff (accented letters, CJK, emoji)
+  reaches the model intact. This mainly affected Windows. If git isn't
+  installed or isn't on `PATH`, committy now says so plainly.
 - Running committy with an empty redirected stdin (from a GUI client, a CI
   step, or `< /dev/null`) now falls back to the staged diff, as the `--no-git`
   help describes, instead of failing with "No patch data available".

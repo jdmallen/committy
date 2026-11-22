@@ -1,6 +1,3 @@
-using CliWrap;
-using CliWrap.Buffered;
-
 namespace JDMallen.Committy.Tests;
 
 public class HookRepairerTests
@@ -31,9 +28,11 @@ public class HookRepairerTests
 		// pre-populate prepare-commit-msg; each test controls the hook state itself.
 		string emptyTemplate = Path.Combine(dir, ".empty-template");
 		Directory.CreateDirectory(emptyTemplate);
-		await Cli.Wrap("git")
-			.WithArguments(["-C", dir, "init", $"--template={emptyTemplate}"])
-			.ExecuteBufferedAsync();
+		await TestGit.RunAsync(
+			"-C",
+			dir,
+			"init",
+			$"--template={emptyTemplate}");
 
 		return dir;
 	}
@@ -53,13 +52,12 @@ public class HookRepairerTests
 
 		string emptyTemplate = Path.Combine(root, ".empty-template");
 		Directory.CreateDirectory(emptyTemplate);
-		await Cli.Wrap("git")
-			.WithArguments(
-			[
-				"-C", workTree, "init", $"--separate-git-dir={gitDir}",
-				$"--template={emptyTemplate}",
-			])
-			.ExecuteBufferedAsync();
+		await TestGit.RunAsync(
+			"-C",
+			workTree,
+			"init",
+			$"--separate-git-dir={gitDir}",
+			$"--template={emptyTemplate}");
 
 		return gitDir;
 	}

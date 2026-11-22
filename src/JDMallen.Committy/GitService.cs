@@ -1,5 +1,4 @@
-using CliWrap;
-using CliWrap.Buffered;
+using System.Diagnostics;
 
 namespace JDMallen.Committy;
 
@@ -40,13 +39,12 @@ public static class GitService
 		await EnsureInsideWorkTreeAsync(cancellationToken)
 			.ConfigureAwait(false);
 
-		BufferedCommandResult result = await Cli.Wrap("git")
-			.WithArguments(StagedDiffArguments)
-			.WithValidation(CommandResultValidation.None)
-			.ExecuteBufferedAsync(cancellationToken)
+		ProcessTextOutput result = await Git.RunAsync(
+				StagedDiffArguments,
+				cancellationToken)
 			.ConfigureAwait(false);
 
-		if (result.ExitCode != 0)
+		if (result.ExitStatus.ExitCode != 0)
 		{
 			throw new InvalidOperationException(
 				$"Git diff failed: {result.StandardError}");
@@ -69,13 +67,12 @@ public static class GitService
 		foreach (string flag in (string[])
 				 ["--show-toplevel", "--absolute-git-dir"])
 		{
-			BufferedCommandResult result = await Cli.Wrap("git")
-				.WithArguments(["rev-parse", flag])
-				.WithValidation(CommandResultValidation.None)
-				.ExecuteBufferedAsync(cancellationToken)
+			ProcessTextOutput result = await Git.RunAsync(
+					["rev-parse", flag],
+					cancellationToken)
 				.ConfigureAwait(false);
 			string path = result.StandardOutput.Trim();
-			if (result.ExitCode == 0 && path.Length > 0)
+			if (result.ExitStatus.ExitCode == 0 && path.Length > 0)
 			{
 				return path;
 			}
@@ -91,13 +88,12 @@ public static class GitService
 	private static async Task EnsureInsideWorkTreeAsync(
 		CancellationToken cancellationToken)
 	{
-		BufferedCommandResult result = await Cli.Wrap("git")
-			.WithArguments(["rev-parse", "--is-inside-work-tree"])
-			.WithValidation(CommandResultValidation.None)
-			.ExecuteBufferedAsync(cancellationToken)
+		ProcessTextOutput result = await Git.RunAsync(
+				["rev-parse", "--is-inside-work-tree"],
+				cancellationToken)
 			.ConfigureAwait(false);
 
-		if (result.ExitCode != 0
+		if (result.ExitStatus.ExitCode != 0
 			|| !result.StandardOutput.Trim()
 				.Equals("true", StringComparison.OrdinalIgnoreCase))
 		{

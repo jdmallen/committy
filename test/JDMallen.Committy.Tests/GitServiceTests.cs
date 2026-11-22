@@ -1,6 +1,3 @@
-using CliWrap;
-using CliWrap.Buffered;
-
 namespace JDMallen.Committy.Tests;
 
 // GitService runs `git diff --cached` in the process working directory, so these tests
@@ -30,10 +27,11 @@ public class GitServiceTests
 			// Empty template so a globally-configured hook template doesn't add noise.
 			string emptyTemplate = Path.Combine(repo, ".empty-template");
 			Directory.CreateDirectory(emptyTemplate);
-			await Cli.Wrap("git")
-				.WithArguments(
-					["-C", repo, "init", $"--template={emptyTemplate}"])
-				.ExecuteBufferedAsync();
+			await TestGit.RunAsync(
+				"-C",
+				repo,
+				"init",
+				$"--template={emptyTemplate}");
 
 			Directory.SetCurrentDirectory(repo);
 			await body(repo);
@@ -59,9 +57,11 @@ public class GitServiceTests
 		string content)
 	{
 		await File.WriteAllTextAsync(Path.Combine(repo, name), content);
-		await Cli.Wrap("git")
-			.WithArguments(["-C", repo, "add", name])
-			.ExecuteBufferedAsync();
+		await TestGit.RunAsync(
+			"-C",
+			repo,
+			"add",
+			name);
 	}
 
 	/// <summary>
@@ -161,9 +161,12 @@ public class GitServiceTests
 		string repo,
 		string key,
 		string value) =>
-		await Cli.Wrap("git")
-			.WithArguments(["-C", repo, "config", key, value])
-			.ExecuteBufferedAsync();
+		await TestGit.RunAsync(
+			"-C",
+			repo,
+			"config",
+			key,
+			value);
 
 	[Fact]
 	public async Task TryGetStagedDiffAsync_IgnoresUserDiffFormatConfig()
@@ -198,5 +201,18 @@ public class GitServiceTests
 
 			Assert.NotNull(diff);
 			Assert.Contains("diff --git a/root.txt b/root.txt", diff);
+		});
+
+	[Fact]
+	public async Task TryGetStagedDiffAsync_DecodesNonAsciiAsUtf8()
+		=> await InRepoAsync(async repo =>
+		{
+			await StageFileAsync(repo, "notes.txt", "café, naïve, 日本語\n");
+
+			string? diff =
+				await GitService.TryGetStagedDiffAsync(CancellationToken.None);
+
+			Assert.NotNull(diff);
+			Assert.Contains("café, naïve, 日本語", diff);
 		});
 }

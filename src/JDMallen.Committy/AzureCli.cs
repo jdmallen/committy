@@ -1,7 +1,5 @@
+using System.Diagnostics;
 using System.Text.Json;
-
-using CliWrap;
-using CliWrap.Buffered;
 
 namespace JDMallen.Committy;
 
@@ -135,17 +133,18 @@ public static class AzureCli
 
 		try
 		{
-			BufferedCommandResult result = await Cli.Wrap(
-					viaCommandShell ? "cmd.exe" : az)
-				.WithArguments(
-					viaCommandShell
-						? ["/d", "/c", az, .. arguments]
-						: arguments)
-				.WithValidation(CommandResultValidation.None)
-				.ExecuteBufferedAsync(timeout.Token)
+			ProcessTextOutput result = await Process.RunAndCaptureTextAsync(
+					Git.CaptureStartInfo(
+						viaCommandShell ? "cmd.exe" : az,
+						viaCommandShell
+							? ["/d", "/c", az, .. arguments]
+							: arguments),
+					timeout.Token)
 				.ConfigureAwait(false);
 
-			return result.ExitCode == 0 ? result.StandardOutput : null;
+			return result.ExitStatus.ExitCode == 0
+				? result.StandardOutput
+				: null;
 		}
 		catch (OperationCanceledException)
 			when (!cancellationToken.IsCancellationRequested)

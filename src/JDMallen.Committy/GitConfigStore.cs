@@ -1,5 +1,4 @@
-using CliWrap;
-using CliWrap.Buffered;
+using System.Diagnostics;
 
 namespace JDMallen.Committy;
 
@@ -17,13 +16,12 @@ public static class GitConfigStore
 		string key,
 		CancellationToken cancellationToken = default)
 	{
-		BufferedCommandResult result = await Cli.Wrap("git")
-			.WithArguments(["config", "--get", key])
-			.WithValidation(CommandResultValidation.None)
-			.ExecuteBufferedAsync(cancellationToken)
+		ProcessTextOutput result = await Git.RunAsync(
+				["config", "--get", key],
+				cancellationToken)
 			.ConfigureAwait(false);
 
-		if (result.ExitCode != 0)
+		if (result.ExitStatus.ExitCode != 0)
 		{
 			return null;
 		}
@@ -41,13 +39,12 @@ public static class GitConfigStore
 		string key,
 		CancellationToken cancellationToken = default)
 	{
-		BufferedCommandResult result = await Cli.Wrap("git")
-			.WithArguments(["config", "--show-scope", "--get", key])
-			.WithValidation(CommandResultValidation.None)
-			.ExecuteBufferedAsync(cancellationToken)
+		ProcessTextOutput result = await Git.RunAsync(
+				["config", "--show-scope", "--get", key],
+				cancellationToken)
 			.ConfigureAwait(false);
 
-		return result.ExitCode == 0
+		return result.ExitStatus.ExitCode == 0
 			? ParseScopedValue(result.StandardOutput)
 			: null;
 	}
@@ -71,13 +68,12 @@ public static class GitConfigStore
 	{
 		string scope = global ? "--global" : "--local";
 
-		BufferedCommandResult result = await Cli.Wrap("git")
-			.WithArguments(["config", scope, key, value])
-			.WithValidation(CommandResultValidation.None)
-			.ExecuteBufferedAsync(cancellationToken)
+		ProcessTextOutput result = await Git.RunAsync(
+				["config", scope, key, value],
+				cancellationToken)
 			.ConfigureAwait(false);
 
-		if (result.ExitCode != 0)
+		if (result.ExitStatus.ExitCode != 0)
 		{
 			throw new InvalidOperationException(
 				$"`git config {scope} {key}` failed: {result.StandardError.Trim()}");
@@ -97,13 +93,12 @@ public static class GitConfigStore
 		const int notSetExitCode = 5;
 		string scope = global ? "--global" : "--local";
 
-		BufferedCommandResult result = await Cli.Wrap("git")
-			.WithArguments(["config", scope, "--unset", key])
-			.WithValidation(CommandResultValidation.None)
-			.ExecuteBufferedAsync(cancellationToken)
+		ProcessTextOutput result = await Git.RunAsync(
+				["config", scope, "--unset", key],
+				cancellationToken)
 			.ConfigureAwait(false);
 
-		if (result.ExitCode is not 0 and not notSetExitCode)
+		if (result.ExitStatus.ExitCode is not 0 and not notSetExitCode)
 		{
 			throw new InvalidOperationException(
 				$"`git config {scope} --unset {key}` failed: {result.StandardError.Trim()}");

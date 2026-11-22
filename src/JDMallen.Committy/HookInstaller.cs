@@ -1,5 +1,4 @@
-using CliWrap;
-using CliWrap.Buffered;
+using System.Diagnostics;
 
 namespace JDMallen.Committy;
 
@@ -93,8 +92,9 @@ public static class HookInstaller
 	/// </summary>
 	/// <param name="defaultTemplateDir">The directory to use for the global template if none is set.</param>
 	/// <param name="globalConfigFile">
-	/// The global git config file to use instead of the user's, so tests can
-	/// leave ~/.gitconfig alone; null for git's own.
+	/// The global git config file to use instead of the user's (via
+	/// <c>GIT_CONFIG_GLOBAL</c>), so tests can leave ~/.gitconfig alone; null
+	/// for git's own.
 	/// </param>
 	/// <param name="output">Where to write progress messages.</param>
 	/// <param name="force">Replace a hook committy did not write, keeping it as <c>.bak</c>.</param>
@@ -106,18 +106,24 @@ public static class HookInstaller
 		string? globalConfigFile,
 		CancellationToken cancellationToken = default)
 	{
-		BufferedCommandResult current = await GlobalGit(globalConfigFile)
-			.WithArguments(
-			[
-				"config", "--global", "--type=path", "--get",
-				TEMPLATE_DIR_KEY,
-			])
-			.ExecuteBufferedAsync(cancellationToken)
+		Dictionary<string, string>? environment = globalConfigFile is null
+			? null
+			: new Dictionary<string, string>
+			{
+				["GIT_CONFIG_GLOBAL"] = globalConfigFile,
+			};
+		ProcessTextOutput current = await Git.RunAsync(
+				[
+					"config", "--global", "--type=path", "--get",
+					TEMPLATE_DIR_KEY,
+				],
+				environment,
+				cancellationToken)
 			.ConfigureAwait(false);
 
 		// Exit code 1 means the key is unset; anything else is a real error,
 		// such as an unreadable config file.
-		if (current.ExitCode is not (0 or 1))
+		if (current.ExitStatus.ExitCode is not (0 or 1))
 		{
 			await output.WriteLineAsync(
 					$"Error: Could not read {TEMPLATE_DIR_KEY}: {current.StandardError.Trim()}",
@@ -127,7 +133,7 @@ public static class HookInstaller
 			return 1;
 		}
 
-		string existing = current.ExitCode == 0
+		string existing = current.ExitStatus.ExitCode == 0
 			? current.StandardOutput.Trim()
 			: string.Empty;
 		string templateDir = existing.Length > 0
@@ -154,13 +160,13 @@ public static class HookInstaller
 
 		if (existing.Length == 0)
 		{
-			BufferedCommandResult set = await GlobalGit(globalConfigFile)
-				.WithArguments(
-					["config", "--global", TEMPLATE_DIR_KEY, templateDir])
-				.ExecuteBufferedAsync(cancellationToken)
+			ProcessTextOutput set = await Git.RunAsync(
+					["config", "--global", TEMPLATE_DIR_KEY, templateDir],
+					environment,
+					cancellationToken)
 				.ConfigureAwait(false);
 
-			if (set.ExitCode != 0)
+			if (set.ExitStatus.ExitCode != 0)
 			{
 				await output.WriteLineAsync(
 						$"Error: Could not set {TEMPLATE_DIR_KEY}: {set.StandardError.Trim()}",
@@ -324,21 +330,6 @@ public static class HookInstaller
 	}
 
 	/// <summary>
-	/// git with buffered, unvalidated output, reading
-	/// <paramref name="globalConfigFile" /> as its global config when set.
-	/// </summary>
-	private static Command GlobalGit(string? globalConfigFile) =>
-		Cli.Wrap("git")
-			.WithValidation(CommandResultValidation.None)
-			.WithEnvironmentVariables(environment =>
-			{
-				if (globalConfigFile is not null)
-				{
-					environment.Set("GIT_CONFIG_GLOBAL", globalConfigFile);
-				}
-			});
-
-	/// <summary>
 	/// True when the content looks like a committy-managed hook of any version. Used
 	/// to
 	/// decide whether <c>repair-hooks</c> may safely overwrite it; foreign hooks (no
@@ -392,13 +383,12 @@ public static class HookInstaller
 		string repo,
 		CancellationToken cancellationToken)
 	{
-		BufferedCommandResult result = await Cli.Wrap("git")
-			.WithArguments(["-C", repo, "rev-parse", "--git-dir"])
-			.WithValidation(CommandResultValidation.None)
-			.ExecuteBufferedAsync(cancellationToken)
+		ProcessTextOutput result = await Git.RunAsync(
+				["-C", repo, "rev-parse", "--git-dir"],
+				cancellationToken)
 			.ConfigureAwait(false);
 
-		return result.ExitCode == 0
+		return result.ExitStatus.ExitCode == 0
 			&& !string.IsNullOrWhiteSpace(result.StandardOutput)
 				? result.StandardOutput.Trim()
 				: null;
@@ -412,13 +402,12 @@ public static class HookInstaller
 		string repo,
 		CancellationToken cancellationToken = default)
 	{
-		BufferedCommandResult result = await Cli.Wrap("git")
-			.WithArguments(["-C", repo, "rev-parse", "--git-path", "hooks"])
-			.WithValidation(CommandResultValidation.None)
-			.ExecuteBufferedAsync(cancellationToken)
+		ProcessTextOutput result = await Git.RunAsync(
+				["-C", repo, "rev-parse", "--git-path", "hooks"],
+				cancellationToken)
 			.ConfigureAwait(false);
 
-		if (result.ExitCode != 0)
+		if (result.ExitStatus.ExitCode != 0)
 		{
 			return null;
 		}

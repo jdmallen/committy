@@ -46,6 +46,10 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Fixed
 
+- On Windows, committy writes UTF-8 to the console, so `✓`, `—` and
+  non-ASCII characters in generated messages no longer print as `?`,
+  including when piped (`committy | clip`) or redirected to a file. The
+  console's code page is restored on exit. (Not yet verified on Windows.)
 - `committy config` shows current values from the scope it writes to. Before,
   `committy config --local` offered the global values and pressing Enter
   copied them into the repository, where they shadowed later global changes;

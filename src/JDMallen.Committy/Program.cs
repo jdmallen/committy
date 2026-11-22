@@ -1,4 +1,5 @@
 using System.CommandLine;
+using System.Text;
 
 namespace JDMallen.Committy;
 
@@ -16,6 +17,25 @@ internal abstract class Program
 		rootCommand.Subcommands.Add(RepairHooksCommand.Build());
 		rootCommand.Subcommands.Add(ConfigCommand.Build());
 
-		return await rootCommand.Parse(args).InvokeAsync();
+		if (!OperatingSystem.IsWindows())
+		{
+			return await rootCommand.Parse(args).InvokeAsync();
+		}
+
+		// Windows consoles default to an OEM code page, which turns ✓, —,
+		// arrows and typographic quotes in output (and in generated messages
+		// piped to clip or a file) into '?'. No byte order mark, so redirected
+		// output stays plain UTF-8. Setting it changes the console's code page,
+		// which outlives this process, so the original is put back.
+		Encoding originalEncoding = Console.OutputEncoding;
+		Console.OutputEncoding = new UTF8Encoding(false);
+		try
+		{
+			return await rootCommand.Parse(args).InvokeAsync();
+		}
+		finally
+		{
+			Console.OutputEncoding = originalEncoding;
+		}
 	}
 }

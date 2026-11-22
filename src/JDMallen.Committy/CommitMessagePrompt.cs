@@ -12,9 +12,11 @@ namespace JDMallen.Committy;
 /// </summary>
 public static class CommitMessagePrompt
 {
-	private const int TITLES_MAX_TOKENS = 100;
-	private const int TITLE_AND_BODY_MAX_TOKENS = 500;
-	private const int LARGE_TITLE_AND_BODY_MAX_TOKENS = 800;
+	// Internal so InfoReport can describe the built-in budgets without
+	// repeating the numbers.
+	internal const int TITLES_MAX_TOKENS = 100;
+	internal const int TITLE_AND_BODY_MAX_TOKENS = 500;
+	internal const int LARGE_TITLE_AND_BODY_MAX_TOKENS = 800;
 
 	/// <summary>The FILES CHANGED list stops after this many entries.</summary>
 	private const int MAX_LISTED_FILES = 150;

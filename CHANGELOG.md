@@ -46,6 +46,9 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Fixed
 
+- `committy --info` lists all three built-in Azure token budgets, including
+  800 for a large change, and the root command's `--model` and `--endpoint`
+  help mention the openai provider.
 - On Windows, committy writes UTF-8 to the console, so `✓`, `—` and
   non-ASCII characters in generated messages no longer print as `?`,
   including when piped (`committy | clip`) or redirected to a file. The

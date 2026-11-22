@@ -115,7 +115,7 @@ public static class InfoReport
 						"max tokens",
 						azure.MaxTokensOverride is { } maxTokens
 							? Count(maxTokens)
-							: "built-in (100 for titles, 500 for a message)",
+							: $"built-in ({CommitMessagePrompt.TITLES_MAX_TOKENS} for titles, {CommitMessagePrompt.TITLE_AND_BODY_MAX_TOKENS} for a message, {CommitMessagePrompt.LARGE_TITLE_AND_BODY_MAX_TOKENS} for a large one)",
 						CommittyConfigResolver.AZURE_MAX_TOKENS_KEY));
 				AddAzureAuthRows(azure);
 

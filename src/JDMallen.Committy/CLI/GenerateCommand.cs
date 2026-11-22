@@ -23,10 +23,10 @@ public static class GenerateCommand
 		Option<string?> apiKeyOption = SharedOptions.ApiKey(
 			"API key for the selected provider (overrides config and environment)");
 		Option<string?> endpointOption = SharedOptions.Endpoint(
-			"Azure OpenAI endpoint host URL; omit everything after the domain");
+			"Azure OpenAI endpoint host URL (omit everything after the domain), or the openai base URL (overrides config)");
 		Option<string?> deploymentOption = SharedOptions.Deployment();
 		Option<string?> modelOption =
-			SharedOptions.Model("Anthropic model name");
+			SharedOptions.Model("Anthropic or openai model name (overrides config)");
 		Option<string?> azureAuthOption = SharedOptions.AzureAuth(
 			"Azure OpenAI auth for this run: apikey, azurecli or azureidentity (overrides config)");
 		Option<string?> tenantOption = SharedOptions.Tenant(

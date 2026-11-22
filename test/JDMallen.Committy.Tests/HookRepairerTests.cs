@@ -144,6 +144,72 @@ public class HookRepairerTests
 		}
 	}
 
+	private static async Task<string> WriteCustomHooksPathHookAsync(
+		string repo,
+		string content)
+	{
+		await TestGit.RunAsync(
+			"-C",
+			repo,
+			"config",
+			"core.hooksPath",
+			".githooks");
+		string hookPath = Path.Combine(
+			repo,
+			".githooks",
+			"prepare-commit-msg");
+		Directory.CreateDirectory(Path.GetDirectoryName(hookPath)!);
+		await File.WriteAllTextAsync(hookPath, content);
+
+		return hookPath;
+	}
+
+	[Fact]
+	public async Task RepairRepoAsync_StaleHookInCustomHooksPath_IsRepaired()
+	{
+		string repo = await NewRepoAsync();
+		try
+		{
+			string hookPath =
+				await WriteCustomHooksPathHookAsync(repo, OLD_HOOK);
+
+			HookRepairResult result =
+				await HookRepairer.RepairRepoAsync(repo, false);
+
+			Assert.Equal(HookRepairOutcome.Updated, result.Outcome);
+			Assert.Contains("custom core.hooksPath", result.Detail);
+			Assert.Equal(
+				HookInstaller.Trampoline.Trim(),
+				(await File.ReadAllTextAsync(hookPath)).Trim());
+		}
+		finally
+		{
+			Directory.Delete(repo, true);
+		}
+	}
+
+	[Fact]
+	public async Task RepairRepoAsync_ForeignHookInCustomHooksPath_IsUntouched()
+	{
+		string repo = await NewRepoAsync();
+		try
+		{
+			string hookPath =
+				await WriteCustomHooksPathHookAsync(repo, FOREIGN_HOOK);
+
+			HookRepairResult result =
+				await HookRepairer.RepairRepoAsync(repo, false);
+
+			Assert.Equal(HookRepairOutcome.SkippedForeign, result.Outcome);
+			Assert.Contains("custom core.hooksPath", result.Detail);
+			Assert.Equal(FOREIGN_HOOK, await File.ReadAllTextAsync(hookPath));
+		}
+		finally
+		{
+			Directory.Delete(repo, true);
+		}
+	}
+
 	[Fact]
 	public async Task RepairRepoAsync_ForeignHook_IsLeftUntouched()
 	{

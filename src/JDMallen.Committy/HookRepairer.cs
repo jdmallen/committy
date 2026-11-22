@@ -10,7 +10,7 @@ public enum HookRepairOutcome
 	/// <summary>The hook is already the current trampoline.</summary>
 	AlreadyCurrent,
 
-	/// <summary>A non-committy hook (or custom core.hooksPath) was left untouched.</summary>
+	/// <summary>A non-committy hook was left untouched.</summary>
 	SkippedForeign,
 
 	/// <summary>No prepare-commit-msg hook present.</summary>
@@ -207,15 +207,6 @@ public static class HookRepairer
 			"core.hooksPath",
 			cancellationToken);
 
-		if (!string.IsNullOrEmpty(customHooksPath))
-		{
-			return new HookRepairResult(
-				repo,
-				customHooksPath,
-				HookRepairOutcome.SkippedForeign,
-				"custom core.hooksPath in use");
-		}
-
 		string? hooksDir = await HookInstaller
 			.TryGetHooksDirAsync(repo, cancellationToken);
 
@@ -229,6 +220,13 @@ public static class HookRepairer
 		}
 
 		string hookPath = Path.Combine(hooksDir, HookInstaller.HOOK_NAME);
+
+		// Ownership is decided by the hook's checksum, so a committy hook in a
+		// custom hooks directory is as safe to repair as one in .git/hooks.
+		// The directory may be tracked and shared, so the report says so.
+		string? customNote = string.IsNullOrEmpty(customHooksPath)
+			? null
+			: $"custom core.hooksPath: {hooksDir}";
 
 		if (!File.Exists(hookPath))
 		{
@@ -255,22 +253,24 @@ public static class HookRepairer
 				repo,
 				hookPath,
 				HookRepairOutcome.SkippedForeign,
-				"no committy signature");
+				customNote is null
+					? "no committy signature"
+					: $"no committy signature; {customNote}");
 		}
 
-		if (dryRun)
+		if (!dryRun)
 		{
-			return new HookRepairResult(
-				repo,
-				hookPath,
-				HookRepairOutcome.Updated);
+			HookInstaller.BackUpHook(hookPath);
+			await HookInstaller.WriteTrampolineAsync(
+				hooksDir,
+				cancellationToken);
 		}
 
-		HookInstaller.BackUpHook(hookPath);
-
-		await HookInstaller.WriteTrampolineAsync(hooksDir, cancellationToken);
-
-		return new HookRepairResult(repo, hookPath, HookRepairOutcome.Updated);
+		return new HookRepairResult(
+			repo,
+			hookPath,
+			HookRepairOutcome.Updated,
+			customNote);
 	}
 
 	private static async Task ReportAsync(
@@ -285,7 +285,10 @@ public static class HookRepairer
 			switch (result.Outcome)
 			{
 				case HookRepairOutcome.Updated:
-					await output.WriteLineAsync($"  ✓ {verb}: {result.Repo}");
+					await output.WriteLineAsync(
+						result.Detail is null
+							? $"  ✓ {verb}: {result.Repo}"
+							: $"  ✓ {verb}: {result.Repo} [{result.Detail}]");
 
 					break;
 				case HookRepairOutcome.SkippedForeign:

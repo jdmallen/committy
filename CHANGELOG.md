@@ -12,6 +12,11 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - Provider errors read "provider request failed: ..." instead of "Failed to
   generate commit message suggestions: ...", in both `committy` and the git
   hook's comment.
+- `repair-hooks` now repairs stale committy hooks in a custom
+  `core.hooksPath` directory instead of skipping every repo that sets it.
+  Hooks committy did not write are still left alone. The report marks these
+  repos `[custom core.hooksPath: <dir>]`, since that directory may be tracked
+  and shared with other contributors.
 
 ### Fixed
 

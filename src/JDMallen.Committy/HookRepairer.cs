@@ -324,6 +324,11 @@ public static class HookRepairer
 			counts.GetValueOrDefault(outcome);
 	}
 
+	/// <summary>
+	/// Repairs every collected repo and reports each outcome. Returns 1 when
+	/// any repo ended in <see cref="HookRepairOutcome.Error" />, so a script
+	/// can tell a sweep with failures from a clean one.
+	/// </summary>
 	public static async Task<int> RunAsync(
 		IReadOnlyList<string> scanRoots,
 		IReadOnlyList<string> gitDirs,
@@ -362,15 +367,32 @@ public static class HookRepairer
 
 		foreach (string repo in repos)
 		{
-			results.Add(
-				await RepairRepoAsync(
-					repo,
-					dryRun,
-					cancellationToken));
+			// One unreadable or read-only hook must not stop the sweep or hide
+			// the repos already repaired.
+			try
+			{
+				results.Add(
+					await RepairRepoAsync(
+						repo,
+						dryRun,
+						cancellationToken));
+			}
+			catch (Exception ex)
+				when (ex is IOException or UnauthorizedAccessException)
+			{
+				results.Add(
+					new HookRepairResult(
+						repo,
+						string.Empty,
+						HookRepairOutcome.Error,
+						ex.Message));
+			}
 		}
 
 		await ReportAsync(results, dryRun, output);
 
-		return 0;
+		return results.Any(result => result.Outcome == HookRepairOutcome.Error)
+			? 1
+			: 0;
 	}
 }

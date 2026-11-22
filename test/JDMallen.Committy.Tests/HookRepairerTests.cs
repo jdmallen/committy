@@ -240,6 +240,59 @@ public class HookRepairerTests
 		}
 	}
 
+	[UnreadableFileFact]
+	[System.Runtime.Versioning.UnsupportedOSPlatform("windows")]
+	public async Task RunAsync_Scan_UnreadableHook_ReportsAndContinues()
+	{
+		string root = Directory.CreateTempSubdirectory("committy-scan-")
+			.FullName;
+		string? unreadableHook = null;
+		try
+		{
+			string brokenRepo = Path.Combine(root, "a-broken");
+			string staleRepo = Path.Combine(root, "b-stale");
+			foreach (string repo in new[] { brokenRepo, staleRepo })
+			{
+				string emptyTemplate = Path.Combine(root, ".empty-template");
+				Directory.CreateDirectory(emptyTemplate);
+				await TestGit.RunAsync(
+					"init",
+					$"--template={emptyTemplate}",
+					repo);
+			}
+
+			unreadableHook = WriteHook(brokenRepo, OLD_HOOK);
+			File.SetUnixFileMode(unreadableHook, UnixFileMode.None);
+			string staleHook = WriteHook(staleRepo, OLD_HOOK);
+			var output = new StringWriter();
+
+			int code = await HookRepairer.RunAsync(
+				[root],
+				[],
+				false,
+				false,
+				output);
+
+			Assert.Equal(1, code);
+			Assert.Contains($"! error: {brokenRepo}", output.ToString());
+			Assert.Contains($"updated: {staleRepo}", output.ToString());
+			Assert.Equal(
+				HookInstaller.Trampoline.Trim(),
+				(await File.ReadAllTextAsync(staleHook)).Trim());
+		}
+		finally
+		{
+			if (unreadableHook is not null)
+			{
+				File.SetUnixFileMode(
+					unreadableHook,
+					UnixFileMode.UserRead | UnixFileMode.UserWrite);
+			}
+
+			Directory.Delete(root, true);
+		}
+	}
+
 	[Fact]
 	public async Task RunAsync_Scan_DoesNotFollowDirectorySymlinks()
 	{
@@ -418,6 +471,25 @@ public class HookRepairerTests
 		finally
 		{
 			Directory.Delete(dir, true);
+		}
+	}
+}
+
+/// <summary>
+/// A fact that needs a file the current user cannot read: Unix permissions,
+/// and not root, who reads everything regardless.
+/// </summary>
+public sealed class UnreadableFileFactAttribute : FactAttribute
+{
+	public UnreadableFileFactAttribute()
+	{
+		if (OperatingSystem.IsWindows())
+		{
+			Skip = "Needs Unix file permissions.";
+		}
+		else if (Environment.UserName == "root")
+		{
+			Skip = "Root can read a file with no permissions.";
 		}
 	}
 }

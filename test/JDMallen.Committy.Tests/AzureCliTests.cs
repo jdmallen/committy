@@ -262,7 +262,14 @@ public sealed class AzureCliTests : IDisposable
 /// <summary>A fact that only runs where a <c>#!/bin/sh</c> script can.</summary>
 public sealed class UnixFactAttribute : FactAttribute
 {
-	public UnixFactAttribute()
+	/// <param name="sourceFilePath">Supplied by the compiler.</param>
+	/// <param name="sourceLineNumber">Supplied by the compiler.</param>
+	public UnixFactAttribute(
+		[System.Runtime.CompilerServices.CallerFilePath]
+		string? sourceFilePath = null,
+		[System.Runtime.CompilerServices.CallerLineNumber]
+		int sourceLineNumber = -1)
+		: base(sourceFilePath, sourceLineNumber)
 	{
 		if (OperatingSystem.IsWindows())
 		{

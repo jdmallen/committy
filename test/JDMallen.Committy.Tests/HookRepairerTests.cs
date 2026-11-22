@@ -91,7 +91,10 @@ public class HookRepairerTests
 			WriteHook(repo, HookInstaller.Trampoline);
 
 			HookRepairResult result =
-				await HookRepairer.RepairRepoAsync(repo, false);
+				await HookRepairer.RepairRepoAsync(
+					repo,
+					false,
+					TestContext.Current.CancellationToken);
 
 			Assert.Equal(HookRepairOutcome.AlreadyCurrent, result.Outcome);
 		}
@@ -109,14 +112,21 @@ public class HookRepairerTests
 		{
 			string hookPath = WriteHook(repo, OLD_HOOK);
 
-			await HookRepairer.RepairRepoAsync(repo, false);
+			await HookRepairer.RepairRepoAsync(
+				repo,
+				false,
+				TestContext.Current.CancellationToken);
 
 			Assert.Equal(
 				OLD_HOOK,
-				await File.ReadAllTextAsync(hookPath + ".bak"));
+				await File.ReadAllTextAsync(
+					hookPath + ".bak",
+					TestContext.Current.CancellationToken));
 			Assert.Equal(
 				HookInstaller.Trampoline.Trim(),
-				(await File.ReadAllTextAsync(hookPath)).Trim());
+				(await File.ReadAllTextAsync(
+					hookPath,
+					TestContext.Current.CancellationToken)).Trim());
 		}
 		finally
 		{
@@ -133,10 +143,15 @@ public class HookRepairerTests
 			string hookPath = WriteHook(repo, OLD_HOOK);
 
 			HookRepairResult result =
-				await HookRepairer.RepairRepoAsync(repo, true);
+				await HookRepairer.RepairRepoAsync(
+					repo,
+					true,
+					TestContext.Current.CancellationToken);
 
 			Assert.Equal(HookRepairOutcome.Updated, result.Outcome);
-			Assert.Equal(OLD_HOOK, await File.ReadAllTextAsync(hookPath));
+			Assert.Equal(OLD_HOOK, await File.ReadAllTextAsync(
+				hookPath,
+				TestContext.Current.CancellationToken));
 		}
 		finally
 		{
@@ -174,13 +189,18 @@ public class HookRepairerTests
 				await WriteCustomHooksPathHookAsync(repo, OLD_HOOK);
 
 			HookRepairResult result =
-				await HookRepairer.RepairRepoAsync(repo, false);
+				await HookRepairer.RepairRepoAsync(
+					repo,
+					false,
+					TestContext.Current.CancellationToken);
 
 			Assert.Equal(HookRepairOutcome.Updated, result.Outcome);
 			Assert.Contains("custom core.hooksPath", result.Detail);
 			Assert.Equal(
 				HookInstaller.Trampoline.Trim(),
-				(await File.ReadAllTextAsync(hookPath)).Trim());
+				(await File.ReadAllTextAsync(
+					hookPath,
+					TestContext.Current.CancellationToken)).Trim());
 		}
 		finally
 		{
@@ -198,11 +218,16 @@ public class HookRepairerTests
 				await WriteCustomHooksPathHookAsync(repo, FOREIGN_HOOK);
 
 			HookRepairResult result =
-				await HookRepairer.RepairRepoAsync(repo, false);
+				await HookRepairer.RepairRepoAsync(
+					repo,
+					false,
+					TestContext.Current.CancellationToken);
 
 			Assert.Equal(HookRepairOutcome.SkippedForeign, result.Outcome);
 			Assert.Contains("custom core.hooksPath", result.Detail);
-			Assert.Equal(FOREIGN_HOOK, await File.ReadAllTextAsync(hookPath));
+			Assert.Equal(FOREIGN_HOOK, await File.ReadAllTextAsync(
+				hookPath,
+				TestContext.Current.CancellationToken));
 		}
 		finally
 		{
@@ -219,10 +244,15 @@ public class HookRepairerTests
 			string hookPath = WriteHook(repo, FOREIGN_HOOK);
 
 			HookRepairResult result =
-				await HookRepairer.RepairRepoAsync(repo, false);
+				await HookRepairer.RepairRepoAsync(
+					repo,
+					false,
+					TestContext.Current.CancellationToken);
 
 			Assert.Equal(HookRepairOutcome.SkippedForeign, result.Outcome);
-			Assert.Equal(FOREIGN_HOOK, await File.ReadAllTextAsync(hookPath));
+			Assert.Equal(FOREIGN_HOOK, await File.ReadAllTextAsync(
+				hookPath,
+				TestContext.Current.CancellationToken));
 		}
 		finally
 		{
@@ -237,7 +267,10 @@ public class HookRepairerTests
 		try
 		{
 			HookRepairResult result =
-				await HookRepairer.RepairRepoAsync(repo, false);
+				await HookRepairer.RepairRepoAsync(
+					repo,
+					false,
+					TestContext.Current.CancellationToken);
 
 			Assert.Equal(HookRepairOutcome.NoHook, result.Outcome);
 		}
@@ -258,15 +291,23 @@ public class HookRepairerTests
 				"hooks",
 				"prepare-commit-msg");
 			Directory.CreateDirectory(Path.GetDirectoryName(hookPath)!);
-			await File.WriteAllTextAsync(hookPath, OLD_HOOK);
+			await File.WriteAllTextAsync(
+				hookPath,
+				OLD_HOOK,
+				TestContext.Current.CancellationToken);
 
 			HookRepairResult result =
-				await HookRepairer.RepairRepoAsync(gitDir, false);
+				await HookRepairer.RepairRepoAsync(
+					gitDir,
+					false,
+					TestContext.Current.CancellationToken);
 
 			Assert.Equal(HookRepairOutcome.Updated, result.Outcome);
 			Assert.Equal(
 				HookInstaller.Trampoline.Trim(),
-				(await File.ReadAllTextAsync(hookPath)).Trim());
+				(await File.ReadAllTextAsync(
+					hookPath,
+					TestContext.Current.CancellationToken)).Trim());
 		}
 		finally
 		{
@@ -285,7 +326,10 @@ public class HookRepairerTests
 				"hooks",
 				"prepare-commit-msg");
 			Directory.CreateDirectory(Path.GetDirectoryName(hookPath)!);
-			await File.WriteAllTextAsync(hookPath, OLD_HOOK);
+			await File.WriteAllTextAsync(
+				hookPath,
+				OLD_HOOK,
+				TestContext.Current.CancellationToken);
 			var output = new StringWriter();
 
 			int code = await HookRepairer.RunAsync(
@@ -293,12 +337,15 @@ public class HookRepairerTests
 				[gitDir],
 				false,
 				true,
-				output);
+				output,
+				TestContext.Current.CancellationToken);
 
 			Assert.Equal(0, code);
 			Assert.Equal(
 				HookInstaller.Trampoline.Trim(),
-				(await File.ReadAllTextAsync(hookPath)).Trim());
+				(await File.ReadAllTextAsync(
+					hookPath,
+					TestContext.Current.CancellationToken)).Trim());
 		}
 		finally
 		{
@@ -384,7 +431,8 @@ public class HookRepairerTests
 				[],
 				true,
 				true,
-				output);
+				output,
+				TestContext.Current.CancellationToken);
 
 			Assert.Equal(0, code);
 			Assert.Contains("no hook: 1,", output.ToString());
@@ -412,7 +460,8 @@ public class HookRepairerTests
 				[dir],
 				false,
 				true,
-				output);
+				output,
+				TestContext.Current.CancellationToken);
 
 			Assert.Equal(0, code);
 			Assert.Contains("not a git directory", output.ToString());
@@ -433,12 +482,17 @@ public class HookRepairerTests
 			string hookPath = WriteHook(repo, OLD_HOOK);
 
 			HookRepairResult result =
-				await HookRepairer.RepairRepoAsync(repo, false);
+				await HookRepairer.RepairRepoAsync(
+					repo,
+					false,
+					TestContext.Current.CancellationToken);
 
 			Assert.Equal(HookRepairOutcome.Updated, result.Outcome);
 			Assert.Equal(
 				HookInstaller.Trampoline.Trim(),
-				(await File.ReadAllTextAsync(hookPath)).Trim());
+				(await File.ReadAllTextAsync(
+					hookPath,
+					TestContext.Current.CancellationToken)).Trim());
 		}
 		finally
 		{
@@ -484,10 +538,15 @@ public class HookRepairerTests
 			string hookPath = WriteHook(repo, handWritten);
 
 			HookRepairResult result =
-				await HookRepairer.RepairRepoAsync(repo, false);
+				await HookRepairer.RepairRepoAsync(
+					repo,
+					false,
+					TestContext.Current.CancellationToken);
 
 			Assert.Equal(HookRepairOutcome.SkippedForeign, result.Outcome);
-			Assert.Equal(handWritten, await File.ReadAllTextAsync(hookPath));
+			Assert.Equal(handWritten, await File.ReadAllTextAsync(
+				hookPath,
+				TestContext.Current.CancellationToken));
 		}
 		finally
 		{
@@ -547,7 +606,14 @@ public class HookRepairerTests
 /// </summary>
 public sealed class UnreadableFileFactAttribute : FactAttribute
 {
-	public UnreadableFileFactAttribute()
+	/// <param name="sourceFilePath">Supplied by the compiler.</param>
+	/// <param name="sourceLineNumber">Supplied by the compiler.</param>
+	public UnreadableFileFactAttribute(
+		[System.Runtime.CompilerServices.CallerFilePath]
+		string? sourceFilePath = null,
+		[System.Runtime.CompilerServices.CallerLineNumber]
+		int sourceLineNumber = -1)
+		: base(sourceFilePath, sourceLineNumber)
 	{
 		if (OperatingSystem.IsWindows())
 		{

@@ -60,9 +60,12 @@ public class PrepareCommitMsgCommandTests : IDisposable
 	{
 		await PrepareCommitMsgCommand.RunAsync(
 			_commitMsgFile,
-			Steps(patch: null));
+			Steps(patch: null),
+			TestContext.Current.CancellationToken);
 
-		Assert.Equal(GIT_TEMPLATE, await File.ReadAllTextAsync(_commitMsgFile));
+		Assert.Equal(GIT_TEMPLATE, await File.ReadAllTextAsync(
+			_commitMsgFile,
+			TestContext.Current.CancellationToken));
 	}
 
 	[Fact]
@@ -81,7 +84,8 @@ public class PrepareCommitMsgCommandTests : IDisposable
 
 		await PrepareCommitMsgCommand.RunAsync(
 			_commitMsgFile,
-			Steps(config: incomplete));
+			Steps(config: incomplete),
+			TestContext.Current.CancellationToken);
 
 		AssertOnlyCommentsAppended();
 		Assert.Contains("OpenAI base URL is required", AppendedText());
@@ -98,7 +102,8 @@ public class PrepareCommitMsgCommandTests : IDisposable
 			_commitMsgFile,
 			Steps(
 				generate: () => new CommitSuggestions([], usage),
-				recorded: recorded));
+				recorded: recorded),
+			TestContext.Current.CancellationToken);
 
 		AssertOnlyCommentsAppended();
 		Assert.Contains("The model returned no message", AppendedText());
@@ -112,7 +117,8 @@ public class PrepareCommitMsgCommandTests : IDisposable
 			_commitMsgFile,
 			Steps(
 				generate: () => throw new InvalidOperationException(
-					"provider request failed: boom\nsecond line from az")));
+					"provider request failed: boom\nsecond line from az")),
+			TestContext.Current.CancellationToken);
 
 		AssertOnlyCommentsAppended();
 		Assert.Contains("provider request failed: boom", AppendedText());
@@ -131,9 +137,12 @@ public class PrepareCommitMsgCommandTests : IDisposable
 				generate: () => new CommitSuggestions(
 					["feat: add thing\n\nWhy it matters."],
 					usage),
-				recorded: recorded));
+				recorded: recorded),
+			TestContext.Current.CancellationToken);
 
-		string text = await File.ReadAllTextAsync(_commitMsgFile);
+		string text = await File.ReadAllTextAsync(
+			_commitMsgFile,
+			TestContext.Current.CancellationToken);
 		Assert.StartsWith("feat: add thing\n\nWhy it matters.", text);
 		Assert.Contains("# Please enter the commit message", text);
 		Assert.Equal([usage], recorded);

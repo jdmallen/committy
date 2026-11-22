@@ -18,7 +18,10 @@ public class CommitMessageGeneratorTests
 			new CommitMessageGenerator(Substitute.For<IChatCompletionClient>());
 
 		await Assert.ThrowsAsync<ArgumentException>(() =>
-			generator.GenerateAsync(patch, false));
+			generator.GenerateAsync(
+				patch,
+				false,
+				TestContext.Current.CancellationToken));
 	}
 
 	[Fact]
@@ -36,7 +39,10 @@ public class CommitMessageGeneratorTests
 
 		var exception = await Assert.ThrowsAsync<InvalidOperationException>(()
 			=>
-			generator.GenerateAsync(PATCH, false));
+			generator.GenerateAsync(
+				PATCH,
+				false,
+				TestContext.Current.CancellationToken));
 
 		Assert.Equal("provider request failed: boom", exception.Message);
 		Assert.Equal(inner, exception.InnerException);
@@ -59,7 +65,10 @@ public class CommitMessageGeneratorTests
 			timeoutSettingKey: "committy.openai.timeoutseconds");
 
 		var exception = await Assert.ThrowsAsync<TimeoutException>(() =>
-			generator.GenerateAsync(PATCH, false));
+			generator.GenerateAsync(
+				PATCH,
+				false,
+				TestContext.Current.CancellationToken));
 
 		Assert.Equal(
 			"The provider did not answer within 300 seconds. Raise committy.openai.timeoutseconds to wait longer.",
@@ -79,7 +88,10 @@ public class CommitMessageGeneratorTests
 		var generator = new CommitMessageGenerator(client, timeoutSeconds: 30);
 
 		var exception = await Assert.ThrowsAsync<TimeoutException>(() =>
-			generator.GenerateAsync(PATCH, false));
+			generator.GenerateAsync(
+				PATCH,
+				false,
+				TestContext.Current.CancellationToken));
 
 		Assert.Equal(
 			"The provider did not answer within 30 seconds.",
@@ -98,7 +110,10 @@ public class CommitMessageGeneratorTests
 		var generator = new CommitMessageGenerator(client, timeoutSeconds: 1);
 
 		var exception = await Assert.ThrowsAsync<TimeoutException>(() =>
-			generator.GenerateAsync(PATCH, false));
+			generator.GenerateAsync(
+				PATCH,
+				false,
+				TestContext.Current.CancellationToken));
 
 		Assert.Equal(
 			"The provider did not answer within 1 second.",
@@ -137,7 +152,10 @@ public class CommitMessageGeneratorTests
 
 		var generator = new CommitMessageGenerator(client);
 
-		CommitSuggestions result = await generator.GenerateAsync(PATCH, false);
+		CommitSuggestions result = await generator.GenerateAsync(
+			PATCH,
+			false,
+			TestContext.Current.CancellationToken);
 
 		Assert.Single(result.Messages);
 		Assert.Equal("feat: do thing\n\nDetail.", result.Messages[0]);
@@ -162,7 +180,10 @@ public class CommitMessageGeneratorTests
 
 		var generator = new CommitMessageGenerator(client);
 
-		CommitSuggestions result = await generator.GenerateAsync(PATCH, true);
+		CommitSuggestions result = await generator.GenerateAsync(
+			PATCH,
+			true,
+			TestContext.Current.CancellationToken);
 
 		Assert.Equal(["feat: a", "fix: b"], result.Messages);
 		Assert.Null(result.Usage);

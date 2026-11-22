@@ -2,14 +2,29 @@
 
 	<PropertyGroup>
 		<IsPackable>false</IsPackable>
+		<!-- xunit v3 test projects are executables run by Microsoft Testing Platform. -->
+		<OutputType>Exe</OutputType>
+		<!--
+			The app is a self-contained (Native AOT) executable, and the SDK
+			refuses an executable that references one unless both are
+			self-contained (NETSDK1151). The tests only load its assembly and
+			never launch it, so the check does not apply here.
+		-->
+		<ValidateExecutableReferencesMatchSelfContained>false</ValidateExecutableReferencesMatchSelfContained>
 	</PropertyGroup>
 
 	<ItemGroup>
-		<PackageReference Include="coverlet.collector" Version="10.1.1"/>
+		<!-- Coverage under Microsoft Testing Platform (the coverage option of dotnet test). -->
+		<PackageReference Include="Microsoft.Testing.Extensions.CodeCoverage" Version="18.12.0"/>
+		<!--
+			Microsoft.NET.Test.Sdk and xunit.runner.visualstudio are not needed by
+			dotnet test under Microsoft Testing Platform; xunit recommends keeping
+			them so IDE test explorers still find the tests.
+		-->
 		<PackageReference Include="Microsoft.NET.Test.Sdk" Version="18.12.0"/>
 		<PackageReference Include="NSubstitute" Version="6.2.0"/>
-		<PackageReference Include="xunit" Version="2.9.3"/>
 		<PackageReference Include="xunit.runner.visualstudio" Version="4.0.1"/>
+		<PackageReference Include="xunit.v3.mtp-v2" Version="4.0.3"/>
 	</ItemGroup>
 
 	<ItemGroup>

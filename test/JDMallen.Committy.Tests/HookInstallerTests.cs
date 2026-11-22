@@ -34,7 +34,11 @@ public class HookInstallerTests
 			await GitInitAsync(repo);
 			var output = new StringWriter();
 
-			int code = await HookInstaller.InstallAsync(false, repo, output);
+			int code = await HookInstaller.InstallAsync(
+				false,
+				repo,
+				output,
+				cancellationToken: TestContext.Current.CancellationToken);
 
 			Assert.Equal(0, code);
 
@@ -45,7 +49,9 @@ public class HookInstallerTests
 				HookInstaller.HOOK_NAME);
 			Assert.True(File.Exists(hookPath));
 
-			string contents = await File.ReadAllTextAsync(hookPath);
+			string contents = await File.ReadAllTextAsync(
+				hookPath,
+				TestContext.Current.CancellationToken);
 			Assert.Contains("committy prepare-commit-msg", contents);
 			Assert.DoesNotContain("\r\n", contents);
 
@@ -81,7 +87,11 @@ public class HookInstallerTests
 
 			var output = new StringWriter();
 
-			int code = await HookInstaller.InstallAsync(false, repo, output);
+			int code = await HookInstaller.InstallAsync(
+				false,
+				repo,
+				output,
+				cancellationToken: TestContext.Current.CancellationToken);
 
 			Assert.Equal(0, code);
 
@@ -114,7 +124,11 @@ public class HookInstallerTests
 			Path.GetRandomFileName());
 
 		var exception = await Assert.ThrowsAsync<InvalidOperationException>(
-			() => HookInstaller.InstallAsync(false, missing, output));
+			() => HookInstaller.InstallAsync(
+				false,
+				missing,
+				output,
+				cancellationToken: TestContext.Current.CancellationToken));
 
 		Assert.Contains("does not exist", exception.Message);
 		Assert.DoesNotContain("Error", output.ToString());
@@ -130,7 +144,12 @@ public class HookInstallerTests
 
 			var exception =
 				await Assert.ThrowsAsync<InvalidOperationException>(() =>
-					HookInstaller.InstallAsync(false, dir, output));
+					HookInstaller.InstallAsync(
+						false,
+						dir,
+						output,
+						cancellationToken:
+							TestContext.Current.CancellationToken));
 
 			Assert.Contains("Not a valid git repository", exception.Message);
 		}
@@ -172,9 +191,16 @@ public class HookInstallerTests
 
 			var exception =
 				await Assert.ThrowsAsync<InvalidOperationException>(() =>
-					HookInstaller.InstallAsync(false, repo, output));
+					HookInstaller.InstallAsync(
+						false,
+						repo,
+						output,
+						cancellationToken:
+							TestContext.Current.CancellationToken));
 
-			Assert.Equal(FOREIGN_HOOK, await File.ReadAllTextAsync(hookPath));
+			Assert.Equal(FOREIGN_HOOK, await File.ReadAllTextAsync(
+				hookPath,
+				TestContext.Current.CancellationToken));
 			Assert.False(File.Exists(hookPath + ".bak"));
 			Assert.Contains("--force", exception.Message);
 		}
@@ -198,15 +224,20 @@ public class HookInstallerTests
 				false,
 				repo,
 				output,
-				true);
+				true,
+				cancellationToken: TestContext.Current.CancellationToken);
 
 			Assert.Equal(0, code);
 			Assert.True(
 				HookInstaller.IsCurrentTrampoline(
-					await File.ReadAllTextAsync(hookPath)));
+					await File.ReadAllTextAsync(
+						hookPath,
+						TestContext.Current.CancellationToken)));
 			Assert.Equal(
 				FOREIGN_HOOK,
-				await File.ReadAllTextAsync(hookPath + ".bak"));
+				await File.ReadAllTextAsync(
+					hookPath + ".bak",
+					TestContext.Current.CancellationToken));
 		}
 		finally
 		{
@@ -226,15 +257,23 @@ public class HookInstallerTests
 				LegacyHooks.UNSTAMPED_TRAMPOLINE);
 			var output = new StringWriter();
 
-			int code = await HookInstaller.InstallAsync(false, repo, output);
+			int code = await HookInstaller.InstallAsync(
+				false,
+				repo,
+				output,
+				cancellationToken: TestContext.Current.CancellationToken);
 
 			Assert.Equal(0, code);
 			Assert.True(
 				HookInstaller.IsCurrentTrampoline(
-					await File.ReadAllTextAsync(hookPath)));
+					await File.ReadAllTextAsync(
+						hookPath,
+						TestContext.Current.CancellationToken)));
 			Assert.Equal(
 				LegacyHooks.UNSTAMPED_TRAMPOLINE,
-				await File.ReadAllTextAsync(hookPath + ".bak"));
+				await File.ReadAllTextAsync(
+					hookPath + ".bak",
+					TestContext.Current.CancellationToken));
 		}
 		finally
 		{
@@ -256,9 +295,15 @@ public class HookInstallerTests
 			var output = new StringWriter();
 
 			await Assert.ThrowsAsync<InvalidOperationException>(() =>
-				HookInstaller.InstallAsync(false, repo, output));
+				HookInstaller.InstallAsync(
+					false,
+					repo,
+					output,
+					cancellationToken: TestContext.Current.CancellationToken));
 
-			Assert.Equal(handWritten, await File.ReadAllTextAsync(hookPath));
+			Assert.Equal(handWritten, await File.ReadAllTextAsync(
+				hookPath,
+				TestContext.Current.CancellationToken));
 		}
 		finally
 		{
@@ -278,7 +323,11 @@ public class HookInstallerTests
 				HookInstaller.Trampoline);
 			var output = new StringWriter();
 
-			int code = await HookInstaller.InstallAsync(false, repo, output);
+			int code = await HookInstaller.InstallAsync(
+				false,
+				repo,
+				output,
+				cancellationToken: TestContext.Current.CancellationToken);
 
 			Assert.Equal(0, code);
 			Assert.Contains("already up to date", output.ToString());
@@ -316,7 +365,8 @@ public class HookInstallerTests
 				output,
 				false,
 				defaultTemplateDir,
-				configFile);
+				configFile,
+				TestContext.Current.CancellationToken);
 
 			Assert.Equal(0, code);
 			Assert.True(
@@ -347,14 +397,16 @@ public class HookInstallerTests
 			string defaultTemplateDir = Path.Combine(root, ".git-templates");
 			await File.WriteAllTextAsync(
 				configFile,
-				$"[init]\n\ttemplateDir = {existingTemplateDir}\n");
+				$"[init]\n\ttemplateDir = {existingTemplateDir}\n",
+				TestContext.Current.CancellationToken);
 			var output = new StringWriter();
 
 			int code = await HookInstaller.InstallGlobalAsync(
 				output,
 				false,
 				defaultTemplateDir,
-				configFile);
+				configFile,
+				TestContext.Current.CancellationToken);
 
 			Assert.Equal(0, code);
 			Assert.True(

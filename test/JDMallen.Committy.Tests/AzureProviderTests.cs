@@ -89,8 +89,13 @@ public class AzureProviderTests
 		IChatCompletionClient client =
 			new ChatCompletionClientFactory(http).Create(config);
 
-		await new CommitMessageGenerator(client, config.MaxTokensOverride)
-			.GenerateAsync("diff --git a/x b/x", true);
+		await new CommitMessageGenerator(
+			client,
+			config.MaxTokensOverride)
+			.GenerateAsync(
+				"diff --git a/x b/x",
+				true,
+				TestContext.Current.CancellationToken);
 
 		using JsonDocument body = JsonDocument.Parse(handler.RequestBody!);
 		JsonElement root = body.RootElement;
@@ -110,8 +115,13 @@ public class AzureProviderTests
 		IChatCompletionClient client =
 			new ChatCompletionClientFactory(http).Create(config);
 
-		await new CommitMessageGenerator(client, config.MaxTokensOverride)
-			.GenerateAsync("diff --git a/x b/x", false);
+		await new CommitMessageGenerator(
+			client,
+			config.MaxTokensOverride)
+			.GenerateAsync(
+				"diff --git a/x b/x",
+				false,
+				TestContext.Current.CancellationToken);
 
 		using JsonDocument body = JsonDocument.Parse(handler.RequestBody!);
 		Assert.True(body.RootElement.TryGetProperty("temperature", out _));

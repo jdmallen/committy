@@ -51,7 +51,13 @@ public class PatchCondenserTests
 		Assert.Equal(patch, condensed.Text);
 		FileChange file = Assert.Single(condensed.Files);
 		Assert.Equal(
-			new FileChange("src/App.cs", 'M', 1, 1, false, FileCondensing.None),
+			new FileChange(
+				"src/App.cs",
+				'M',
+				1,
+				1,
+				false,
+				FileCondensing.None),
 			file);
 		Assert.Equal(ChangeSize.Small, condensed.Size);
 	}
@@ -120,11 +126,14 @@ public class PatchCondenserTests
 
 		Assert.Collection(
 			condensed.Files,
-			file => Assert.Equal(("new.txt", 'A', 1, 0),
+			file => Assert.Equal(
+				("new.txt", 'A', 1, 0),
 				(file.Path, file.Status, file.Added, file.Removed)),
-			file => Assert.Equal(("gone.txt", 'D', 0, 1),
+			file => Assert.Equal(
+				("gone.txt", 'D', 0, 1),
 				(file.Path, file.Status, file.Added, file.Removed)),
-			file => Assert.Equal(("new name.txt", 'R', 0, 0),
+			file => Assert.Equal(
+				("new name.txt", 'R', 0, 0),
 				(file.Path, file.Status, file.Added, file.Removed)));
 		Assert.Equal(patch, condensed.Text);
 	}
@@ -195,7 +204,9 @@ public class PatchCondenserTests
 		CondensedPatch condensed = PatchCondenser.Condense(patch);
 
 		Assert.DoesNotContain("zcmV", condensed.Text);
-		Assert.Contains("[committy] Binary file; contents omitted.", condensed.Text);
+		Assert.Contains(
+			"[committy] Binary file; contents omitted.",
+			condensed.Text);
 		FileChange file = Assert.Single(condensed.Files);
 		Assert.True(file.IsBinary);
 		Assert.Equal(FileCondensing.Generated, file.Condensing);
@@ -215,6 +226,7 @@ public class PatchCondenserTests
 		Assert.Contains("+de 1", condensed.Text);
 		Assert.DoesNotContain("+fr 1", condensed.Text);
 		Assert.DoesNotContain("+ja 1", condensed.Text);
+
 		// The neutral file's counts differ, so it isn't a repeat.
 		Assert.Contains("+en 1", condensed.Text);
 		Assert.Contains(
@@ -270,7 +282,9 @@ public class PatchCondenserTests
 		FileChange file = Assert.Single(condensed.Files);
 		Assert.Equal(FileCondensing.Truncated, file.Condensing);
 		Assert.Equal(2000, file.Added);
-		Assert.Contains("[committy] Diff truncated for length: showed ", condensed.Text);
+		Assert.Contains(
+			"[committy] Diff truncated for length: showed ",
+			condensed.Text);
 		Assert.True(
 			condensed.Text.Length < PatchCondenser.PER_FILE_CHAR_LIMIT + 200);
 		Assert.Contains("+++ b/src/Big.cs", condensed.Text);
@@ -280,12 +294,14 @@ public class PatchCondenserTests
 	{
 		var builder = new StringBuilder();
 
-		for (int fileNumber = 0; fileNumber < fileCount; fileNumber++)
+		for (var fileNumber = 0; fileNumber < fileCount; fileNumber++)
 		{
 			builder.Append(
 				ModifiedFile(
 					$"dir{fileNumber}/File{fileNumber}",
-					Lines(linesPerFile, $"f{fileNumber} " + new string('x', 40))));
+					Lines(
+						linesPerFile,
+						$"f{fileNumber} " + new string('x', 40))));
 		}
 
 		return builder.ToString();
@@ -295,8 +311,8 @@ public class PatchCondenserTests
 	public void Condense_OverTotalLimit_SharesBudgetSoEveryFileShows()
 	{
 		// Each file is under the per-file cap; together they're over the total.
-		const int fileCount = PatchCondenser.TOTAL_CHAR_LIMIT
-			/ PatchCondenser.PER_FILE_CHAR_LIMIT
+		const int fileCount = (PatchCondenser.TOTAL_CHAR_LIMIT
+				/ PatchCondenser.PER_FILE_CHAR_LIMIT)
 			+ 3;
 
 		CondensedPatch condensed =
@@ -307,7 +323,7 @@ public class PatchCondenserTests
 			condensed.Files,
 			file => Assert.Equal(FileCondensing.Truncated, file.Condensing));
 
-		for (int fileNumber = 0; fileNumber < fileCount; fileNumber++)
+		for (var fileNumber = 0; fileNumber < fileCount; fileNumber++)
 		{
 			Assert.Contains($"+f{fileNumber} x", condensed.Text);
 		}
@@ -334,8 +350,8 @@ public class PatchCondenserTests
 	[Fact]
 	public void Condense_TooManyFilesToShareOut_OmitsTheRestAndSaysSo()
 	{
-		const int fileCount = PatchCondenser.TOTAL_CHAR_LIMIT
-			/ PatchCondenser.MIN_SHARED_FILE_CHARS
+		const int fileCount = (PatchCondenser.TOTAL_CHAR_LIMIT
+				/ PatchCondenser.MIN_SHARED_FILE_CHARS)
 			+ 50;
 
 		CondensedPatch condensed =

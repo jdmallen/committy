@@ -152,7 +152,7 @@ public static class PatchCondenser
 		string[] lines = patch.Split('\n');
 		List<int> sectionStarts = [];
 
-		for (int lineIndex = 0; lineIndex < lines.Length; lineIndex++)
+		for (var lineIndex = 0; lineIndex < lines.Length; lineIndex++)
 		{
 			if (lines[lineIndex]
 				.StartsWith(DIFF_HEADER, StringComparison.Ordinal))
@@ -177,7 +177,7 @@ public static class PatchCondenser
 			: null;
 		List<FileSection> sections = [];
 
-		for (int sectionIndex = 0;
+		for (var sectionIndex = 0;
 			 sectionIndex < sectionStarts.Count;
 			 sectionIndex++)
 		{
@@ -266,7 +266,11 @@ public static class PatchCondenser
 	private static void MarkRepeated(List<FileSection> sections)
 	{
 		IEnumerable<IGrouping<string, FileSection>> groups = sections
-			.Where(section => section is { Condensing: FileCondensing.None, IsBinary: false }
+			.Where(section
+				=> section is
+				{
+					Condensing: FileCondensing.None, IsBinary: false,
+				}
 				&& section.Added + section.Removed > 0)
 			.Select(section => (Section: section, Key: section.RepeatKey()))
 			.Where(pair => pair.Key is not null)
@@ -338,9 +342,9 @@ public static class PatchCondenser
 			return;
 		}
 
-		int allowance = 0;
+		var allowance = 0;
 
-		for (int index = 0; index < lengths.Count; index++)
+		for (var index = 0; index < lengths.Count; index++)
 		{
 			allowance = available / (lengths.Count - index);
 
@@ -368,8 +372,8 @@ public static class PatchCondenser
 			: section.Text!;
 		string[] sectionLines = text.Split('\n');
 		int totalLines = section.TotalLines ?? sectionLines.Length;
-		int keptLength = 0;
-		int keptLines = 0;
+		var keptLength = 0;
+		var keptLines = 0;
 
 		while (keptLines < sectionLines.Length
 			   && keptLength + sectionLines[keptLines].Length + 1 <= charLimit)
@@ -392,7 +396,7 @@ public static class PatchCondenser
 		int preambleLength)
 	{
 		int usedLength = preambleLength;
-		int omittedCount = 0;
+		var omittedCount = 0;
 
 		foreach (FileSection section in sections)
 		{
@@ -494,9 +498,9 @@ public static class PatchCondenser
 			string? minusPath = null;
 			string? plusPath = null;
 			string? renameToPath = null;
-			bool inHunk = false;
+			var inHunk = false;
 
-			for (int lineIndex = 1; lineIndex < lines.Length; lineIndex++)
+			for (var lineIndex = 1; lineIndex < lines.Length; lineIndex++)
 			{
 				string line = lines[lineIndex];
 

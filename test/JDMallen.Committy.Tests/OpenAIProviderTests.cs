@@ -181,7 +181,7 @@ public class CommitMessagePromptTests
 		// 12 distinct files is enough to be LARGE regardless of line count.
 		var builder = new System.Text.StringBuilder();
 
-		for (int fileNumber = 0; fileNumber < 12; fileNumber++)
+		for (var fileNumber = 0; fileNumber < 12; fileNumber++)
 		{
 			builder.Append(
 				$"diff --git a/f{fileNumber}/Code{fileNumber}.cs b/f{fileNumber}/Code{fileNumber}.cs\n"
@@ -222,6 +222,7 @@ public class CommitMessagePromptTests
 			"REMINDER: This is a SMALL change",
 			StringComparison.Ordinal);
 		Assert.True(reminderIndex > patchIndex);
+
 		// Escaped braces in the example survive string.Format.
 		Assert.Contains("/dead-letters/{id}/replay", request.UserPrompt);
 	}
@@ -270,11 +271,42 @@ public class CommitMessagePromptTests
 	{
 		List<FileChange> files =
 		[
-			new("pnpm-lock.yaml", 'M', 10, 2, false, FileCondensing.Generated),
-			new("logo.png", 'A', 0, 0, true, FileCondensing.Generated),
-			new("S.fr.resx", 'M', 4, 0, false, FileCondensing.Repeated, "S.de.resx"),
-			new("Big.cs", 'M', 900, 0, false, FileCondensing.Truncated),
-			new("Late.cs", 'M', 3, 3, false, FileCondensing.Omitted),
+			new(
+				"pnpm-lock.yaml",
+				'M',
+				10,
+				2,
+				false,
+				FileCondensing.Generated),
+			new(
+				"logo.png",
+				'A',
+				0,
+				0,
+				true,
+				FileCondensing.Generated),
+			new(
+				"S.fr.resx",
+				'M',
+				4,
+				0,
+				false,
+				FileCondensing.Repeated,
+				"S.de.resx"),
+			new(
+				"Big.cs",
+				'M',
+				900,
+				0,
+				false,
+				FileCondensing.Truncated),
+			new(
+				"Late.cs",
+				'M',
+				3,
+				3,
+				false,
+				FileCondensing.Omitted),
 		];
 
 		Assert.Equal(

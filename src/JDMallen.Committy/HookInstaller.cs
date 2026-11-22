@@ -315,7 +315,9 @@ public static class HookInstaller
 
 		await WriteTrampolineAsync(hooksDir, cancellationToken)
 			.ConfigureAwait(false);
-		await output.WriteLineAsync($"✓ Hook installed: {hookPath}", cancellationToken)
+		await output.WriteLineAsync(
+				$"✓ Hook installed: {hookPath}",
+				cancellationToken)
 			.ConfigureAwait(false);
 
 		return true;

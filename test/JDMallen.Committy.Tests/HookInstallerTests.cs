@@ -136,7 +136,11 @@ public class HookInstallerTests
 	}
 
 	private static string LocalHookPath(string repo) =>
-		Path.Combine(repo, ".git", "hooks", HookInstaller.HOOK_NAME);
+		Path.Combine(
+			repo,
+			".git",
+			"hooks",
+			HookInstaller.HOOK_NAME);
 
 	private static async Task<string> WriteLocalHookAsync(
 		string repo,
@@ -267,7 +271,8 @@ public class HookInstallerTests
 	}
 
 	[Fact]
-	public async Task InstallGlobalAsync_TemplateDirUnset_CreatesDefaultAndSetsIt()
+	public async Task
+		InstallGlobalAsync_TemplateDirUnset_CreatesDefaultAndSetsIt()
 	{
 		string root = CreateTempDir();
 		try
@@ -300,7 +305,8 @@ public class HookInstallerTests
 	}
 
 	[Fact]
-	public async Task InstallGlobalAsync_TemplateDirSet_InstallsThereAndKeepsIt()
+	public async Task
+		InstallGlobalAsync_TemplateDirSet_InstallsThereAndKeepsIt()
 	{
 		string root = CreateTempDir();
 		try

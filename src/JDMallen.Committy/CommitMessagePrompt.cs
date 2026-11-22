@@ -219,7 +219,7 @@ public static class CommitMessagePrompt
 			return $"CHANGE SIZE: {size}";
 		}
 
-		string summary = string.Create(
+		var summary = string.Create(
 			CultureInfo.InvariantCulture,
 			$"CHANGE SIZE: {size} ({Plural(fileCount, "file")}, +{condensed.TotalAdded}/-{condensed.TotalRemoved} lines");
 
@@ -260,8 +260,8 @@ public static class CommitMessagePrompt
 					FileCondensing.Repeated =>
 						$", same change as {FileNameOf(file.RepeatOf)}, diff omitted",
 					FileCondensing.Truncated => ", diff truncated",
-					FileCondensing.Omitted => ", diff omitted for length",
-					_ => string.Empty,
+					FileCondensing.Omitted   => ", diff omitted for length",
+					_                        => string.Empty,
 				});
 			builder.Append(")\n");
 		}

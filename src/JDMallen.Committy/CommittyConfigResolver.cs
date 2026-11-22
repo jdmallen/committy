@@ -93,7 +93,7 @@ public static class CommittyConfigResolver
 		value?.Trim().ToLowerInvariant() switch
 		{
 			"1" or "true" or "yes" or "on" => true,
-			_ => false,
+			_                              => false,
 		};
 
 	/// <summary>The accepted <see cref="PROVIDER_KEY" /> values.</summary>
@@ -106,10 +106,10 @@ public static class CommittyConfigResolver
 	public static Provider? ParseProvider(string? name) =>
 		name?.Trim().ToLowerInvariant() switch
 		{
-			null or "" or "azure" => Provider.Azure,
+			null or "" or "azure"   => Provider.Azure,
 			"anthropic" or "claude" => Provider.Anthropic,
-			"openai" or "local" => Provider.OpenAI,
-			_ => null,
+			"openai" or "local"     => Provider.OpenAI,
+			_                       => null,
 		};
 
 	/// <summary>
@@ -121,8 +121,8 @@ public static class CommittyConfigResolver
 		provider switch
 		{
 			Provider.Anthropic => "anthropic",
-			Provider.OpenAI => "openai",
-			_ => "azure",
+			Provider.OpenAI    => "openai",
+			_                  => "azure",
 		};
 
 	/// <summary>
@@ -133,7 +133,7 @@ public static class CommittyConfigResolver
 		name?.Trim().ToLowerInvariant() switch
 		{
 			null or "" or "apikey" or "api-key" or "key" => AzureAuth.ApiKey,
-			"azurecli" or "azure-cli" or "az" or "cli" => AzureAuth.AzureCli,
+			"azurecli" or "azure-cli" or "az" or "cli"   => AzureAuth.AzureCli,
 			"azureidentity" or "azure-identity" or "identity" or "entra" =>
 				AzureAuth.AzureIdentity,
 			_ => null,
@@ -147,9 +147,9 @@ public static class CommittyConfigResolver
 	public static string AzureAuthName(AzureAuth auth) =>
 		auth switch
 		{
-			AzureAuth.AzureCli => "azurecli",
+			AzureAuth.AzureCli      => "azurecli",
 			AzureAuth.AzureIdentity => "azureidentity",
-			_ => "apikey",
+			_                       => "apikey",
 		};
 
 	/// <summary>
@@ -183,11 +183,11 @@ public static class CommittyConfigResolver
 	public static string AzureCredentialName(AzureCredentialKind kind) =>
 		kind switch
 		{
-			AzureCredentialKind.DeviceCode => "devicecode",
-			AzureCredentialKind.Default => "default",
-			AzureCredentialKind.AzureCli => "azurecli",
+			AzureCredentialKind.DeviceCode        => "devicecode",
+			AzureCredentialKind.Default           => "default",
+			AzureCredentialKind.AzureCli          => "azurecli",
 			AzureCredentialKind.AzureDeveloperCli => "azd",
-			_ => "interactivebrowser",
+			_                                     => "interactivebrowser",
 		};
 
 	/// <summary>
@@ -227,9 +227,9 @@ public static class CommittyConfigResolver
 	public static string? NormalizeBool(string? value) =>
 		value?.Trim().ToLowerInvariant() switch
 		{
-			"y" or "yes" or "true" or "1" or "on" => "true",
+			"y" or "yes" or "true" or "1" or "on"  => "true",
 			"n" or "no" or "false" or "0" or "off" => "false",
-			_ => null,
+			_                                      => null,
 		};
 
 	public static Task<CommittyConfig> ResolveAsync(
@@ -386,6 +386,7 @@ public static class CommittyConfigResolver
 						DEFAULT_OPEN_AI_MAX_TOKENS),
 				},
 			},
+
 			// An unknown name still resolves as Azure, the default, but is kept
 			// so Validate() reports the typo instead of a missing Azure endpoint.
 			_ => await ResolveAzureAsync(provider is null ? providerName : null)

@@ -552,7 +552,7 @@ internal class Program
 			bool dryRun = parseResult.GetValue(dryRunOption);
 			bool backup = parseResult.GetValue(backupOption);
 
-			int templateExitCode = 0;
+			var templateExitCode = 0;
 
 			if (global)
 			{

@@ -165,7 +165,7 @@ public class CommittyConfigResolverTests
 		_gitConfig[CommittyConfigResolver.PROVIDER_KEY] = "anthropic";
 
 		CommittyConfig config = await Resolve(
-			new ConfigOverrides(Provider: "gemini"));
+			new ConfigOverrides("gemini"));
 
 		Assert.Equal("gemini", config.UnknownProvider);
 		Assert.Contains("gemini", config.Validate());

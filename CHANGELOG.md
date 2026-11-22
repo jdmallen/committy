@@ -15,6 +15,10 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Changed
 
+- The prompt now says what counts as a breaking change, so suggestions add
+  `!` only when users, scripts, or dependent code must change (a removed CLI
+  flag, config key, or library API, a changed default or format), not for a
+  renamed public method inside an application, a refactor, or a bug fix.
 - Provider errors read "provider request failed: ..." instead of "Failed to
   generate commit message suggestions: ...", in both `committy` and the git
   hook's comment.

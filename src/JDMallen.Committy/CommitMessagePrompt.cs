@@ -45,7 +45,14 @@ public static class CommitMessagePrompt
 		2. No period at end
 		3. Keep under 50 characters when possible
 		4. Add scope when it clarifies context
-		5. Use ! for breaking changes: feat!: or feat(api)!:
+		5. Add ! (feat!: or feat(api)!:) only for a breaking change: one that
+		   forces existing users, scripts, or dependent code to change, such as
+		   a removed or renamed CLI flag, command, config key, or endpoint; a
+		   changed default or file format; or a removed or changed public API
+		   of a library that others consume. NOT breaking: renamed or changed
+		   methods inside an application's own code (even if declared public),
+		   refactors, new options, changed wording of interactive output, and
+		   bug fixes. When unsure, leave ! off.
 		""";
 
 	private const string CONDENSED_PATCH_NOTE =

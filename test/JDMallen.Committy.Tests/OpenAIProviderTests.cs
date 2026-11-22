@@ -208,6 +208,24 @@ public class CommitMessagePromptTests
 		Assert.Contains("M src/App.cs (+1/-1)", request.UserPrompt);
 	}
 
+	/// <summary>
+	/// Without a definition, models flagged ! on any changed public C#
+	/// signature, though an application's own members are not an API.
+	/// </summary>
+	[Theory]
+	[InlineData(true)]
+	[InlineData(false)]
+	public void Build_DefinesBreakingChangesNarrowly(bool titlesOnly)
+	{
+		CompletionRequest request =
+			CommitMessagePrompt.Build(SMALL_PATCH, titlesOnly);
+
+		Assert.Contains(
+			"even if declared public",
+			request.UserPrompt);
+		Assert.Contains("When unsure, leave ! off.", request.UserPrompt);
+	}
+
 	[Fact]
 	public void Build_TitleAndBody_EndsWithSizeReminderAfterPatch()
 	{

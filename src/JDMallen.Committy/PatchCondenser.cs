@@ -1,5 +1,4 @@
 using System.Globalization;
-using System.Text;
 
 namespace JDMallen.Committy;
 
@@ -104,41 +103,41 @@ public static class PatchCondenser
 	private const int NOTE_ALLOWANCE = 200;
 
 	/// <summary>Smallest group of look-alike siblings that gets collapsed.</summary>
-	public const int MIN_REPEAT_GROUP = 3;
+	private const int MIN_REPEAT_GROUP = 3;
 
-	public const int SMALL_MAX_LINES = 30;
-	public const int SMALL_MAX_FILES = 3;
-	public const int LARGE_MIN_LINES = 251;
-	public const int LARGE_MIN_FILES = 11;
+	private const int SMALL_MAX_LINES = 30;
+	private const int SMALL_MAX_FILES = 3;
+	private const int LARGE_MIN_LINES = 251;
+	private const int LARGE_MIN_FILES = 11;
 
 	/// <summary>Prefix on every note the condenser writes into the patch.</summary>
-	public const string NOTE_PREFIX = "[committy]";
+	private const string NOTE_PREFIX = "[committy]";
 
 	private const string DIFF_HEADER = "diff --git ";
 
-	private static readonly HashSet<string> s_generatedFileNames =
-		new(StringComparer.OrdinalIgnoreCase)
-		{
-			"pnpm-lock.yaml",
-			"package-lock.json",
-			"npm-shrinkwrap.json",
-			"yarn.lock",
-			"bun.lock",
-			"bun.lockb",
-			"Cargo.lock",
-			"Gemfile.lock",
-			"composer.lock",
-			"poetry.lock",
-			"Pipfile.lock",
-			"uv.lock",
-			"flake.lock",
-			"Podfile.lock",
-			"go.sum",
-			"packages.lock.json",
-			".terraform.lock.hcl",
-		};
+	private static readonly HashSet<string> GeneratedFileNames =
+	[
+		with(StringComparer.OrdinalIgnoreCase),
+		"pnpm-lock.yaml",
+		"package-lock.json",
+		"npm-shrinkwrap.json",
+		"yarn.lock",
+		"bun.lock",
+		"bun.lockb",
+		"Cargo.lock",
+		"Gemfile.lock",
+		"composer.lock",
+		"poetry.lock",
+		"Pipfile.lock",
+		"uv.lock",
+		"flake.lock",
+		"Podfile.lock",
+		"go.sum",
+		"packages.lock.json",
+		".terraform.lock.hcl",
+	];
 
-	private static readonly string[] s_generatedFileSuffixes =
+	private static readonly string[] GeneratedFileSuffixes =
 	[
 		".min.js",
 		".min.css",
@@ -155,7 +154,8 @@ public static class PatchCondenser
 
 		for (int lineIndex = 0; lineIndex < lines.Length; lineIndex++)
 		{
-			if (lines[lineIndex].StartsWith(DIFF_HEADER, StringComparison.Ordinal))
+			if (lines[lineIndex]
+				.StartsWith(DIFF_HEADER, StringComparison.Ordinal))
 			{
 				sectionStarts.Add(lineIndex);
 			}
@@ -204,7 +204,9 @@ public static class PatchCondenser
 	}
 
 	/// <summary>The size tier for the given meaningful counts.</summary>
-	public static ChangeSize ClassifySize(int meaningfulLines, int meaningfulFiles)
+	public static ChangeSize ClassifySize(
+		int meaningfulLines,
+		int meaningfulFiles)
 	{
 		if (meaningfulLines >= LARGE_MIN_LINES
 			|| meaningfulFiles >= LARGE_MIN_FILES)
@@ -213,9 +215,9 @@ public static class PatchCondenser
 		}
 
 		return meaningfulLines <= SMALL_MAX_LINES
-			   && meaningfulFiles <= SMALL_MAX_FILES
-			? ChangeSize.Small
-			: ChangeSize.Medium;
+			&& meaningfulFiles <= SMALL_MAX_FILES
+				? ChangeSize.Small
+				: ChangeSize.Medium;
 	}
 
 	/// <summary>Whether a path names a lock or generated file.</summary>
@@ -223,8 +225,8 @@ public static class PatchCondenser
 	{
 		string fileName = FileNameOf(path);
 
-		return s_generatedFileNames.Contains(fileName)
-			|| s_generatedFileSuffixes.Any(suffix =>
+		return GeneratedFileNames.Contains(fileName)
+			|| GeneratedFileSuffixes.Any(suffix =>
 				fileName.EndsWith(suffix, StringComparison.OrdinalIgnoreCase));
 	}
 
@@ -247,13 +249,10 @@ public static class PatchCondenser
 
 	private static void MarkGenerated(List<FileSection> sections)
 	{
-		foreach (FileSection section in sections)
+		foreach (FileSection section in sections.Where(section
+					 => section.HasBinaryPatch
+					 || IsGeneratedFile(section.Path)))
 		{
-			if (!section.HasBinaryPatch && !IsGeneratedFile(section.Path))
-			{
-				continue;
-			}
-
 			section.Condensing = FileCondensing.Generated;
 			string note = section.HasBinaryPatch
 				? $"{NOTE_PREFIX} Binary file; contents omitted."
@@ -267,9 +266,8 @@ public static class PatchCondenser
 	private static void MarkRepeated(List<FileSection> sections)
 	{
 		IEnumerable<IGrouping<string, FileSection>> groups = sections
-			.Where(section => section.Condensing == FileCondensing.None
-							  && !section.IsBinary
-							  && section.Added + section.Removed > 0)
+			.Where(section => section is { Condensing: FileCondensing.None, IsBinary: false }
+				&& section.Added + section.Removed > 0)
 			.Select(section => (Section: section, Key: section.RepeatKey()))
 			.Where(pair => pair.Key is not null)
 			.GroupBy(pair => pair.Key!, pair => pair.Section)
@@ -307,8 +305,8 @@ public static class PatchCondenser
 	{
 		foreach (FileSection section in sections)
 		{
-			if (section.Condensing is (FileCondensing.None
-					or FileCondensing.Truncated)
+			if (section.Condensing is FileCondensing.None
+					or FileCondensing.Truncated
 				&& section.Text is not null
 				&& section.Text.Length > charLimit)
 			{
@@ -326,10 +324,13 @@ public static class PatchCondenser
 		List<FileSection> sections,
 		int preambleLength)
 	{
-		List<int> lengths = [.. sections
-			.Where(section => section.Text is not null)
-			.Select(section => section.Text!.Length + 1)
-			.Order()];
+		List<int> lengths =
+		[
+			.. sections
+				.Where(section => section.Text is not null)
+				.Select(section => section.Text!.Length + 1)
+				.Order(),
+		];
 		int available = TOTAL_CHAR_LIMIT - preambleLength - NOTE_ALLOWANCE;
 
 		if (lengths.Sum() <= available)
@@ -405,6 +406,7 @@ public static class PatchCondenser
 			if (usedLength + sectionLength <= TOTAL_CHAR_LIMIT)
 			{
 				usedLength += sectionLength;
+
 				continue;
 			}
 
@@ -456,9 +458,9 @@ public static class PatchCondenser
 	{
 		private string[] _lines = [];
 
-		public string Path { get; private set; } = string.Empty;
+		private char Status { get; set; } = 'M';
 
-		public char Status { get; private set; } = 'M';
+		public string Path { get; private set; } = string.Empty;
 
 		public int Added { get; private set; }
 
@@ -520,7 +522,9 @@ public static class PatchCondenser
 					continue;
 				}
 
-				if (line.StartsWith("GIT binary patch", StringComparison.Ordinal))
+				if (line.StartsWith(
+						"GIT binary patch",
+						StringComparison.Ordinal))
 				{
 					section.BodyStart = lineIndex;
 					section.IsBinary = true;
@@ -539,11 +543,15 @@ public static class PatchCondenser
 				{
 					section.Status = 'D';
 				}
-				else if (line.StartsWith("rename from ", StringComparison.Ordinal))
+				else if (line.StartsWith(
+							 "rename from ",
+							 StringComparison.Ordinal))
 				{
 					section.Status = 'R';
 				}
-				else if (line.StartsWith("rename to ", StringComparison.Ordinal))
+				else if (line.StartsWith(
+							 "rename to ",
+							 StringComparison.Ordinal))
 				{
 					renameToPath = line["rename to ".Length..].TrimEnd('\r');
 				}
@@ -555,7 +563,9 @@ public static class PatchCondenser
 				{
 					plusPath = CleanPath(line[4..]);
 				}
-				else if (line.StartsWith("Binary files ", StringComparison.Ordinal))
+				else if (line.StartsWith(
+							 "Binary files ",
+							 StringComparison.Ordinal))
 				{
 					section.IsBinary = true;
 				}
@@ -610,7 +620,14 @@ public static class PatchCondenser
 		}
 
 		public FileChange ToFileChange() =>
-			new(Path, Status, Added, Removed, IsBinary, Condensing, RepeatOf);
+			new(
+				Path,
+				Status,
+				Added,
+				Removed,
+				IsBinary,
+				Condensing,
+				RepeatOf);
 
 		private static string CleanPath(string rawPath)
 		{
@@ -620,20 +637,22 @@ public static class PatchCondenser
 			string path = Unquote(tab < 0 ? trimmed : trimmed[..tab]);
 
 			return path.StartsWith("a/", StringComparison.Ordinal)
-				   || path.StartsWith("b/", StringComparison.Ordinal)
-				? path[2..]
-				: path;
+				|| path.StartsWith("b/", StringComparison.Ordinal)
+					? path[2..]
+					: path;
 		}
 
 		private static string Unquote(string path) =>
-			path.Length >= 2 && path[0] == '"' && path[^1] == '"'
+			path is ['"', _, ..] && path[^1] == '"'
 				? path[1..^1]
 				: path;
 
 		private static string PathFromDiffHeader(string headerLine)
 		{
 			string rest = headerLine[DIFF_HEADER.Length..].TrimEnd('\r');
-			int quotedStart = rest.LastIndexOf(" \"b/", StringComparison.Ordinal);
+			int quotedStart = rest.LastIndexOf(
+				" \"b/",
+				StringComparison.Ordinal);
 
 			if (quotedStart >= 0)
 			{

@@ -154,6 +154,13 @@ public static class CommitMessagePrompt
 		REMINDER: {5} Title in imperative mood, under 50 characters when possible. Return only the commit message text: no quotation marks, no code fences, no commentary before or after.
 		""";
 
+	// Parsed once rather than on every Build call (CA1863).
+	private static readonly CompositeFormat TitlesUserPromptFormat =
+		CompositeFormat.Parse(TITLES_USER_PROMPT_TEMPLATE);
+
+	private static readonly CompositeFormat TitleAndBodyUserPromptFormat =
+		CompositeFormat.Parse(TITLE_AND_BODY_USER_PROMPT_TEMPLATE);
+
 	/// <param name="patch">The staged diff to summarize.</param>
 	/// <param name="titlesOnly">Whether to ask for five titles or one title+body.</param>
 	/// <param name="maxTokensOverride">
@@ -173,7 +180,7 @@ public static class CommitMessagePrompt
 		string userPrompt = titlesOnly
 			? string.Format(
 				CultureInfo.InvariantCulture,
-				TITLES_USER_PROMPT_TEMPLATE,
+				TitlesUserPromptFormat,
 				changeSummary,
 				fileList,
 				TYPES_AND_TITLE_RULES,
@@ -181,7 +188,7 @@ public static class CommitMessagePrompt
 				condensed.Text)
 			: string.Format(
 				CultureInfo.InvariantCulture,
-				TITLE_AND_BODY_USER_PROMPT_TEMPLATE,
+				TitleAndBodyUserPromptFormat,
 				changeSummary,
 				fileList,
 				TYPES_AND_TITLE_RULES,

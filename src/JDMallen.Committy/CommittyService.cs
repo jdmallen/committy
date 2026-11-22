@@ -28,7 +28,8 @@ public static class CommittyService
 			if (!s_clipboardWarningShown)
 			{
 				await Console.Error.WriteLineAsync(
-						"Warning: Clipboard functionality not available on this system. If running Linux, try installing `xsel` package.")
+						"Warning: Clipboard functionality not available on this system. If running Linux, try installing `xsel` package.",
+						cancellationToken)
 					.ConfigureAwait(false);
 				s_clipboardWarningShown = true;
 			}

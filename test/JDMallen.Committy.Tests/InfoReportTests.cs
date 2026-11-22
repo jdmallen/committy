@@ -234,6 +234,20 @@ public class InfoReportTests
 	}
 
 	[Fact]
+	public async Task Info_UnknownProvider_ReportsIt()
+	{
+		_gitConfig[CommittyConfigResolver.PROVIDER_KEY] =
+			new GitConfigValue("antropic", "global");
+
+		string report = await Build();
+
+		Assert.Matches(
+			@"provider:\s+antropic, unknown \(expected azure, anthropic or openai\)",
+			report);
+		Assert.Matches(@"problem:\s+Unknown provider 'antropic'", report);
+	}
+
+	[Fact]
 	public async Task Info_AzureIdentity_ShowsCredentialTenantAndSavedSignIn()
 	{
 		_gitConfig[CommittyConfigResolver.AZURE_ENDPOINT_KEY] =

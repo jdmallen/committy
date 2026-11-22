@@ -6,6 +6,21 @@ namespace JDMallen.Committy;
 public static class GitService
 {
 	/// <summary>
+	/// <c>git diff --cached</c>, pinned to the plain format
+	/// <see cref="PatchCondenser" /> parses. User config can otherwise drop the
+	/// <c>a/</c> and <c>b/</c> prefixes (<c>diff.noprefix</c>,
+	/// <c>diff.mnemonicPrefix</c>), hand the diff to another tool
+	/// (<c>diff.external</c>), add ANSI colors (<c>color.diff=always</c>), or
+	/// hide files outside the current directory (<c>diff.relative</c>).
+	/// </summary>
+	private static readonly string[] StagedDiffArguments =
+	[
+		"-c", "diff.noprefix=false",
+		"-c", "diff.mnemonicPrefix=false",
+		"diff", "--cached", "--no-ext-diff", "--no-color", "--no-relative",
+	];
+
+	/// <summary>
 	/// Gets staged diff for manual execution fallback, throwing when nothing is
 	/// staged.
 	/// In hook usage, diff comes via stdin instead.
@@ -26,7 +41,7 @@ public static class GitService
 			.ConfigureAwait(false);
 
 		BufferedCommandResult result = await Cli.Wrap("git")
-			.WithArguments(["diff", "--cached"])
+			.WithArguments(StagedDiffArguments)
 			.WithValidation(CommandResultValidation.None)
 			.ExecuteBufferedAsync(cancellationToken)
 			.ConfigureAwait(false);

@@ -112,7 +112,7 @@ internal class Program
 				// Checked before anything is written, so a typo leaves the
 				// config as it was.
 				if (parseResult.GetValue(tenantOption)?.Trim() is
-				{ } tenantFlag and not "-"
+						{ } tenantFlag and not "-"
 					&& !AzureCli.IsValidTenant(tenantFlag))
 				{
 					throw new InvalidOperationException(
@@ -322,7 +322,9 @@ internal class Program
 			}
 			catch (Exception ex)
 			{
-				await Console.Error.WriteLineAsync($"Error: {ex.Message}");
+				await Console.Error.WriteLineAsync(
+					$"Error: {ex.Message}",
+					cancellationToken);
 				Environment.Exit(1);
 			}
 		});
@@ -344,6 +346,11 @@ internal class Program
 			Description =
 				"Install as a global hook template for all future repositories",
 		};
+		var forceOption = new Option<bool>("--force", "-f")
+		{
+			Description =
+				"Replace an existing prepare-commit-msg hook that committy did not write; the old hook is kept as prepare-commit-msg.bak",
+		};
 		var repoArgument = new Argument<string?>("repo")
 		{
 			Description
@@ -356,6 +363,7 @@ internal class Program
 			"Install the committy git hook (local or global)")
 		{
 			globalOption,
+			forceOption,
 			repoArgument,
 		};
 
@@ -368,6 +376,7 @@ internal class Program
 				global,
 				repo,
 				Console.Out,
+				parseResult.GetValue(forceOption),
 				cancellationToken);
 
 			if (exitCode != 0)
@@ -543,24 +552,27 @@ internal class Program
 			bool dryRun = parseResult.GetValue(dryRunOption);
 			bool backup = parseResult.GetValue(backupOption);
 
+			int templateExitCode = 0;
+
 			if (global)
 			{
 				if (dryRun)
 				{
 					await Console.Out.WriteLineAsync(
-						"[dry-run] would re-stamp the global hook template");
+						"[dry-run] would re-stamp the global hook template",
+						cancellationToken);
 				}
 				else
 				{
-					await HookInstaller.InstallAsync(
+					templateExitCode = await HookInstaller.InstallAsync(
 						true,
 						null,
 						Console.Out,
-						cancellationToken);
+						cancellationToken: cancellationToken);
 				}
 			}
 
-			int exitCode = await HookRepairer.RunAsync(
+			int repairExitCode = await HookRepairer.RunAsync(
 				scan,
 				gitDirs,
 				dryRun,
@@ -568,6 +580,7 @@ internal class Program
 				!global,
 				Console.Out,
 				cancellationToken);
+			int exitCode = Math.Max(templateExitCode, repairExitCode);
 
 			if (exitCode != 0)
 			{
@@ -690,8 +703,7 @@ internal class Program
 		};
 		var clipboardOption = new Option<bool>(
 			"--clipboard",
-			"-c")
-		{ Description = "Copy first suggestion to clipboard" };
+			"-c") { Description = "Copy first suggestion to clipboard" };
 		var titlesOnlyOption = new Option<bool>(
 			"--titles-only",
 			"-t")
@@ -755,21 +767,26 @@ internal class Program
 
 				if (error is not null)
 				{
-					await Console.Error.WriteLineAsync($"Error: {error}");
+					await Console.Error.WriteLineAsync(
+						$"Error: {error}",
+						cancellationToken);
 					Environment.Exit(1);
 				}
 
 				bool titlesOnly = parseResult.GetValue(titlesOnlyOption)
 					|| config.TitlesOnly;
 
-				string patch;
+				string? patch = null;
 
 				if (isGitAccessDisabled || Console.IsInputRedirected)
 				{
 					patch = await CommittyService.ReadPatchFromStdinAsync(
 						cancellationToken);
 				}
-				else
+
+				// A GUI client, CI step or `< /dev/null` redirects stdin without
+				// sending a patch; read the staged diff unless --no-git says not to.
+				if (string.IsNullOrWhiteSpace(patch) && !isGitAccessDisabled)
 				{
 					patch = await GitService.GetStagedDiffAsync(
 						cancellationToken);
@@ -778,7 +795,8 @@ internal class Program
 				if (string.IsNullOrWhiteSpace(patch))
 				{
 					await Console.Error.WriteLineAsync(
-						"Error: No patch data available.");
+						"Error: No patch data available.",
+						cancellationToken);
 					Environment.Exit(1);
 				}
 
@@ -809,7 +827,9 @@ internal class Program
 			}
 			catch (Exception ex)
 			{
-				await Console.Error.WriteLineAsync($"Error: {ex.Message}");
+				await Console.Error.WriteLineAsync(
+					$"Error: {ex.Message}",
+					cancellationToken);
 				Environment.Exit(1);
 			}
 		});
@@ -996,16 +1016,19 @@ internal class Program
 	{
 		if (flag is not null)
 		{
-			return CommittyConfigResolver.ParseProvider(flag);
+			return CommittyConfigResolver.ParseProvider(flag)
+				?? throw UnknownProvider(flag);
 		}
 
 		string? current = await GitConfigStore.GetAsync(
 			CommittyConfigResolver.PROVIDER_KEY,
 			cancellationToken);
+		Provider? currentProvider =
+			CommittyConfigResolver.ParseProvider(current);
 
 		if (Console.IsInputRedirected)
 		{
-			return CommittyConfigResolver.ParseProvider(current);
+			return currentProvider ?? throw UnknownProvider(current);
 		}
 
 		Console.WriteLine("Select a provider:");
@@ -1013,24 +1036,47 @@ internal class Program
 		Console.WriteLine("  2) anthropic (Claude)");
 		Console.WriteLine(
 			"  3) openai    (openai.com or a self-hosted OpenAI-compatible server)");
-		string defaultChoice =
-			CommittyConfigResolver.ParseProvider(current) switch
-			{
-				Provider.Anthropic => "2",
-				Provider.OpenAI => "3",
-				_ => "1",
-			};
-		Console.Write($"Choice [{defaultChoice}]: ");
-
-		string? choice = Console.ReadLine()?.Trim();
-		choice = string.IsNullOrEmpty(choice) ? defaultChoice : choice;
-
-		return choice switch
+		string defaultChoice = currentProvider switch
 		{
-			"2" or "anthropic" or "claude" => Provider.Anthropic,
-			"3" or "openai" or "local" => Provider.OpenAI,
-			_ => Provider.Azure,
+			Provider.Anthropic => "2",
+			Provider.OpenAI    => "3",
+			_                  => "1",
 		};
+
+		while (true)
+		{
+			Console.Write($"Choice [{defaultChoice}]: ");
+
+			string? choice = Console.ReadLine()?.Trim();
+
+			Provider? chosen = choice switch
+			{
+				null or "" => ChoiceProvider(defaultChoice),
+				_ => ChoiceProvider(choice)
+					?? CommittyConfigResolver.ParseProvider(choice),
+			};
+
+			if (chosen is { } provider)
+			{
+				return provider;
+			}
+
+			Console.WriteLine(
+				$"'{choice}' is not a provider. Enter 1, 2 or 3, or {CommittyConfigResolver.PROVIDER_NAMES}.");
+		}
+
+		static Provider? ChoiceProvider(string choice) =>
+			choice switch
+			{
+				"1" => Provider.Azure,
+				"2" => Provider.Anthropic,
+				"3" => Provider.OpenAI,
+				_   => null,
+			};
+
+		static InvalidOperationException UnknownProvider(string? name) =>
+			new(
+				$"'{name}' is not a provider ({CommittyConfigResolver.PROVIDER_NAMES}).");
 	}
 
 	private static async Task SetAsync(
@@ -1280,7 +1326,9 @@ internal class Program
 
 		if (azure.Validate() is { } problem)
 		{
-			await Console.Error.WriteLineAsync($"  {problem}");
+			await Console.Error.WriteLineAsync(
+				$"  {problem}",
+				cancellationToken);
 			Environment.Exit(1);
 		}
 
@@ -1329,9 +1377,11 @@ internal class Program
 					  or CredentialUnavailableException)
 		{
 			await Console.Error.WriteLineAsync(
-				$"  Sign-in failed: {ex.Message}");
+				$"  Sign-in failed: {ex.Message}",
+				cancellationToken);
 			await Console.Error.WriteLineAsync(
-				"  The settings above are saved; run `committy config` again to retry.");
+				"  The settings above are saved; run `committy config` again to retry.",
+				cancellationToken);
 			Environment.Exit(1);
 		}
 	}

@@ -7,8 +7,23 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [1.9.0]
 
+### Added
+
+- `committy install-hook --force` (`-f`) replaces an existing
+  `prepare-commit-msg` hook that committy didn't write, keeping the old one as
+  `prepare-commit-msg.bak`.
+
 ### Changed
 
+- `committy install-hook` no longer overwrites a `prepare-commit-msg` hook
+  that committy didn't write. It leaves the hook in place and exits with an
+  error that names the file; pass `--force` to replace it. Older committy
+  hooks are still upgraded without asking.
+- `committy install-hook --global` now installs into your existing
+  `init.templateDir` if one is set, instead of pointing it at
+  `~/.git-templates`. `~/.git-templates` is only created and configured when
+  `init.templateDir` is unset. `repair-hooks --global` now exits non-zero if
+  the template can't be updated.
 - Committy now targets .NET 11. The release binaries are still
   self-contained, so no .NET install is needed to run them; building from
   source requires the .NET 11 SDK (pinned in `global.json`).
@@ -18,6 +33,21 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   Arm64 builds need a CPU with LSE atomics. On older CPUs committy exits at
   startup with "The current CPU is missing one or more of the baseline
   instruction sets." Stay on 1.8.0 if that affects you.
+
+### Fixed
+
+- An unknown provider name (for example `--provider antropic` or a typo in
+  `committy.provider`) is now reported as "Unknown provider" with the accepted
+  values (`azure`, `anthropic`, `openai`), instead of silently falling back to
+  Azure and complaining about a missing endpoint. `committy --info` shows it
+  too, and the `committy config` menu asks again on an invalid choice.
+- Staged diffs are read in git's plain format whatever your diff settings.
+  `diff.noprefix`, `diff.mnemonicPrefix`, `diff.external`, `color.diff` and
+  `diff.relative` no longer break the file list, send color codes or another
+  tool's output to the model, or hide files outside the current directory.
+- Running committy with an empty redirected stdin (from a GUI client, a CI
+  step, or `< /dev/null`) now falls back to the staged diff, as the `--no-git`
+  help describes, instead of failing with "No patch data available".
 
 ## [1.8.0]
 

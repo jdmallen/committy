@@ -156,4 +156,47 @@ public class GitServiceTests
 			Assert.Contains("diff --git", diff);
 			Assert.Contains("hello world", diff);
 		});
+
+	private static async Task GitConfigAsync(
+		string repo,
+		string key,
+		string value) =>
+		await Cli.Wrap("git")
+			.WithArguments(["-C", repo, "config", key, value])
+			.ExecuteBufferedAsync();
+
+	[Fact]
+	public async Task TryGetStagedDiffAsync_IgnoresUserDiffFormatConfig()
+		=> await InRepoAsync(async repo =>
+		{
+			await GitConfigAsync(repo, "diff.noprefix", "true");
+			await GitConfigAsync(repo, "diff.mnemonicPrefix", "true");
+			await GitConfigAsync(repo, "color.diff", "always");
+			await GitConfigAsync(repo, "diff.external", "false");
+			await StageFileAsync(repo, "file.txt", "hello world\n");
+
+			string? diff =
+				await GitService.TryGetStagedDiffAsync(CancellationToken.None);
+
+			Assert.NotNull(diff);
+			Assert.Contains("diff --git a/file.txt b/file.txt", diff);
+			Assert.Contains("hello world", diff);
+			Assert.DoesNotContain("\e[", diff);
+		});
+
+	[Fact]
+	public async Task TryGetStagedDiffAsync_DiffRelative_StillShowsWholeRepo()
+		=> await InRepoAsync(async repo =>
+		{
+			await GitConfigAsync(repo, "diff.relative", "true");
+			await StageFileAsync(repo, "root.txt", "at the root\n");
+			Directory.CreateDirectory(Path.Combine(repo, "sub"));
+			Directory.SetCurrentDirectory(Path.Combine(repo, "sub"));
+
+			string? diff =
+				await GitService.TryGetStagedDiffAsync(CancellationToken.None);
+
+			Assert.NotNull(diff);
+			Assert.Contains("diff --git a/root.txt b/root.txt", diff);
+		});
 }

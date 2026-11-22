@@ -11,10 +11,12 @@ public class CommittyConfigTests
 	[InlineData("OpenAI", Provider.OpenAI)]
 	[InlineData("local", Provider.OpenAI)]
 	[InlineData(null, Provider.Azure)]
-	[InlineData("nonsense", Provider.Azure)]
+	[InlineData("", Provider.Azure)]
+	[InlineData("nonsense", null)]
+	[InlineData("antropic", null)]
 	public void ParseProvider_MapsNamesCaseInsensitively(
 		string? name,
-		Provider expected) => Assert.Equal(
+		Provider? expected) => Assert.Equal(
 		expected,
 		CommittyConfigResolver.ParseProvider(name));
 

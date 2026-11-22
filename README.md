@@ -64,6 +64,12 @@ committy install-hook /path/to/repo # a specific repository
 committy install-hook --global      # template for all future repositories
 ```
 
+If a `prepare-commit-msg` hook that committy didn't write is already there,
+`install-hook` leaves it alone and exits with an error. Pass `--force` to
+replace it; the old hook is kept as `prepare-commit-msg.bak`. With `--global`,
+committy installs into your existing `init.templateDir` if you have one, and
+only creates `~/.git-templates` (and points `init.templateDir` at it) if not.
+
 The installed hook is a thin **trampoline** that only calls
 `committy prepare-commit-msg`; all logic lives in the binary, so upgrading
 committy upgrades its behavior everywhere and a per-repo hook can't drift out of
@@ -334,6 +340,7 @@ normal run.
 | `--info`        |       |                                                       | off                         | Show the configuration in effect here, its sources, and lifetime token usage.  |
 | `--local`       | —     | —                                                     | off                         | (`config` only) Write to the current repo's git config instead of global.       |
 | `--global`      | `-g`  | —                                                     | off                         | (`install-hook` / `repair-hooks`) Target the global hook template.              |
+| `--force`       | `-f`  |                                                       | off                         | (`install-hook` only) Replace a hook committy didn't write, keeping it as `prepare-commit-msg.bak`. |
 | `--scan <dir>`  | —     | —                                                     | current repo                | (`repair-hooks` only) Recursively sweep a directory for repos; repeatable.      |
 | `--git-dir <dir>` | —   | —                                                     | current repo                | (`repair-hooks` only) Target a headless git directory directly (e.g. `~/.cfg`); repeatable. |
 | `--dry-run`     | —     | —                                                     | off                         | (`repair-hooks` only) Report what would change without modifying anything.      |

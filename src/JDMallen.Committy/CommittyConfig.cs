@@ -312,6 +312,13 @@ public sealed class CommittyConfig
 
 	public required Provider Provider { get; init; }
 
+	/// <summary>
+	/// The provider setting as given when it names no known provider, so
+	/// <see cref="Validate" /> can report it; otherwise null.
+	/// <see cref="Provider" /> is then the Azure default.
+	/// </summary>
+	public string? UnknownProvider { get; init; }
+
 	public bool TitlesOnly { get; init; }
 
 	/// <summary>
@@ -337,17 +344,19 @@ public sealed class CommittyConfig
 	/// misconfigured, else null.
 	/// </summary>
 	public string? Validate() =>
-		Provider switch
-		{
-			Provider.Azure => Azure is null
-				? "Azure configuration missing."
-				: Azure.Validate(),
-			Provider.Anthropic => Anthropic is null
-				? "Anthropic configuration missing."
-				: Anthropic.Validate(),
-			Provider.OpenAI => OpenAI is null
-				? "OpenAI configuration missing."
-				: OpenAI.Validate(),
-			_ => $"Unknown provider: {Provider}",
-		};
+		UnknownProvider is not null
+			? $"Unknown provider '{UnknownProvider}' (expected {CommittyConfigResolver.PROVIDER_NAMES}). Check --provider, {CommittyConfigResolver.PROVIDER_KEY} and $COMMITTY_PROVIDER."
+			: Provider switch
+			{
+				Provider.Azure => Azure is null
+					? "Azure configuration missing."
+					: Azure.Validate(),
+				Provider.Anthropic => Anthropic is null
+					? "Anthropic configuration missing."
+					: Anthropic.Validate(),
+				Provider.OpenAI => OpenAI is null
+					? "OpenAI configuration missing."
+					: OpenAI.Validate(),
+				_ => $"Unknown provider: {Provider}",
+			};
 }

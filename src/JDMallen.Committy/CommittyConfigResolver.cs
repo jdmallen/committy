@@ -96,12 +96,20 @@ public static class CommittyConfigResolver
 			_ => false,
 		};
 
-	public static Provider ParseProvider(string? name) =>
+	/// <summary>The accepted <see cref="PROVIDER_KEY" /> values.</summary>
+	public const string PROVIDER_NAMES = "azure, anthropic or openai";
+
+	/// <summary>
+	/// Reads <c>committy.provider</c>: unset means Azure; null means the value
+	/// names no known provider.
+	/// </summary>
+	public static Provider? ParseProvider(string? name) =>
 		name?.Trim().ToLowerInvariant() switch
 		{
+			null or "" or "azure" => Provider.Azure,
 			"anthropic" or "claude" => Provider.Anthropic,
 			"openai" or "local" => Provider.OpenAI,
-			_ => Provider.Azure,
+			_ => null,
 		};
 
 	/// <summary>
@@ -309,9 +317,12 @@ public static class CommittyConfigResolver
 	{
 		overrides ??= new ConfigOverrides();
 
-		Provider provider = ParseProvider(
-			await Setting(overrides.Provider, PROVIDER_KEY, PROVIDER_ENV)
-				.ConfigureAwait(false));
+		string? providerName = await Setting(
+				overrides.Provider,
+				PROVIDER_KEY,
+				PROVIDER_ENV)
+			.ConfigureAwait(false);
+		Provider? provider = ParseProvider(providerName);
 
 		bool titlesOnly = IsTruthy(
 			await Setting(null, TITLES_ONLY_KEY, TITLES_ONLY_ENV)
@@ -321,7 +332,7 @@ public static class CommittyConfigResolver
 		{
 			Provider.Anthropic => new CommittyConfig
 			{
-				Provider = provider,
+				Provider = Provider.Anthropic,
 				TitlesOnly = titlesOnly,
 				Anthropic = new AnthropicConfig
 				{
@@ -340,7 +351,7 @@ public static class CommittyConfigResolver
 			},
 			Provider.OpenAI => new CommittyConfig
 			{
-				Provider = provider,
+				Provider = Provider.OpenAI,
 				TitlesOnly = titlesOnly,
 				OpenAI = new OpenAIConfig
 				{
@@ -375,10 +386,13 @@ public static class CommittyConfigResolver
 						DEFAULT_OPEN_AI_MAX_TOKENS),
 				},
 			},
-			_ => await ResolveAzureAsync().ConfigureAwait(false),
+			// An unknown name still resolves as Azure, the default, but is kept
+			// so Validate() reports the typo instead of a missing Azure endpoint.
+			_ => await ResolveAzureAsync(provider is null ? providerName : null)
+				.ConfigureAwait(false),
 		};
 
-		async Task<CommittyConfig> ResolveAzureAsync()
+		async Task<CommittyConfig> ResolveAzureAsync(string? unknownProvider)
 		{
 			string? authName = await FlagOrGit(
 					overrides.AzureAuth,
@@ -395,6 +409,7 @@ public static class CommittyConfigResolver
 			return new CommittyConfig
 			{
 				Provider = Provider.Azure,
+				UnknownProvider = unknownProvider,
 				TitlesOnly = titlesOnly,
 				Azure = new AzureConfig
 				{

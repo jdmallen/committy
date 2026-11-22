@@ -147,6 +147,40 @@ public class CommittyConfigResolverTests
 	}
 
 	[Fact]
+	public async Task Provider_Unknown_IsKeptForValidation()
+	{
+		_gitConfig[CommittyConfigResolver.PROVIDER_KEY] = "antropic";
+
+		CommittyConfig config = await Resolve();
+
+		Assert.Equal("antropic", config.UnknownProvider);
+		string? problem = config.Validate();
+		Assert.NotNull(problem);
+		Assert.StartsWith("Unknown provider 'antropic'", problem);
+	}
+
+	[Fact]
+	public async Task Provider_UnknownFlag_BeatsValidGitConfig()
+	{
+		_gitConfig[CommittyConfigResolver.PROVIDER_KEY] = "anthropic";
+
+		CommittyConfig config = await Resolve(
+			new ConfigOverrides(Provider: "gemini"));
+
+		Assert.Equal("gemini", config.UnknownProvider);
+		Assert.Contains("gemini", config.Validate());
+	}
+
+	[Fact]
+	public async Task Provider_Unset_IsAzureWithNoUnknown()
+	{
+		CommittyConfig config = await Resolve();
+
+		Assert.Equal(Provider.Azure, config.Provider);
+		Assert.Null(config.UnknownProvider);
+	}
+
+	[Fact]
 	public async Task AzureAuth_DefaultsToApiKey()
 	{
 		CommittyConfig config = await Resolve();

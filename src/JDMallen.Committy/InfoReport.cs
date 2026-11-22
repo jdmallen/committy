@@ -45,7 +45,9 @@ public static class InfoReport
 				?? "(none: only global and system git config apply)"),
 			Row(
 				"provider",
-				CommittyConfigResolver.ProviderName(config.Provider),
+				config.UnknownProvider is { } unknownProvider
+					? $"{unknownProvider}, unknown (expected {CommittyConfigResolver.PROVIDER_NAMES})"
+					: CommittyConfigResolver.ProviderName(config.Provider),
 				CommittyConfigResolver.PROVIDER_KEY),
 		};
 

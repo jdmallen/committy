@@ -1,3 +1,4 @@
+using System.Globalization;
 using System.Text;
 
 namespace JDMallen.Committy.Tests;
@@ -13,11 +14,14 @@ public class PatchCondenserTests
 		List<string> added = [.. addedLines];
 		List<string> removed = [.. removedLines ?? []];
 		var builder = new StringBuilder();
-		builder.Append($"diff --git a/{path} b/{path}\n");
-		builder.Append("index 1111111..2222222 100644\n");
-		builder.Append($"--- a/{path}\n");
-		builder.Append($"+++ b/{path}\n");
 		builder.Append(
+			CultureInfo.InvariantCulture,
+			$"diff --git a/{path} b/{path}\n");
+		builder.Append("index 1111111..2222222 100644\n");
+		builder.Append(CultureInfo.InvariantCulture, $"--- a/{path}\n");
+		builder.Append(CultureInfo.InvariantCulture, $"+++ b/{path}\n");
+		builder.Append(
+			CultureInfo.InvariantCulture,
 			$"@@ -1,{removed.Count + 1} +1,{added.Count + 1} @@\n");
 		builder.Append(" context\n");
 
@@ -181,8 +185,7 @@ public class PatchCondenserTests
 	[Fact]
 	public void Condense_GitBinaryPatch_ReplacedWithNote()
 	{
-		string patch =
-			"diff --git a/logo.png b/logo.png\n"
+		const string patch = "diff --git a/logo.png b/logo.png\n"
 			+ "index 1111111..2222222 100644\n"
 			+ "GIT binary patch\n"
 			+ "literal 1234\n"
@@ -292,7 +295,7 @@ public class PatchCondenserTests
 	public void Condense_OverTotalLimit_SharesBudgetSoEveryFileShows()
 	{
 		// Each file is under the per-file cap; together they're over the total.
-		int fileCount = PatchCondenser.TOTAL_CHAR_LIMIT
+		const int fileCount = PatchCondenser.TOTAL_CHAR_LIMIT
 			/ PatchCondenser.PER_FILE_CHAR_LIMIT
 			+ 3;
 
@@ -331,7 +334,7 @@ public class PatchCondenserTests
 	[Fact]
 	public void Condense_TooManyFilesToShareOut_OmitsTheRestAndSaysSo()
 	{
-		int fileCount = PatchCondenser.TOTAL_CHAR_LIMIT
+		const int fileCount = PatchCondenser.TOTAL_CHAR_LIMIT
 			/ PatchCondenser.MIN_SHARED_FILE_CHARS
 			+ 50;
 

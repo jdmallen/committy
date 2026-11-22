@@ -69,7 +69,8 @@ public static class HookRepairer
 			if (!Directory.Exists(full))
 			{
 				await output.WriteLineAsync(
-						$"Skipping {full}: directory does not exist.")
+						$"Skipping {full}: directory does not exist.",
+						cancellationToken)
 					.ConfigureAwait(false);
 
 				continue;
@@ -87,7 +88,8 @@ public static class HookRepairer
 			if (!Directory.Exists(full))
 			{
 				await output.WriteLineAsync(
-						$"Skipping {full}: directory does not exist.")
+						$"Skipping {full}: directory does not exist.",
+						cancellationToken)
 					.ConfigureAwait(false);
 
 				continue;
@@ -97,7 +99,9 @@ public static class HookRepairer
 					.ConfigureAwait(false))
 			{
 				await output
-					.WriteLineAsync($"Skipping {full}: not a git directory.")
+					.WriteLineAsync(
+						$"Skipping {full}: not a git directory.",
+						cancellationToken)
 					.ConfigureAwait(false);
 
 				continue;
@@ -358,13 +362,16 @@ public static class HookRepairer
 				&& currentRepoRequired)
 			{
 				await output.WriteLineAsync(
-						"Error: not inside a git repository. Run from a repo, or pass --scan <dir> to sweep, --git-dir <dir> for a headless repo, or --global.")
+						"Error: not inside a git repository. Run from a repo, or pass --scan <dir> to sweep, --git-dir <dir> for a headless repo, or --global.",
+						cancellationToken)
 					.ConfigureAwait(false);
 
 				return 1;
 			}
 
-			await output.WriteLineAsync("No repositories to repair.")
+			await output.WriteLineAsync(
+					"No repositories to repair.",
+					cancellationToken)
 				.ConfigureAwait(false);
 
 			return 0;

@@ -38,9 +38,7 @@ public class CommitMessageGeneratorTests
 			=>
 			generator.GenerateAsync(PATCH, false));
 
-		Assert.StartsWith(
-			"Failed to generate commit message suggestions:",
-			exception.Message);
+		Assert.Equal("provider request failed: boom", exception.Message);
 		Assert.Equal(inner, exception.InnerException);
 	}
 
@@ -85,6 +83,25 @@ public class CommitMessageGeneratorTests
 
 		Assert.Equal(
 			"The provider did not answer within 30 seconds.",
+			exception.Message);
+	}
+
+	[Fact]
+	public async Task GenerateAsync_OneSecondTimeout_UsesSingular()
+	{
+		var client = Substitute.For<IChatCompletionClient>();
+		client.GetCompletionAsync(
+				Arg.Any<CompletionRequest>(),
+				Arg.Any<CancellationToken>())
+			.ThrowsAsync(new TaskCanceledException());
+
+		var generator = new CommitMessageGenerator(client, timeoutSeconds: 1);
+
+		var exception = await Assert.ThrowsAsync<TimeoutException>(() =>
+			generator.GenerateAsync(PATCH, false));
+
+		Assert.Equal(
+			"The provider did not answer within 1 second.",
 			exception.Message);
 	}
 

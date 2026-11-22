@@ -7,6 +7,12 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Changed
+
+- Provider errors read "provider request failed: ..." instead of "Failed to
+  generate commit message suggestions: ...", in both `committy` and the git
+  hook's comment.
+
 ### Fixed
 
 - When the provider takes longer than the HTTP timeout, `committy` now prints

@@ -60,7 +60,7 @@ public sealed class CommitMessageGenerator(
 									   and not OperationCanceledException)
 		{
 			throw new InvalidOperationException(
-				$"Failed to generate commit message suggestions: {ex.Message}",
+				$"provider request failed: {ex.Message}",
 				ex);
 		}
 	}
@@ -68,7 +68,7 @@ public sealed class CommitMessageGenerator(
 	private string BuildTimeoutMessage()
 	{
 		string waited = timeoutSeconds is { } seconds
-			? $"within {seconds} seconds"
+			? $"within {seconds} {(seconds == 1 ? "second" : "seconds")}"
 			: "in time";
 		string hint = timeoutSettingKey is null
 			? string.Empty

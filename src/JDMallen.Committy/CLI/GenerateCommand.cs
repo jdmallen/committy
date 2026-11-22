@@ -203,7 +203,7 @@ public static class GenerateCommand
 	/// </summary>
 	public static string? CheckReady(CommittyConfig config) =>
 		config.Validate()
-		?? (config is { Provider: Provider.Azure, Azure: { } azure }
+		?? (config.Provider is AzureConfig azure
 			? AzureCli.Problem(azure, Environment.GetEnvironmentVariable)
 			: null);
 

@@ -568,7 +568,7 @@ public static class ConfigCommand
 				&& (await CommittyConfigResolver.ResolveAsync(
 						null,
 						cancellationToken))
-					.Azure is { UsesInteractiveSignIn: true }
+					.Provider is AzureConfig { UsesInteractiveSignIn: true }
 					? await AzureCliTenantAsync(cancellationToken)
 					: null);
 		string? value =
@@ -611,16 +611,30 @@ public static class ConfigCommand
 	}
 
 	/// <summary>
+	/// The Azure settings in effect here, now that they are written. Throws
+	/// when another provider is in effect, as when <c>--global</c> wrote azure
+	/// but this repository's own config names another provider.
+	/// </summary>
+	private static async Task<AzureConfig> ResolveAzureAsync(
+		CancellationToken cancellationToken)
+	{
+		CommittyConfig config = await CommittyConfigResolver.ResolveAsync(
+			null,
+			cancellationToken);
+
+		return config.Provider as AzureConfig
+			?? throw new InvalidOperationException(
+				$"{CommittyConfigResolver.PROVIDER_KEY} is {CommittyConfigResolver.ProviderName(config.Provider.Kind)} here, not azure, so the Azure sign-in cannot be checked. A local setting may override the global one.");
+	}
+
+	/// <summary>
 	/// In place of the API key step: where az is, who is signed in (a
 	/// read-only <c>az account show</c>), and the role the account needs.
 	/// </summary>
 	private static async Task WriteAzureCliSetupAsync(
 		CancellationToken cancellationToken)
 	{
-		AzureConfig azure = (await CommittyConfigResolver.ResolveAsync(
-				null,
-				cancellationToken))
-			.Azure!;
+		AzureConfig azure = await ResolveAzureAsync(cancellationToken);
 		string? az = AzureCli.Locate(azure, Environment.GetEnvironmentVariable);
 		string? accountJson = az is null
 			? null
@@ -660,10 +674,7 @@ public static class ConfigCommand
 	private static async Task SignInWithAzureIdentityAsync(
 		CancellationToken cancellationToken)
 	{
-		AzureConfig azure = (await CommittyConfigResolver.ResolveAsync(
-				null,
-				cancellationToken))
-			.Azure!;
+		AzureConfig azure = await ResolveAzureAsync(cancellationToken);
 		string credential =
 			CommittyConfigResolver.AzureCredentialName(azure.Credential);
 		const string roleLine =

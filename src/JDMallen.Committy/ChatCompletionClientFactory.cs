@@ -23,25 +23,21 @@ public sealed class ChatCompletionClientFactory(HttpClient httpClient)
 		bool allowInteractiveSignIn = true) =>
 		config.Provider switch
 		{
-			Provider.Azure => new AzureOpenAIChatClient(
+			AzureConfig azure => new AzureOpenAIChatClient(
 				httpClient,
-				AzureOptions(config.Azure!, allowInteractiveSignIn) with
+				AzureOptions(azure, allowInteractiveSignIn) with
 				{
-					IsReasoningModel = config.Azure!.ReasoningModel,
+					IsReasoningModel = azure.ReasoningModel,
 				}),
-			Provider.Anthropic => new AnthropicChatClient(
+			AnthropicConfig anthropic => new AnthropicChatClient(
 				httpClient,
-				new AnthropicClientOptions(
-					config.Anthropic!.ApiKey!,
-					config.Anthropic.Model)),
-			Provider.OpenAI => new OpenAICompatibleChatClient(
+				new AnthropicClientOptions(anthropic.ApiKey!, anthropic.Model)),
+			OpenAIConfig openAI => new OpenAICompatibleChatClient(
 				httpClient,
 				new OpenAICompatibleClientOptions(
-					config.OpenAI!.BaseUrl!,
-					config.OpenAI.Model,
-					config.OpenAI.ApiKey)),
-			_ => throw new InvalidOperationException(
-				$"Unsupported provider: {config.Provider}"),
+					openAI.BaseUrl!,
+					openAI.Model,
+					openAI.ApiKey)),
 		};
 
 	/// <summary>

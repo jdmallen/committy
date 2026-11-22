@@ -68,7 +68,7 @@ public class AzureIdentityTests
 	{
 		_gitConfig[CommittyConfigResolver.AZURE_AUTH_KEY] = "azureidentity";
 
-		AzureConfig azure = (await Resolve()).Azure!;
+		AzureConfig azure = (await Resolve()).Azure();
 
 		Assert.Equal(AzureAuth.AzureIdentity, azure.Auth);
 		Assert.Equal(AzureCredentialKind.InteractiveBrowser, azure.Credential);
@@ -86,7 +86,7 @@ public class AzureIdentityTests
 
 		AzureConfig azure = (await Resolve(
 				new ConfigOverrides(AzureCredential: "default")))
-			.Azure!;
+			.Azure();
 
 		Assert.Equal(AzureCredentialKind.Default, azure.Credential);
 	}
@@ -97,7 +97,7 @@ public class AzureIdentityTests
 		_gitConfig[CommittyConfigResolver.AZURE_AUTH_KEY] = "azureidentity";
 		_gitConfig[CommittyConfigResolver.AZURE_CREDENTIAL_KEY] = "broker";
 
-		AzureConfig azure = (await Resolve()).Azure!;
+		AzureConfig azure = (await Resolve()).Azure();
 
 		Assert.Equal("broker", azure.UnknownCredential);
 		Assert.Contains(
@@ -171,8 +171,7 @@ public class AzureIdentityTests
 			.Create(
 				new CommittyConfig
 				{
-					Provider = Provider.Azure,
-					Azure = IdentityConfig(),
+					Provider = IdentityConfig(),
 				},
 				false);
 

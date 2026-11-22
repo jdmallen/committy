@@ -56,6 +56,9 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Fixed
 
+- `committy config` setting up Azure sign-in in a repository whose own git
+  config names another provider now says so, instead of failing with "Object
+  reference not set to an instance of an object".
 - When generation fails in the git hook, the note it adds to the commit
   message no longer repeats itself ("failed to generate AI suggestions
   (Failed to generate commit message suggestions: ...)"). Every command now

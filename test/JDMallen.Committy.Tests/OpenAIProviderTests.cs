@@ -28,8 +28,7 @@ public class OpenAIProviderTests
 	private static CommittyConfig Wrap(OpenAIConfig openAI) =>
 		new()
 		{
-			Provider = Provider.OpenAI,
-			OpenAI = openAI,
+			Provider = openAI,
 		};
 
 	[Fact]
@@ -76,14 +75,6 @@ public class OpenAIProviderTests
 			Config(maxTokens: maxTokens).Validate());
 
 	[Fact]
-	public void Validate_MissingOpenAISection_ReturnsError()
-	{
-		var config = new CommittyConfig { Provider = Provider.OpenAI };
-
-		Assert.Equal("OpenAI configuration missing.", config.Validate());
-	}
-
-	[Fact]
 	public void TimeoutSeconds_OpenAI_ComesFromConfig() => Assert.Equal(
 		120,
 		Wrap(Config(timeoutSeconds: 120)).TimeoutSeconds);
@@ -94,7 +85,12 @@ public class OpenAIProviderTests
 	public void TimeoutSeconds_HostedProviders_KeepTheShortDefault(
 		Provider provider)
 	{
-		var config = new CommittyConfig { Provider = provider };
+		var config = new CommittyConfig
+		{
+			Provider = provider == Provider.Azure
+				? new AzureConfig { Deployment = "deployment" }
+				: new AnthropicConfig { Model = "model" },
+		};
 
 		Assert.Equal(
 			CommittyConfig.DEFAULT_TIMEOUT_SECONDS,
@@ -109,7 +105,10 @@ public class OpenAIProviderTests
 	[Fact]
 	public void MaxTokensOverride_Anthropic_IsNull()
 	{
-		var config = new CommittyConfig { Provider = Provider.Anthropic };
+		var config = new CommittyConfig
+		{
+			Provider = new AnthropicConfig { Model = "model" },
+		};
 
 		Assert.Null(config.MaxTokensOverride);
 	}

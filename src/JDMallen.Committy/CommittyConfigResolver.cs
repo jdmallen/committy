@@ -324,9 +324,8 @@ public static class CommittyConfigResolver
 		{
 			Provider.Anthropic => new CommittyConfig
 			{
-				Provider = Provider.Anthropic,
 				TitlesOnly = titlesOnly,
-				Anthropic = new AnthropicConfig
+				Provider = new AnthropicConfig
 				{
 					ApiKey = Key(
 						overrides.ApiKey,
@@ -341,9 +340,8 @@ public static class CommittyConfigResolver
 			},
 			Provider.OpenAI => new CommittyConfig
 			{
-				Provider = Provider.OpenAI,
 				TitlesOnly = titlesOnly,
-				OpenAI = new OpenAIConfig
+				Provider = new OpenAIConfig
 				{
 					// Optional: self-hosted runners generally accept anonymous
 					// requests, so a missing key is not a misconfiguration.
@@ -391,10 +389,9 @@ public static class CommittyConfigResolver
 
 			return new CommittyConfig
 			{
-				Provider = Provider.Azure,
 				UnknownProvider = unknownProvider,
 				TitlesOnly = titlesOnly,
-				Azure = new AzureConfig
+				Provider = new AzureConfig
 				{
 					Auth = auth ?? AzureAuth.ApiKey,
 					UnknownAuth = auth is null ? authName : null,

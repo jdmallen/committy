@@ -27,9 +27,9 @@ public class CommittyConfigResolverTests
 
 		CommittyConfig config = await Resolve();
 
-		Assert.Equal(Provider.Azure, config.Provider);
-		Assert.Equal("https://config", config.Azure!.Endpoint);
-		Assert.Equal("gpt-6-luna", config.Azure.Deployment);
+		Assert.Equal(Provider.Azure, config.Provider.Kind);
+		Assert.Equal("https://config", config.Azure().Endpoint);
+		Assert.Equal("gpt-6-luna", config.Azure().Deployment);
 	}
 
 	[Fact]
@@ -41,9 +41,9 @@ public class CommittyConfigResolverTests
 
 		CommittyConfig config = await Resolve();
 
-		Assert.Equal(Provider.OpenAI, config.Provider);
-		Assert.Equal("http://env/v1", config.OpenAI!.BaseUrl);
-		Assert.Equal("env-model", config.OpenAI.Model);
+		Assert.Equal(Provider.OpenAI, config.Provider.Kind);
+		Assert.Equal("http://env/v1", Assert.IsType<OpenAIConfig>(config.Provider).BaseUrl);
+		Assert.Equal("env-model", Assert.IsType<OpenAIConfig>(config.Provider).Model);
 	}
 
 	[Fact]
@@ -55,7 +55,7 @@ public class CommittyConfigResolverTests
 		CommittyConfig config =
 			await Resolve(new ConfigOverrides(Model: "flag-model"));
 
-		Assert.Equal("flag-model", config.Anthropic!.Model);
+		Assert.Equal("flag-model", Assert.IsType<AnthropicConfig>(config.Provider).Model);
 	}
 
 	[Fact]
@@ -67,7 +67,7 @@ public class CommittyConfigResolverTests
 
 		CommittyConfig config = await Resolve();
 
-		Assert.Equal("env-model", config.Anthropic!.Model);
+		Assert.Equal("env-model", Assert.IsType<AnthropicConfig>(config.Provider).Model);
 	}
 
 	[Theory]
@@ -88,8 +88,12 @@ public class CommittyConfigResolverTests
 
 		CommittyConfig config = await Resolve();
 
-		string? apiKey = config.Azure?.ApiKey
-			?? config.Anthropic?.ApiKey ?? config.OpenAI?.ApiKey;
+		string? apiKey = config.Provider switch
+		{
+			AzureConfig azure         => azure.ApiKey,
+			AnthropicConfig anthropic => anthropic.ApiKey,
+			OpenAIConfig openAI       => openAI.ApiKey,
+		};
 		Assert.Equal("env-key", apiKey);
 	}
 
@@ -100,7 +104,7 @@ public class CommittyConfigResolverTests
 
 		CommittyConfig config = await Resolve();
 
-		Assert.Equal("config-key", config.Azure!.ApiKey);
+		Assert.Equal("config-key", config.Azure().ApiKey);
 	}
 
 	[Fact]
@@ -111,7 +115,7 @@ public class CommittyConfigResolverTests
 		CommittyConfig config =
 			await Resolve(new ConfigOverrides(ApiKey: "flag-key"));
 
-		Assert.Equal("flag-key", config.Azure!.ApiKey);
+		Assert.Equal("flag-key", config.Azure().ApiKey);
 	}
 
 	[Theory]
@@ -145,7 +149,7 @@ public class CommittyConfigResolverTests
 
 		CommittyConfig config = await Resolve();
 
-		Assert.True(config.Azure!.ReasoningModel);
+		Assert.True(config.Azure().ReasoningModel);
 		Assert.Equal(4096, config.MaxTokensOverride);
 	}
 
@@ -179,7 +183,7 @@ public class CommittyConfigResolverTests
 	{
 		CommittyConfig config = await Resolve();
 
-		Assert.Equal(Provider.Azure, config.Provider);
+		Assert.Equal(Provider.Azure, config.Provider.Kind);
 		Assert.Null(config.UnknownProvider);
 	}
 
@@ -188,9 +192,9 @@ public class CommittyConfigResolverTests
 	{
 		CommittyConfig config = await Resolve();
 
-		Assert.Equal(AzureAuth.ApiKey, config.Azure!.Auth);
-		Assert.Null(config.Azure.UnknownAuth);
-		Assert.Null(config.Azure.TenantId);
+		Assert.Equal(AzureAuth.ApiKey, config.Azure().Auth);
+		Assert.Null(config.Azure().UnknownAuth);
+		Assert.Null(config.Azure().TenantId);
 	}
 
 	[Fact]
@@ -202,7 +206,7 @@ public class CommittyConfigResolverTests
 			AzureOpenAIScopes.COGNITIVE_SERVICES;
 		_gitConfig[CommittyConfigResolver.AZURE_AZ_PATH_KEY] = "/opt/az/bin/az";
 
-		AzureConfig azure = (await Resolve()).Azure!;
+		AzureConfig azure = (await Resolve()).Azure();
 
 		Assert.Equal(AzureAuth.AzureCli, azure.Auth);
 		Assert.Equal("contoso.com", azure.TenantId);
@@ -220,7 +224,7 @@ public class CommittyConfigResolverTests
 				new ConfigOverrides(
 					AzureAuth: "azurecli",
 					TenantId: "flag.com")))
-			.Azure!;
+			.Azure();
 
 		Assert.Equal(AzureAuth.AzureCli, azure.Auth);
 		Assert.Equal("flag.com", azure.TenantId);
@@ -231,7 +235,7 @@ public class CommittyConfigResolverTests
 	{
 		_gitConfig[CommittyConfigResolver.AZURE_AUTH_KEY] = "kerberos";
 
-		AzureConfig azure = (await Resolve()).Azure!;
+		AzureConfig azure = (await Resolve()).Azure();
 
 		Assert.Equal("kerberos", azure.UnknownAuth);
 		Assert.Contains("kerberos", azure.Validate());
@@ -244,7 +248,7 @@ public class CommittyConfigResolverTests
 		// not switch a working key setup over.
 		_environment["COMMITTY_AZURE_AUTH"] = "azurecli";
 
-		Assert.Equal(AzureAuth.ApiKey, (await Resolve()).Azure!.Auth);
+		Assert.Equal(AzureAuth.ApiKey, (await Resolve()).Azure().Auth);
 	}
 
 	[Fact]

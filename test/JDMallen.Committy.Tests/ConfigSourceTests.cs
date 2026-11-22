@@ -21,7 +21,7 @@ public class ConfigSourceTests
 
 		ResolvedConfig resolved = await Resolve();
 
-		Assert.Equal(Provider.Anthropic, resolved.Config.Provider);
+		Assert.Equal(Provider.Anthropic, resolved.Config.Provider.Kind);
 		Assert.Equal(
 			"git config --local",
 			Source(resolved, CommittyConfigResolver.PROVIDER_KEY));
@@ -42,7 +42,7 @@ public class ConfigSourceTests
 		ResolvedConfig resolved =
 			await Resolve(new ConfigOverrides("openai"));
 
-		Assert.Equal(Provider.OpenAI, resolved.Config.Provider);
+		Assert.Equal(Provider.OpenAI, resolved.Config.Provider.Kind);
 		Assert.Equal(
 			"command-line flag",
 			Source(resolved, CommittyConfigResolver.PROVIDER_KEY));

@@ -47,13 +47,13 @@ public static class InfoReport
 				"provider",
 				config.UnknownProvider is { } unknownProvider
 					? $"{unknownProvider}, unknown (expected {CommittyConfigResolver.PROVIDER_NAMES})"
-					: CommittyConfigResolver.ProviderName(config.Provider),
+					: CommittyConfigResolver.ProviderName(config.Provider.Kind),
 				CommittyConfigResolver.PROVIDER_KEY),
 		};
 
 		switch (config.Provider)
 		{
-			case Provider.Anthropic when config.Anthropic is { } anthropic:
+			case AnthropicConfig anthropic:
 				rows.Add(
 					Row(
 						"model",
@@ -66,7 +66,7 @@ public static class InfoReport
 						false));
 
 				break;
-			case Provider.OpenAI when config.OpenAI is { } openAI:
+			case OpenAIConfig openAI:
 				rows.Add(
 					Row(
 						"base url",
@@ -94,7 +94,7 @@ public static class InfoReport
 						true));
 
 				break;
-			case Provider.Azure when config.Azure is { } azure:
+			case AzureConfig azure:
 				rows.Add(
 					Row(
 						"endpoint",
@@ -113,19 +113,13 @@ public static class InfoReport
 				rows.Add(
 					Row(
 						"max tokens",
-						azure.EffectiveMaxTokens is { } maxTokens
+						azure.MaxTokensOverride is { } maxTokens
 							? Count(maxTokens)
 							: "built-in (100 for titles, 500 for a message)",
 						CommittyConfigResolver.AZURE_MAX_TOKENS_KEY));
 				AddAzureAuthRows(azure);
 
 				break;
-			default:
-#pragma warning disable CA2208
-				throw new ArgumentOutOfRangeException(
-#pragma warning restore CA2208
-					nameof(resolved.Config.Provider),
-					$"unknown provider: {resolved.Config.Provider}");
 		}
 
 		rows.Add(

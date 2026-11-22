@@ -30,12 +30,46 @@ public enum AzureAuth
 }
 
 /// <summary>
+/// One provider's settings. Closed: the three providers below are the only
+/// kinds, so a <c>switch</c> over them needs no default arm, and adding a
+/// provider makes every switch that misses it a compile error.
+/// </summary>
+public closed class ProviderConfig
+{
+	/// <summary>Which provider these settings are for.</summary>
+	public abstract Provider Kind { get; }
+
+	/// <summary>
+	/// The generation budget to use, or null to keep the prompt's own per-mode
+	/// default. The OpenAI provider and Azure reasoning deployments override
+	/// it, because a thinking block is spent from the same budget as the
+	/// answer.
+	/// </summary>
+	public virtual int? MaxTokensOverride => null;
+
+	/// <summary>
+	/// The HTTP timeout. The hosted providers answer in seconds; only the
+	/// self-hosted path sets it.
+	/// </summary>
+	public virtual int TimeoutSeconds { get; init; } =
+		CommittyConfig.DEFAULT_TIMEOUT_SECONDS;
+
+	/// <summary>
+	/// Returns a human-readable error if these settings are incomplete or
+	/// invalid, else null.
+	/// </summary>
+	public abstract string? Validate();
+}
+
+/// <summary>
 /// Azure OpenAI settings. <see cref="Endpoint" /> is required, and so is
 /// <see cref="ApiKey" /> when <see cref="Auth" /> is
 /// <see cref="AzureAuth.ApiKey" />.
 /// </summary>
-public sealed class AzureConfig
+public sealed class AzureConfig : ProviderConfig
 {
+	public override Provider Kind => Provider.Azure;
+
 	public string? ApiKey { get; init; }
 
 	public AzureAuth Auth { get; init; } = AzureAuth.ApiKey;
@@ -115,8 +149,11 @@ public sealed class AzureConfig
 	/// </summary>
 	public bool ReasoningModel { get; init; }
 
-	/// <summary>The budget to send, or null for the prompt's default.</summary>
-	public int? EffectiveMaxTokens =>
+	/// <summary>
+	/// The configured budget; otherwise a higher default for a reasoning
+	/// deployment, or null for the prompt's own.
+	/// </summary>
+	public override int? MaxTokensOverride =>
 		MaxTokens
 		?? (ReasoningModel
 			? CommittyConfigResolver.DEFAULT_AZURE_REASONING_MAX_TOKENS
@@ -167,7 +204,7 @@ public sealed class AzureConfig
 		Auth == AzureAuth.AzureIdentity
 		&& AzureCredentialFactory.IsInteractive(Credential);
 
-	public string? Validate()
+	public override string? Validate()
 	{
 		if (UnknownAuth is not null)
 		{
@@ -235,13 +272,15 @@ public sealed class AzureConfig
 }
 
 /// <summary>Anthropic (Claude) settings. <see cref="ApiKey" /> is required.</summary>
-public sealed class AnthropicConfig
+public sealed class AnthropicConfig : ProviderConfig
 {
+	public override Provider Kind => Provider.Anthropic;
+
 	public string? ApiKey { get; init; }
 
 	public required string Model { get; init; }
 
-	public string? Validate() =>
+	public override string? Validate() =>
 		string.IsNullOrWhiteSpace(ApiKey)
 			? "Anthropic API key is required (run `committy config` or set ANTHROPIC_API_KEY_COMMITTY)."
 			: null;
@@ -254,8 +293,10 @@ public sealed class AnthropicConfig
 /// deployment-specific; <see cref="ApiKey" /> is not, because self-hosted runners
 /// generally accept anonymous requests.
 /// </summary>
-public sealed class OpenAIConfig
+public sealed class OpenAIConfig : ProviderConfig
 {
+	public override Provider Kind => Provider.OpenAI;
+
 	public string? ApiKey { get; init; }
 
 	/// <summary>
@@ -271,15 +312,17 @@ public sealed class OpenAIConfig
 	/// </summary>
 	public required int MaxTokens { get; init; }
 
+	public override int? MaxTokensOverride => MaxTokens;
+
 	public required string Model { get; init; }
 
 	/// <summary>
 	/// HTTP timeout. Higher than the hosted providers' because a self-hosted
 	/// runner may have to load its weights from disk before generating a token.
 	/// </summary>
-	public required int TimeoutSeconds { get; init; }
+	public override required int TimeoutSeconds { get; init; }
 
-	public string? Validate() =>
+	public override string? Validate() =>
 		string.IsNullOrWhiteSpace(BaseUrl)
 			? "OpenAI base URL is required (run `committy config` or set OPENAI_BASE_URL)."
 			: string.IsNullOrWhiteSpace(Model)
@@ -303,13 +346,7 @@ public sealed class CommittyConfig
 	/// </summary>
 	public const int DEFAULT_TIMEOUT_SECONDS = 30;
 
-	public AnthropicConfig? Anthropic { get; init; }
-
-	public AzureConfig? Azure { get; init; }
-
-	public OpenAIConfig? OpenAI { get; init; }
-
-	public required Provider Provider { get; init; }
+	public required ProviderConfig Provider { get; init; }
 
 	/// <summary>
 	/// The provider setting as given when it names no known provider, so
@@ -320,23 +357,11 @@ public sealed class CommittyConfig
 
 	public bool TitlesOnly { get; init; }
 
-	/// <summary>
-	/// The generation budget to use, or null to keep the prompt's own per-mode
-	/// default. The OpenAI provider and Azure reasoning deployments override it,
-	/// because a thinking block is spent from the same budget as the answer.
-	/// </summary>
-	public int? MaxTokensOverride =>
-		Provider switch
-		{
-			Provider.OpenAI => OpenAI?.MaxTokens,
-			Provider.Azure  => Azure?.EffectiveMaxTokens,
-			_               => null,
-		};
+	/// <inheritdoc cref="ProviderConfig.MaxTokensOverride" />
+	public int? MaxTokensOverride => Provider.MaxTokensOverride;
 
-	public int TimeoutSeconds =>
-		Provider == Provider.OpenAI
-			? OpenAI?.TimeoutSeconds ?? DEFAULT_TIMEOUT_SECONDS
-			: DEFAULT_TIMEOUT_SECONDS;
+	/// <inheritdoc cref="ProviderConfig.TimeoutSeconds" />
+	public int TimeoutSeconds => Provider.TimeoutSeconds;
 
 	/// <summary>
 	/// Returns a human-readable error if the selected provider is
@@ -345,17 +370,5 @@ public sealed class CommittyConfig
 	public string? Validate() =>
 		UnknownProvider is not null
 			? $"Unknown provider '{UnknownProvider}' (expected {CommittyConfigResolver.PROVIDER_NAMES}). Check --provider, {CommittyConfigResolver.PROVIDER_KEY} and $COMMITTY_PROVIDER."
-			: Provider switch
-			{
-				Provider.Azure => Azure is null
-					? "Azure configuration missing."
-					: Azure.Validate(),
-				Provider.Anthropic => Anthropic is null
-					? "Anthropic configuration missing."
-					: Anthropic.Validate(),
-				Provider.OpenAI => OpenAI is null
-					? "OpenAI configuration missing."
-					: OpenAI.Validate(),
-				_ => $"Unknown provider: {Provider}",
-			};
+			: Provider.Validate();
 }

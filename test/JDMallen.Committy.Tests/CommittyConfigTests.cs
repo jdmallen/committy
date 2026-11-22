@@ -25,8 +25,7 @@ public class CommittyConfigTests
 	{
 		var config = new CommittyConfig
 		{
-			Provider = Provider.Anthropic,
-			Anthropic = new AnthropicConfig
+			Provider = new AnthropicConfig
 			{
 				ApiKey = "k",
 				Model = "claude",
@@ -41,8 +40,7 @@ public class CommittyConfigTests
 	{
 		var config = new CommittyConfig
 		{
-			Provider = Provider.Anthropic,
-			Anthropic = new AnthropicConfig
+			Provider = new AnthropicConfig
 			{
 				ApiKey = " ",
 				Model = "claude",
@@ -57,8 +55,7 @@ public class CommittyConfigTests
 	{
 		var config = new CommittyConfig
 		{
-			Provider = Provider.Azure,
-			Azure = new AzureConfig
+			Provider = new AzureConfig
 			{
 				ApiKey = "k",
 				Endpoint = "https://e",
@@ -74,8 +71,7 @@ public class CommittyConfigTests
 	{
 		var config = new CommittyConfig
 		{
-			Provider = Provider.Azure,
-			Azure = new AzureConfig
+			Provider = new AzureConfig
 			{
 				ApiKey = null,
 				Endpoint = "https://e",

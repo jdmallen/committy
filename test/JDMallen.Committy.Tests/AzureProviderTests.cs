@@ -12,8 +12,7 @@ public class AzureProviderTests
 		int? maxTokens = null) =>
 		new()
 		{
-			Provider = Provider.Azure,
-			Azure = new AzureConfig
+			Provider = new AzureConfig
 			{
 				ApiKey = "k",
 				Endpoint = "https://example.openai.azure.com",
@@ -146,8 +145,7 @@ public class AzureProviderTests
 			using var http = new HttpClient(handler);
 			var config = new CommittyConfig
 			{
-				Provider = Provider.Azure,
-				Azure = new AzureConfig
+				Provider = new AzureConfig
 				{
 					Auth = AzureAuth.AzureCli,
 					ApiKey = "should-not-be-sent",

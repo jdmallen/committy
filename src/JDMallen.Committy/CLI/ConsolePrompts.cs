@@ -6,12 +6,16 @@ public static class ConsolePrompts
 	/// <summary>
 	/// A flag value always wins. Otherwise asks interactively, showing the
 	/// current value, which a blank answer keeps; with redirected input, the
-	/// current value is used without asking.
+	/// current value is used without asking. With nothing current,
+	/// <paramref name="defaultValue" /> is shown instead, but a blank answer
+	/// still returns null, so the built-in default is not written to config
+	/// and a later change to it still reaches the user.
 	/// </summary>
 	public static string? Prompt(
 		string label,
 		string? flagValue,
-		string? current)
+		string? current,
+		string? defaultValue = null)
 	{
 		if (flagValue is not null)
 		{
@@ -23,8 +27,8 @@ public static class ConsolePrompts
 			return current;
 		}
 
-		Console.Write(
-			current is null ? $"{label}: " : $"{label} [{current}]: ");
+		string? shown = current ?? defaultValue;
+		Console.Write(shown is null ? $"{label}: " : $"{label} [{shown}]: ");
 
 		// A typed value may be pasted with quotes around it (e.g. a tenant
 		// ID).

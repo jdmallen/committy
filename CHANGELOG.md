@@ -12,6 +12,11 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - Provider errors read "provider request failed: ..." instead of "Failed to
   generate commit message suggestions: ...", in both `committy` and the git
   hook's comment.
+- `committy config` no longer writes built-in defaults (such as the
+  `gpt-4.1-mini` deployment, the 300 second timeout or 2048 max tokens) when
+  you press Enter on a setting that is not set; the prompt still shows the
+  default, and a future change to it reaches you. Settings whose value did not
+  change are not rewritten, and the summary lists only what was written.
 - `repair-hooks` now repairs stale committy hooks in a custom
   `core.hooksPath` directory instead of skipping every repo that sets it.
   Hooks committy did not write are still left alone. The report marks these

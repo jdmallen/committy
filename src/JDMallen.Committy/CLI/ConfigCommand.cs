@@ -151,17 +151,25 @@ public static class ConfigCommand
 		List<(string Key, string? Display)> written,
 		CancellationToken cancellationToken)
 	{
-		Provider provider = await ResolveProviderAsync(
-			flags.Provider,
-			flags.Global,
-			cancellationToken);
-
-		await SetAsync(
-			written,
+		string? storedProvider = await GitConfigStore.GetAsync(
 			CommittyConfigResolver.PROVIDER_KEY,
-			CommittyConfigResolver.ProviderName(provider),
 			flags.Global,
 			cancellationToken);
+		Provider provider = ResolveProvider(flags.Provider, storedProvider);
+		string providerName = CommittyConfigResolver.ProviderName(provider);
+
+		if (!string.Equals(
+				providerName,
+				storedProvider,
+				StringComparison.OrdinalIgnoreCase))
+		{
+			await SetAsync(
+				written,
+				CommittyConfigResolver.PROVIDER_KEY,
+				providerName,
+				flags.Global,
+				cancellationToken);
+		}
 
 		ConfigField[] fields = provider switch
 		{
@@ -369,10 +377,12 @@ public static class ConfigCommand
 				: "AZURE_OPENAI_ENDPOINT_HOST.");
 	}
 
-	private static async Task<Provider> ResolveProviderAsync(
-		string? flag,
-		bool global,
-		CancellationToken cancellationToken)
+	/// <summary>
+	/// The provider from the flag, else asked for with
+	/// <paramref name="current" /> (the stored value in the scope being
+	/// written) as the default.
+	/// </summary>
+	private static Provider ResolveProvider(string? flag, string? current)
 	{
 		if (flag is not null)
 		{
@@ -380,10 +390,6 @@ public static class ConfigCommand
 				?? throw UnknownProvider(flag);
 		}
 
-		string? current = await GitConfigStore.GetAsync(
-			CommittyConfigResolver.PROVIDER_KEY,
-			global,
-			cancellationToken);
 		Provider? currentProvider =
 			CommittyConfigResolver.ParseProvider(current);
 
@@ -493,7 +499,9 @@ public static class ConfigCommand
 
 	/// <summary>
 	/// Prompts for one field (or takes its flag), re-asking until a field with
-	/// fixed answers gets a valid one, and writes it.
+	/// fixed answers gets a valid one, and writes it. Nothing is written when
+	/// the answer matches what this scope already stores, or when a blank
+	/// answer leaves an unset key unset (the built-in default then applies).
 	/// </summary>
 	private static async Task ApplyFieldAsync(
 		List<(string Key, string? Display)> written,
@@ -501,15 +509,15 @@ public static class ConfigCommand
 		bool global,
 		CancellationToken cancellationToken)
 	{
-		string? current =
-			await GitConfigStore.GetAsync(field.Key, global, cancellationToken)
-			?? field.Default;
+		string? stored =
+			await GitConfigStore.GetAsync(field.Key, global, cancellationToken);
 		string? value = ConsolePrompts.Prompt(
 			field.Label,
 			field.FlagValue,
-			current);
+			stored,
+			field.Default);
 
-		if (field.Normalize is { } normalize)
+		if (value is not null && field.Normalize is { } normalize)
 		{
 			string? normalized = normalize(value);
 			if (normalized is null && field.FlagValue is not null)
@@ -518,14 +526,25 @@ public static class ConfigCommand
 					$"'{field.FlagValue}' is not valid for {field.Key}. {field.RetryHint}");
 			}
 
-			while (normalized is null && !Console.IsInputRedirected)
+			while (normalized is null
+				&& value is not null
+				&& !Console.IsInputRedirected)
 			{
 				Console.WriteLine($"  {field.RetryHint}");
-				normalized = normalize(
-					ConsolePrompts.Prompt(field.Label, null, current));
+				value = ConsolePrompts.Prompt(
+					field.Label,
+					null,
+					stored,
+					field.Default);
+				normalized = normalize(value);
 			}
 
-			value = normalized ?? normalize(current);
+			value = value is null ? null : normalized ?? normalize(stored);
+		}
+
+		if (value == stored)
+		{
+			return;
 		}
 
 		await SetAsync(
@@ -605,6 +624,11 @@ public static class ConfigCommand
 				cancellationToken);
 			written.Add((CommittyConfigResolver.AZURE_TENANT_KEY, null));
 
+			return;
+		}
+
+		if (value == current)
+		{
 			return;
 		}
 

@@ -293,8 +293,7 @@ public sealed class OpenAIConfig
 
 /// <summary>
 /// The fully resolved committy configuration: which provider to use, that
-/// provider's
-/// credentials, and the default output mode.
+/// provider's credentials, and the default output mode.
 /// </summary>
 public sealed class CommittyConfig
 {

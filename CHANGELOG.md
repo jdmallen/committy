@@ -56,6 +56,10 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Fixed
 
+- When generation fails in the git hook, the note it adds to the commit
+  message no longer repeats itself ("failed to generate AI suggestions
+  (Failed to generate commit message suggestions: ...)"). Every command now
+  exits with 130 when stopped with Ctrl+C.
 - An unknown provider name (for example `--provider antropic` or a typo in
   `committy.provider`) is now reported as "Unknown provider" with the accepted
   values (`azure`, `anthropic`, `openai`), instead of silently falling back to

@@ -30,12 +30,10 @@ public sealed record HookRepairResult(
 
 /// <summary>
 /// Repairs stale committy hooks by replacing them with the current trampoline.
-/// Only
-/// touches hooks it recognizes as committy-managed (see
-/// <see cref="HookInstaller.IsCommittyManaged" />); foreign hooks are reported and
-/// left
-/// alone. Reuses <see cref="HookInstaller" /> so there is a single source for the
-/// hook text.
+/// Only touches hooks it recognizes as committy-managed (see
+/// <see cref="HookInstaller.IsCommittyManaged" />); foreign hooks are reported
+/// and left alone. Reuses <see cref="HookInstaller" /> so there is a single source
+/// for the hook text.
 /// </summary>
 public static class HookRepairer
 {

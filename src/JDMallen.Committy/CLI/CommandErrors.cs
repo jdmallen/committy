@@ -1,0 +1,35 @@
+namespace JDMallen.Committy;
+
+/// <summary>
+/// Runs a command's body and turns how it ended into the process exit code,
+/// so commands return their code instead of calling
+/// <see cref="Environment.Exit(int)" /> mid-way and skipping cleanup.
+/// </summary>
+public static class CommandErrors
+{
+	/// <summary>The usual exit code for a run stopped by Ctrl+C.</summary>
+	public const int CANCELED_EXIT_CODE = 130;
+
+	/// <summary>
+	/// Returns the body's exit code; <see cref="CANCELED_EXIT_CODE" /> when it
+	/// was cancelled; and 1, after printing "Error: ..." to stderr, when it
+	/// threw anything else.
+	/// </summary>
+	public static async Task<int> HandleAsync(Func<Task<int>> body)
+	{
+		try
+		{
+			return await body();
+		}
+		catch (OperationCanceledException)
+		{
+			return CANCELED_EXIT_CODE;
+		}
+		catch (Exception ex)
+		{
+			await Console.Error.WriteLineAsync($"Error: {ex.Message}");
+
+			return 1;
+		}
+	}
+}

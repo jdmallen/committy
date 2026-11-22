@@ -1,10 +1,10 @@
 namespace JDMallen.Committy;
 
 /// <summary>
-/// Orchestrates commit message generation independently of any provider: build the
-/// prompt, ask the configured <see cref="IChatCompletionClient" />, parse the
-/// result.
-/// The provider is injected, so this class never changes when a new LLM is added.
+/// Orchestrates commit message generation independently of any provider: build
+/// the prompt, ask the configured <see cref="IChatCompletionClient" />, parse
+/// the result. The provider is injected, so this class never changes when a new
+/// LLM is added.
 /// </summary>
 /// <param name="client">The configured chat client to ask.</param>
 /// <param name="maxTokensOverride">

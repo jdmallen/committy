@@ -3,12 +3,11 @@ using System.Diagnostics;
 namespace JDMallen.Committy;
 
 /// <summary>
-/// Reads and writes committy settings through <c>git config</c>. Reading uses
-/// <c>--get</c>, which (when run inside a repository) transparently layers local
-/// over
-/// global over system scope, so a per-repo override just works at commit time.
-/// Writing
-/// targets either <c>--global</c> or <c>--local</c>.
+/// Reads and writes committy settings through <c>git config</c>. Reading
+/// (<see cref="ReadAllAsync" /> for every setting at once, or
+/// <see cref="GetAsync" /> for one) sees local over global over system scope
+/// when run inside a repository, so a per-repo override just works at commit
+/// time. Writing targets either <c>--global</c> or <c>--local</c>.
 /// </summary>
 public static class GitConfigStore
 {

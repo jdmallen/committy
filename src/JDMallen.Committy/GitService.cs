@@ -20,9 +20,8 @@ public static class GitService
 	];
 
 	/// <summary>
-	/// Gets staged diff for manual execution fallback, throwing when nothing is
-	/// staged.
-	/// In hook usage, diff comes via stdin instead.
+	/// Gets the staged diff, throwing when nothing is staged. The root command
+	/// uses it when no patch is piped to stdin.
 	/// </summary>
 	public static async Task<string> GetStagedDiffAsync(
 		CancellationToken cancellationToken = default)

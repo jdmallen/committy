@@ -2,10 +2,9 @@ namespace JDMallen.Committy;
 
 /// <summary>
 /// Turns the model's raw completion text into the list of suggestions committy
-/// emits.
-/// Provider-agnostic: it depends only on the output mode, not on which LLM
-/// produced
-/// the text. Owns the fallbacks for empty or under-filled responses.
+/// emits. Provider-agnostic: it depends only on the output mode, not on which
+/// LLM produced the text. Owns the fallbacks for empty or under-filled
+/// responses.
 /// </summary>
 public static class CommitMessageParser
 {

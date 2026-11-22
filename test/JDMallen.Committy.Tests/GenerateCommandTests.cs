@@ -1,10 +1,10 @@
 namespace JDMallen.Committy.Tests;
 
-public class CommittyServiceTests
+public class GenerateCommandTests
 {
 	[Fact]
 	public async Task CopyToClipboardAsync_NullText_DoesNotThrow()
-		=> await CommittyService.CopyToClipboardAsync(
+		=> await GenerateCommand.CopyToClipboardAsync(
 			null!,
 			CancellationToken.None);
 
@@ -13,7 +13,7 @@ public class CommittyServiceTests
 	{
 		const string text = "feat: add new feature";
 
-		await CommittyService.CopyToClipboardAsync(
+		await GenerateCommand.CopyToClipboardAsync(
 			text,
 			CancellationToken.None);
 	}
@@ -25,7 +25,7 @@ public class CommittyServiceTests
 		// Note: assumes Console.IsInputRedirected is false in the test environment.
 		Task<InvalidOperationException> exception =
 			Assert.ThrowsAsync<InvalidOperationException>(() =>
-				CommittyService.ReadPatchFromStdinAsync(
+				GenerateCommand.ReadPatchFromStdinAsync(
 					CancellationToken.None));
 
 		Assert.NotNull(exception);

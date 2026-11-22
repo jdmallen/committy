@@ -366,10 +366,10 @@ environment variable, then git config**. See
 [Configuration](#configuration) for details, or run `committy --info` to see
 which source each setting came from.
 
-**Clipboard support** is optional: Linux needs `xsel` or `xclip`; macOS uses
-built-in `pbcopy`/`pbpaste`; Windows uses the built-in clipboard APIs. If a
-clipboard tool isn't available, committy shows a one-time warning and continues
-normally.
+**Clipboard support** is optional: Linux needs `xsel` (`xclip` alone is not
+enough); macOS uses built-in `pbcopy`/`pbpaste`; Windows uses the built-in
+clipboard APIs. If a clipboard tool isn't available, committy shows a one-time
+warning and continues normally.
 
 ## Configuration
 

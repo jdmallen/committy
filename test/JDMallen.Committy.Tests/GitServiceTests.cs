@@ -188,6 +188,40 @@ public class GitServiceTests
 		});
 
 	[Fact]
+	public async Task TryGetStagedDiffAsync_IgnoresCustomDiffPrefixes()
+		=> await InRepoAsync(async repo =>
+		{
+			// diff.srcPrefix/dstPrefix arrived in git 2.45; older git accepts
+			// the keys and ignores them, so this passes there trivially.
+			await GitConfigAsync(repo, "diff.srcPrefix", "x/");
+			await GitConfigAsync(repo, "diff.dstPrefix", "y/");
+			await GitConfigAsync(repo, "diff.noprefix", "true");
+			await GitConfigAsync(repo, "diff.mnemonicPrefix", "true");
+			await StageFileAsync(repo, "file.txt", "hello world\n");
+
+			string? diff =
+				await GitService.TryGetStagedDiffAsync(CancellationToken.None);
+
+			Assert.NotNull(diff);
+			Assert.Contains("diff --git a/file.txt b/file.txt", diff);
+			Assert.Contains("+++ b/file.txt", diff);
+		});
+
+	[Fact]
+	public async Task TryGetStagedDiffAsync_NonAsciiPath_IsNotOctalEscaped()
+		=> await InRepoAsync(async repo =>
+		{
+			await StageFileAsync(repo, "café.txt", "hello\n");
+
+			string? diff =
+				await GitService.TryGetStagedDiffAsync(CancellationToken.None);
+
+			Assert.NotNull(diff);
+			Assert.Contains("diff --git a/café.txt b/café.txt", diff);
+			Assert.DoesNotContain(@"\303", diff);
+		});
+
+	[Fact]
 	public async Task TryGetStagedDiffAsync_DiffRelative_StillShowsWholeRepo()
 		=> await InRepoAsync(async repo =>
 		{

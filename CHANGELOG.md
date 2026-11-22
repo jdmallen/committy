@@ -15,6 +15,10 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Fixed
 
+- File names with non-ASCII characters (such as `café.txt`) reach the model
+  as written, not as octal escapes (`caf\303\251.txt`).
+- The staged diff ignores `diff.srcPrefix` and `diff.dstPrefix` (git 2.45+),
+  which changed the `a/` and `b/` prefixes committy reads file names from.
 - The README now lists ICU as a Linux requirement. Release binaries have
   always needed it, and stop at startup on images without it (slim
   containers, minimal servers). Install the distro's ICU package, or set

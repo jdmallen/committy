@@ -6,17 +6,19 @@ public static class GitService
 {
 	/// <summary>
 	/// <c>git diff --cached</c>, pinned to the plain format
-	/// <see cref="PatchCondenser" /> parses. User config can otherwise drop the
-	/// <c>a/</c> and <c>b/</c> prefixes (<c>diff.noprefix</c>,
-	/// <c>diff.mnemonicPrefix</c>), hand the diff to another tool
-	/// (<c>diff.external</c>), add ANSI colors (<c>color.diff=always</c>), or
-	/// hide files outside the current directory (<c>diff.relative</c>).
+	/// <see cref="PatchCondenser" /> parses. User config can otherwise change
+	/// or drop the <c>a/</c> and <c>b/</c> prefixes (<c>diff.noprefix</c>,
+	/// <c>diff.mnemonicPrefix</c>, <c>diff.srcPrefix</c>/<c>dstPrefix</c>;
+	/// the explicit prefix options beat all of them), octal-escape non-ASCII
+	/// paths (<c>core.quotePath</c>, on by default), hand the diff to another
+	/// tool (<c>diff.external</c>), add ANSI colors (<c>color.diff=always</c>),
+	/// or hide files outside the current directory (<c>diff.relative</c>).
 	/// </summary>
 	private static readonly string[] StagedDiffArguments =
 	[
-		"-c", "diff.noprefix=false",
-		"-c", "diff.mnemonicPrefix=false",
+		"-c", "core.quotePath=false",
 		"diff", "--cached", "--no-ext-diff", "--no-color", "--no-relative",
+		"--src-prefix=a/", "--dst-prefix=b/",
 	];
 
 	/// <summary>

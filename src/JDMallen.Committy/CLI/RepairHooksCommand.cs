@@ -65,7 +65,8 @@ public static class RepairHooksCommand
 					parseResult.GetValue(scanOption) ?? [],
 					parseResult.GetValue(gitDirOption) ?? [],
 					parseResult.GetValue(dryRunOption),
-					cancellationToken)));
+					cancellationToken),
+				cancellationToken));
 
 		return command;
 	}

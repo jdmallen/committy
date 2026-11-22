@@ -57,6 +57,12 @@ public closed class ProviderConfig
 		CommittyConfig.DEFAULT_TIMEOUT_SECONDS;
 
 	/// <summary>
+	/// The git config key that sets <see cref="TimeoutSeconds" />, named in
+	/// the timeout error; null when the provider has no such setting.
+	/// </summary>
+	public virtual string? TimeoutSettingKey => null;
+
+	/// <summary>
 	/// Returns a human-readable error if these settings are incomplete or
 	/// invalid, else null.
 	/// </summary>
@@ -309,6 +315,9 @@ public sealed class OpenAIConfig : ProviderConfig
 	/// </summary>
 	public override required int TimeoutSeconds { get; init; }
 
+	public override string TimeoutSettingKey =>
+		CommittyConfigResolver.OPEN_AI_TIMEOUT_KEY;
+
 	public override string? Validate() =>
 		string.IsNullOrWhiteSpace(BaseUrl)
 			? "OpenAI base URL is required (run `committy config` or set OPENAI_BASE_URL)."
@@ -349,6 +358,9 @@ public sealed class CommittyConfig
 
 	/// <inheritdoc cref="ProviderConfig.TimeoutSeconds" />
 	public int TimeoutSeconds => Provider.TimeoutSeconds;
+
+	/// <inheritdoc cref="ProviderConfig.TimeoutSettingKey" />
+	public string? TimeoutSettingKey => Provider.TimeoutSettingKey;
 
 	/// <summary>
 	/// Returns a human-readable error if the selected provider is

@@ -5,6 +5,16 @@ All notable changes to this project are documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [Unreleased]
+
+### Fixed
+
+- When the provider takes longer than the HTTP timeout, `committy` now prints
+  an error naming the timeout (and, for the openai provider, the
+  `committy.openai.timeoutseconds` setting) and exits 1. It used to exit 130
+  with no output, as if Ctrl+C had been pressed. The git hook adds the same
+  text as a comment.
+
 ## [1.10.0]
 
 ### Changed

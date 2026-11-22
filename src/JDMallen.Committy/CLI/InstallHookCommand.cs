@@ -44,7 +44,8 @@ public static class InstallHookCommand
 					parseResult.GetValue(repoArgument),
 					Console.Out,
 					parseResult.GetValue(forceOption),
-					cancellationToken)));
+					cancellationToken),
+				cancellationToken));
 
 		return command;
 	}

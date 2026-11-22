@@ -12,9 +12,18 @@ namespace JDMallen.Committy;
 /// it: the thinking block comes out of the same budget and is discarded before
 /// parsing.
 /// </param>
+/// <param name="timeoutSeconds">
+/// The HTTP timeout the client was built with, quoted in the timeout error.
+/// </param>
+/// <param name="timeoutSettingKey">
+/// The git config key that raises the timeout, named in the timeout error;
+/// null when the provider has none.
+/// </param>
 public sealed class CommitMessageGenerator(
 	IChatCompletionClient client,
-	int? maxTokensOverride = null)
+	int? maxTokensOverride = null,
+	int? timeoutSeconds = null,
+	string? timeoutSettingKey = null)
 {
 	public async Task<CommitSuggestions> GenerateAsync(
 		string patch,
@@ -41,6 +50,12 @@ public sealed class CommitMessageGenerator(
 				CommitMessageParser.Parse(result.Text, titlesOnly),
 				result.Usage);
 		}
+		catch (OperationCanceledException ex)
+			when (!cancellationToken.IsCancellationRequested)
+		{
+			// The caller did not cancel, so the HTTP client's timeout did.
+			throw new TimeoutException(BuildTimeoutMessage(), ex);
+		}
 		catch (Exception ex) when (ex is not ArgumentException
 									   and not OperationCanceledException)
 		{
@@ -48,6 +63,18 @@ public sealed class CommitMessageGenerator(
 				$"Failed to generate commit message suggestions: {ex.Message}",
 				ex);
 		}
+	}
+
+	private string BuildTimeoutMessage()
+	{
+		string waited = timeoutSeconds is { } seconds
+			? $"within {seconds} seconds"
+			: "in time";
+		string hint = timeoutSettingKey is null
+			? string.Empty
+			: $" Raise {timeoutSettingKey} to wait longer.";
+
+		return $"The provider did not answer {waited}.{hint}";
 	}
 }
 

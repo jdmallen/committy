@@ -45,6 +45,67 @@ public class CommitMessageGeneratorTests
 	}
 
 	[Fact]
+	public async Task GenerateAsync_HttpTimeout_ThrowsTimeoutNamingSetting()
+	{
+		var client = Substitute.For<IChatCompletionClient>();
+		var inner = new TaskCanceledException(
+			"The request was canceled due to the configured HttpClient.Timeout of 300 seconds elapsing.");
+		client.GetCompletionAsync(
+				Arg.Any<CompletionRequest>(),
+				Arg.Any<CancellationToken>())
+			.ThrowsAsync(inner);
+
+		var generator = new CommitMessageGenerator(
+			client,
+			timeoutSeconds: 300,
+			timeoutSettingKey: "committy.openai.timeoutseconds");
+
+		var exception = await Assert.ThrowsAsync<TimeoutException>(() =>
+			generator.GenerateAsync(PATCH, false));
+
+		Assert.Equal(
+			"The provider did not answer within 300 seconds. Raise committy.openai.timeoutseconds to wait longer.",
+			exception.Message);
+		Assert.Equal(inner, exception.InnerException);
+	}
+
+	[Fact]
+	public async Task GenerateAsync_HttpTimeoutWithoutSetting_OmitsHint()
+	{
+		var client = Substitute.For<IChatCompletionClient>();
+		client.GetCompletionAsync(
+				Arg.Any<CompletionRequest>(),
+				Arg.Any<CancellationToken>())
+			.ThrowsAsync(new TaskCanceledException());
+
+		var generator = new CommitMessageGenerator(client, timeoutSeconds: 30);
+
+		var exception = await Assert.ThrowsAsync<TimeoutException>(() =>
+			generator.GenerateAsync(PATCH, false));
+
+		Assert.Equal(
+			"The provider did not answer within 30 seconds.",
+			exception.Message);
+	}
+
+	[Fact]
+	public async Task GenerateAsync_CallerCancels_RethrowsCancellation()
+	{
+		using var cancellation = new CancellationTokenSource();
+		await cancellation.CancelAsync();
+		var client = Substitute.For<IChatCompletionClient>();
+		client.GetCompletionAsync(
+				Arg.Any<CompletionRequest>(),
+				Arg.Any<CancellationToken>())
+			.ThrowsAsync(new TaskCanceledException());
+
+		var generator = new CommitMessageGenerator(client, timeoutSeconds: 30);
+
+		await Assert.ThrowsAnyAsync<OperationCanceledException>(() =>
+			generator.GenerateAsync(PATCH, false, cancellation.Token));
+	}
+
+	[Fact]
 	public async Task GenerateAsync_TitleAndBody_PassesRequestAndParsesResult()
 	{
 		var client = Substitute.For<IChatCompletionClient>();

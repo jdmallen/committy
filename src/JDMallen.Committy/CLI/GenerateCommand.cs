@@ -97,7 +97,8 @@ public static class GenerateCommand
 						cancellationToken));
 
 				return 0;
-			}));
+			},
+			cancellationToken));
 
 		return rootCommand;
 	}
@@ -198,7 +199,9 @@ public static class GenerateCommand
 				allowInteractiveSignIn);
 		var generator = new CommitMessageGenerator(
 			client,
-			config.MaxTokensOverride);
+			config.MaxTokensOverride,
+			config.TimeoutSeconds,
+			config.TimeoutSettingKey);
 
 		return await generator.GenerateAsync(
 			patch,

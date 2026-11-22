@@ -70,7 +70,8 @@ public static class ConfigCommand
 						parseResult.GetValue(credentialOption),
 						parseResult.GetValue(titlesOnlyOption),
 						!parseResult.GetValue(localOption)),
-					cancellationToken)));
+					cancellationToken),
+				cancellationToken));
 
 		return command;
 	}

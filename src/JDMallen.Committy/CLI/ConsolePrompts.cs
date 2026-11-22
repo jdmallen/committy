@@ -4,18 +4,18 @@ namespace JDMallen.Committy;
 public static class ConsolePrompts
 {
 	/// <summary>
-	/// A flag value always wins. Otherwise asks interactively, showing the
-	/// current value, which a blank answer keeps; with redirected input, the
-	/// current value is used without asking. With nothing current,
-	/// <paramref name="defaultValue" /> is shown instead, but a blank answer
-	/// still returns null, so the built-in default is not written to config
-	/// and a later change to it still reaches the user.
+	/// A flag value always wins. Otherwise asks interactively, showing
+	/// <paramref name="shown" /> (or the current value) in brackets; a blank
+	/// answer keeps the current value, which may be null. With redirected
+	/// input, the current value is used without asking. Showing a built-in
+	/// default or another scope's value without returning it keeps either
+	/// from being copied into config on Enter.
 	/// </summary>
 	public static string? Prompt(
 		string label,
 		string? flagValue,
 		string? current,
-		string? defaultValue = null)
+		string? shown = null)
 	{
 		if (flagValue is not null)
 		{
@@ -27,8 +27,9 @@ public static class ConsolePrompts
 			return current;
 		}
 
-		string? shown = current ?? defaultValue;
-		Console.Write(shown is null ? $"{label}: " : $"{label} [{shown}]: ");
+		string? bracketed = shown ?? current;
+		Console.Write(
+			bracketed is null ? $"{label}: " : $"{label} [{bracketed}]: ");
 
 		// A typed value may be pasted with quotes around it (e.g. a tenant
 		// ID).

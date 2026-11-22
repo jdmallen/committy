@@ -20,8 +20,12 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   hook's comment.
 - `committy config` no longer writes built-in defaults (such as the
   `gpt-4.1-mini` deployment, the 300 second timeout or 2048 max tokens) when
-  you press Enter on a setting that is not set; the prompt still shows the
-  default, and a future change to it reaches you. Settings whose value did not
+  you press Enter on a setting that is not set, and a future change to the
+  default reaches you. Each prompt shows the value stored in the scope being
+  written and, when another scope's value or an environment variable is the
+  one that applies, that too: `[unset; true from global applies]`,
+  `[unset; 1 from $COMMITTY_TITLES_ONLY applies]`, `[unset; default 300]`, or
+  `[gpt-4o; gpt-5 from local applies here]`. Settings whose value did not
   change are not rewritten, and the summary lists only what was written.
 - `committy config` asks again when the timeout or a max tokens setting is not
   a whole number greater than 0, instead of saving a value that was then

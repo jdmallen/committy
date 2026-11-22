@@ -91,6 +91,26 @@ public static class CommittyConfigResolver
 	private const string OPENAI_BASE_URL_ENV = "OPENAI_BASE_URL";
 	private const string OPENAI_MODEL_ENV = "OPENAI_MODEL";
 
+	/// <summary>
+	/// The environment variable each setting falls back to when no git config
+	/// scope sets it (git config wins; see <c>Setting</c> in
+	/// <see cref="Resolve" />), so <c>committy config</c> can say when one is
+	/// in effect. API keys are left out: they read the environment first, and
+	/// <c>committy config</c> reports them in its own step.
+	/// </summary>
+	public static IReadOnlyDictionary<string, string>
+		SettingEnvironmentVariables { get; } =
+		new Dictionary<string, string>(StringComparer.OrdinalIgnoreCase)
+		{
+			[PROVIDER_KEY] = PROVIDER_ENV,
+			[TITLES_ONLY_KEY] = TITLES_ONLY_ENV,
+			[AZURE_ENDPOINT_KEY] = AZURE_ENDPOINT_ENV,
+			[AZURE_DEPLOYMENT_KEY] = AZURE_DEPLOYMENT_ENV,
+			[ANTHROPIC_MODEL_KEY] = ANTHROPIC_MODEL_ENV,
+			[OPEN_AI_BASE_URL_KEY] = OPENAI_BASE_URL_ENV,
+			[OPEN_AI_MODEL_KEY] = OPENAI_MODEL_ENV,
+		};
+
 	private static bool IsTruthy(string? value) =>
 		value?.Trim().ToLowerInvariant() switch
 		{

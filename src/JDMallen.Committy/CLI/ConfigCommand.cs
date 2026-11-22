@@ -113,8 +113,14 @@ public static class ConfigCommand
 		}
 
 		var written = new List<(string Key, string? Display)>();
+
+		// What applies here before anything is written, so each prompt can
+		// say when another scope's value is the one in effect.
+		IReadOnlyDictionary<string, GitConfigValue> inEffect =
+			await GitConfigStore.ReadAllAsync(cancellationToken);
 		Provider provider = await WriteProviderFieldsAsync(
 			flags,
+			inEffect,
 			written,
 			cancellationToken);
 
@@ -132,6 +138,7 @@ public static class ConfigCommand
 		{
 			await WriteAzureSignInFieldsAsync(
 				flags,
+				inEffect,
 				written,
 				usesAzureIdentity,
 				cancellationToken);
@@ -164,6 +171,7 @@ public static class ConfigCommand
 	/// <returns>The configured provider.</returns>
 	private static async Task<Provider> WriteProviderFieldsAsync(
 		ConfigFlags flags,
+		IReadOnlyDictionary<string, GitConfigValue> inEffect,
 		List<(string Key, string? Display)> written,
 		CancellationToken cancellationToken)
 	{
@@ -171,12 +179,30 @@ public static class ConfigCommand
 			CommittyConfigResolver.PROVIDER_KEY,
 			flags.Global,
 			cancellationToken);
-		Provider provider = ResolveProvider(flags.Provider, storedProvider);
+		GitConfigValue? effectiveProvider = InEffect(
+			inEffect,
+			CommittyConfigResolver.PROVIDER_KEY);
+		Provider provider = ResolveProvider(
+			flags.Provider,
+			storedProvider,
+			DescribeCurrent(
+				storedProvider,
+				effectiveProvider,
+				null,
+				flags.Global),
+			storedProvider ?? effectiveProvider?.Value);
 		string providerName = CommittyConfigResolver.ProviderName(provider);
 
+		// Unchanged, or unset here and inherited from a broader scope (global
+		// or system for --local, or an environment variable): writing it would
+		// only freeze a copy.
+		string? unchangedProvider = storedProvider
+			?? (IsBroaderScope(effectiveProvider?.Scope, flags.Global)
+				? effectiveProvider!.Value
+				: null);
 		if (!string.Equals(
 				providerName,
-				storedProvider,
+				unchangedProvider,
 				StringComparison.OrdinalIgnoreCase))
 		{
 			await SetAsync(
@@ -269,6 +295,7 @@ public static class ConfigCommand
 				written,
 				field,
 				flags.Global,
+				inEffect,
 				cancellationToken);
 		}
 
@@ -286,6 +313,7 @@ public static class ConfigCommand
 				CommittyConfigResolver.NormalizeBool,
 				"Please answer y or n."),
 			flags.Global,
+			inEffect,
 			cancellationToken);
 
 		return provider;
@@ -297,6 +325,7 @@ public static class ConfigCommand
 	/// </summary>
 	private static async Task WriteAzureSignInFieldsAsync(
 		ConfigFlags flags,
+		IReadOnlyDictionary<string, GitConfigValue> inEffect,
 		List<(string Key, string? Display)> written,
 		bool azureIdentity,
 		CancellationToken cancellationToken)
@@ -314,6 +343,7 @@ public static class ConfigCommand
 					NormalizeAzureCredential,
 					$"Please answer {CommittyConfigResolver.AZURE_CREDENTIAL_NAMES}."),
 				flags.Global,
+				inEffect,
 				cancellationToken);
 		}
 
@@ -416,10 +446,85 @@ public static class ConfigCommand
 	/// so a printed command pastes as one argument in POSIX shells,
 	/// PowerShell and cmd alike.
 	/// </summary>
+	/// <summary>
+	/// The bracketed text a prompt shows: the value stored in the scope being
+	/// written, and, when another scope's value is the one that applies, that
+	/// value and its scope too. With nothing set anywhere, the built-in
+	/// default. Null when there is nothing to show.
+	/// </summary>
+	/// <param name="stored">The value in the scope being written.</param>
+	/// <param name="inEffect">The value git sees here, and its scope.</param>
+	/// <param name="builtInDefault">The value used when nothing is set.</param>
+	/// <param name="global">True when writing the global config.</param>
+	public static string? DescribeCurrent(
+		string? stored,
+		GitConfigValue? inEffect,
+		string? builtInDefault,
+		bool global)
+	{
+		string writeScope = global ? "global" : "local";
+		bool otherScopeApplies = inEffect is not null
+			&& inEffect.Scope != writeScope
+			&& inEffect.Value != stored;
+
+		return (stored, otherScopeApplies, builtInDefault) switch
+		{
+			(not null, true, _) =>
+				$"{stored}; {inEffect!.Value} from {inEffect.Scope} applies here",
+			(not null, false, _) => stored,
+			(null, true, _) =>
+				$"unset; {inEffect!.Value} from {inEffect.Scope} applies",
+			(null, false, not null) => $"unset; default {builtInDefault}",
+			(null, false, null) => null,
+		};
+	}
+
+	/// <summary>
+	/// True when a value from <paramref name="scope" /> is inherited by the
+	/// scope being written, rather than overriding it.
+	/// </summary>
+	private static bool IsBroaderScope(string? scope, bool global) =>
+		scope?.StartsWith('$') == true
+		|| (global ? scope == "system" : scope is "global" or "system");
+
+	/// <summary>
+	/// The value in effect for <paramref name="key" />: git config's, else
+	/// its environment variable's, with the variable's name (as
+	/// <c>$NAME</c>) standing in for the scope.
+	/// </summary>
+	private static GitConfigValue? InEffect(
+		IReadOnlyDictionary<string, GitConfigValue> gitConfig,
+		string key)
+	{
+		if (gitConfig.GetValueOrDefault(key) is { } fromGit)
+		{
+			return fromGit;
+		}
+
+		return CommittyConfigResolver.SettingEnvironmentVariables
+				.GetValueOrDefault(key) is { } variable
+			&& Environment.GetEnvironmentVariable(variable)?.Trim() is
+				{ Length: > 0 } value
+				? new GitConfigValue(value, $"${variable}")
+				: null;
+	}
+
 	private static string QuoteForShell(string value) =>
 		value.Any(char.IsWhiteSpace) ? $"\"{value}\"" : value;
 
-	private static Provider ResolveProvider(string? flag, string? current)
+	/// <param name="flag">The --provider value, if given.</param>
+	/// <param name="stored">The provider stored in the scope being written.</param>
+	/// <param name="description">
+	/// What <see cref="DescribeCurrent" /> says about it, shown above the menu.
+	/// </param>
+	/// <param name="current">
+	/// The menu default: the stored value, else the one in effect here.
+	/// </param>
+	private static Provider ResolveProvider(
+		string? flag,
+		string? stored,
+		string? description,
+		string? current)
 	{
 		if (flag is not null)
 		{
@@ -435,7 +540,10 @@ public static class ConfigCommand
 			return currentProvider ?? throw UnknownProvider(current);
 		}
 
-		Console.WriteLine("Select a provider:");
+		Console.WriteLine(
+			description is null || description == stored
+				? "Select a provider:"
+				: $"Select a provider [{description}]:");
 		Console.WriteLine("  1) azure     (Azure OpenAI)");
 		Console.WriteLine("  2) anthropic (Claude)");
 		Console.WriteLine(
@@ -551,15 +659,21 @@ public static class ConfigCommand
 		List<(string Key, string? Display)> written,
 		ConfigField field,
 		bool global,
+		IReadOnlyDictionary<string, GitConfigValue> inEffect,
 		CancellationToken cancellationToken)
 	{
 		string? stored =
 			await GitConfigStore.GetAsync(field.Key, global, cancellationToken);
+		string? shown = DescribeCurrent(
+			stored,
+			InEffect(inEffect, field.Key),
+			field.Default,
+			global);
 		string? value = ConsolePrompts.Prompt(
 			field.Label,
 			field.FlagValue,
 			stored,
-			field.Default);
+			shown);
 
 		if (field.DashUnsets && value?.Trim() == "-")
 		{
@@ -593,7 +707,7 @@ public static class ConfigCommand
 					field.Label,
 					null,
 					stored,
-					field.Default);
+					shown);
 				normalized = normalize(value);
 			}
 

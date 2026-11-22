@@ -9,42 +9,15 @@ namespace JDMallen.Committy;
 /// Installs the committy git hook. The hook itself is a thin "trampoline" whose
 /// only job is to invoke <c>committy prepare-commit-msg</c>; all behavior lives
 /// in the binary so it can be updated centrally without re-installing per-repo
-/// hooks. The trampoline text is embedded here, so installation does not depend
-/// on the current working directory or any source files being present.
+/// hooks. The trampoline text (<c>hooks/prepare-commit-msg</c>) is compiled in
+/// as a resource, so installation does not depend on the current working
+/// directory or any source files being present.
 /// </summary>
 public static class HookInstaller
 {
 	public const string HOOK_NAME = "prepare-commit-msg";
 
 	private const string TEMPLATE_DIR_KEY = "init.templateDir";
-
-	/// <summary>
-	/// The installed hook. Intentionally minimal and version-stable: it guards
-	/// against non-plain commits and a missing binary, then hands off to the
-	/// binary, which owns all logic. It always exits 0 so a stale hook paired
-	/// with an older binary can never abort a commit.
-	/// </summary>
-	private const string TRAMPOLINE_SCRIPT =
-		"""
-		#!/usr/bin/env bash
-		# Committy trampoline hook — installed by `committy install-hook`.
-		# Intentionally minimal: all behavior lives in the committy binary so it can
-		# be updated centrally without re-installing per-repo hooks.
-
-		# Skip non-plain commits (merge, squash, message, template, etc.).
-		if [ -n "$2" ]; then
-		    exit 0
-		fi
-
-		# If committy isn't on PATH, do nothing rather than block the commit.
-		if ! command -v committy >/dev/null 2>&1; then
-		    exit 0
-		fi
-
-		# Never let hook failure abort the commit; the binary writes the message in place.
-		committy prepare-commit-msg "$1"
-		exit 0
-		""";
 
 	/// <summary>
 	/// Starts the line, just after the shebang, that records the SHA-256 of
@@ -98,10 +71,15 @@ public static class HookInstaller
 
 	/// <summary>
 	/// The current trampoline text, with normalized newlines and its checksum
-	/// line.
+	/// line. Read from <c>hooks/prepare-commit-msg</c>, which is intentionally
+	/// minimal and version-stable: it guards against non-plain commits and a
+	/// missing binary, then hands off to the binary, which owns all logic. It
+	/// always exits 0 so a stale hook paired with an older binary can never
+	/// abort a commit. Every installed hook is compared against this text, so
+	/// editing that file, even a comment, makes them all stale.
 	/// </summary>
 	public static string Trampoline { get; } =
-		WithChecksum(TRAMPOLINE_SCRIPT.Replace("\r\n", "\n"));
+		WithChecksum(ReadTrampolineResource());
 
 	/// <summary>
 	/// Installs the hook either globally (as a git template) or into a single
@@ -429,6 +407,19 @@ public static class HookInstaller
 	/// Inserts the checksum line after the shebang. The checksum covers the
 	/// <see cref="Normalize" />d hook without that line.
 	/// </summary>
+	private static string ReadTrampolineResource()
+	{
+		using Stream stream =
+			typeof(HookInstaller).Assembly.GetManifestResourceStream(HOOK_NAME)
+			?? throw new InvalidOperationException(
+				$"The {HOOK_NAME} hook text is missing from the build.");
+		using var reader = new StreamReader(stream, Encoding.UTF8);
+
+		// A Windows checkout may give the file CRLF line endings, and the
+		// file ends with a newline the original embedded text did not.
+		return reader.ReadToEnd().ReplaceLineEndings("\n").TrimEnd('\n');
+	}
+
 	private static string WithChecksum(string hook)
 	{
 		int shebangEnd = hook.IndexOf('\n');

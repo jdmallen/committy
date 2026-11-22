@@ -97,6 +97,18 @@ public static class PrepareCommitMsgCommand
 			cancellationToken);
 		GenerateCommand.RecordUsage(suggestions.Usage);
 
+		if (suggestions.Messages.Count == 0)
+		{
+			// A comment, never a made-up message, so nothing gets committed
+			// by accident.
+			await AppendLinesAsync(
+				commitMsgFile,
+				CommitMessageComposer.CommentLines(
+					$"Committy: {CommitMessageParser.NO_MESSAGE}"));
+
+			return;
+		}
+
 		string existing = File.Exists(commitMsgFile)
 			? await File.ReadAllTextAsync(commitMsgFile, cancellationToken)
 			: string.Empty;

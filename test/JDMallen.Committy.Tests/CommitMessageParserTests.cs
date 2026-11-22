@@ -2,14 +2,17 @@ namespace JDMallen.Committy.Tests;
 
 public class CommitMessageParserTests
 {
-	[Fact]
-	public void Parse_TitleAndBody_Empty_ReturnsFallback()
-	{
-		List<string> result = CommitMessageParser.Parse("", false);
-
-		Assert.Single(result);
-		Assert.Equal("feat: implement changes", result[0]);
-	}
+	[Theory]
+	[InlineData(null, false)]
+	[InlineData("", false)]
+	[InlineData("  \r\n ", false)]
+	[InlineData(null, true)]
+	[InlineData("", true)]
+	[InlineData("```\n```", true)]
+	public void Parse_NothingUsable_ReturnsNoMessage(
+		string? raw,
+		bool titlesOnly) =>
+		Assert.Empty(CommitMessageParser.Parse(raw, titlesOnly));
 
 	[Fact]
 	public void Parse_TitleAndBody_NormalizesCrlf()
@@ -19,7 +22,6 @@ public class CommitMessageParserTests
 			false);
 
 		Assert.Single(result);
-		Assert.DoesNotContain("\r", result[0]);
 		Assert.Equal(
 			"feat: add thing\n\nDoes the thing.\nMore detail.",
 			result[0]);
@@ -38,43 +40,41 @@ public class CommitMessageParserTests
 	}
 
 	[Fact]
-	public void Parse_TitlesOnly_Empty_ReturnsFiveFallbacks()
-	{
-		List<string> result = CommitMessageParser.Parse("", true);
-
-		Assert.Equal(5, result.Count);
-		Assert.All(
-			result,
-			line => Assert.StartsWith("feat: implement changes", line));
-	}
-
-	[Fact]
-	public void Parse_TitlesOnly_FillsToFive()
+	public void Parse_TitlesOnly_KeepsWhatCameBackWithoutPadding()
 	{
 		List<string> result = CommitMessageParser.Parse(
 			"feat: add feature\nfix: resolve issue",
 			true);
 
-		Assert.Equal(5, result.Count);
-		Assert.Equal("feat: add feature", result[0]);
-		Assert.Equal("fix: resolve issue", result[1]);
-		Assert.Equal("feat: implement changes (3)", result[2]);
-		Assert.Equal("feat: implement changes (4)", result[3]);
-		Assert.Equal("feat: implement changes (5)", result[4]);
+		Assert.Equal(["feat: add feature", "fix: resolve issue"], result);
 	}
 
 	[Fact]
-	public void Parse_TitlesOnly_ReturnsFiveLines()
+	public void Parse_TitlesOnly_StripsListMarkersAndCodeFences()
 	{
 		List<string> result = CommitMessageParser.Parse(
-			"feat: add feature\nfix: bug\ndocs: update readme",
+			"```text\n1. feat: one\n2) fix: two\n- docs: three\n* test: four\n```",
 			true);
 
-		Assert.Equal(5, result.Count);
-		Assert.Equal("feat: add feature", result[0]);
-		Assert.Equal("fix: bug", result[1]);
-		Assert.Equal("docs: update readme", result[2]);
-		Assert.StartsWith("feat: implement changes", result[3]);
-		Assert.StartsWith("feat: implement changes", result[4]);
+		Assert.Equal(
+			["feat: one", "fix: two", "docs: three", "test: four"],
+			result);
 	}
+
+	[Fact]
+	public void Parse_TitlesOnly_CapsAtFive()
+	{
+		List<string> result = CommitMessageParser.Parse(
+			"feat: a\nfeat: b\nfeat: c\nfeat: d\nfeat: e\nfeat: f\nfeat: g",
+			true);
+
+		Assert.Equal(CommitMessageParser.MAX_TITLES, result.Count);
+		Assert.Equal("feat: e", result[^1]);
+	}
+
+	[Fact]
+	public void Parse_TitlesOnly_KeepsAHyphenInsideATitle()
+		=> Assert.Equal(
+			["fix: handle a half-written file"],
+			CommitMessageParser.Parse("fix: handle a half-written file", true));
 }

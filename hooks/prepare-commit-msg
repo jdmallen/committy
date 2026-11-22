@@ -2,9 +2,6 @@
 # Committy trampoline hook — installed by `committy install-hook`.
 # Intentionally minimal: all behavior lives in the committy binary so it can
 # be updated centrally without re-installing per-repo hooks.
-#
-# This file is the canonical trampoline; the same text is embedded in the
-# binary (HookInstaller.TrampolineScript) and written by `committy install-hook`.
 
 # Skip non-plain commits (merge, squash, message, template, etc.).
 if [ -n "$2" ]; then

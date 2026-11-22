@@ -16,6 +16,21 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - Linux release binaries need glibc 2.35 or newer (Ubuntu 22.04, Debian 12,
   RHEL 9, or later).
 - Building from source needs the platform's C toolchain (see the README).
+- When the model returns an empty response, committy no longer substitutes
+  "feat: implement changes", which the git hook pre-filled as a real message
+  that could be committed by accident. The hook now adds a comment saying the
+  model returned no message, and `committy` reports it as an error. A
+  reasoning model that spends its whole token budget thinking is the usual
+  cause; the message suggests raising its max tokens setting.
+- Titles-only mode shows the titles the model returned, up to five, without
+  numbering, bullets or code fences, and no longer pads a short list with
+  placeholder titles.
+
+### Fixed
+
+- `committy repair-hooks --scan` no longer follows directory symlinks, so a
+  link pointing back up the tree can't make it find the same repositories
+  over and over.
 
 ## [1.9.0]
 

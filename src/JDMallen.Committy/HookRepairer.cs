@@ -120,6 +120,17 @@ public static class HookRepairer
 		return result.ExitStatus.ExitCode == 0;
 	}
 
+	/// <summary>
+	/// Unreadable directories are skipped, and so are directory symlinks
+	/// (and junctions): following one that points back up the tree would find
+	/// the same repositories again at every level.
+	/// </summary>
+	private static readonly EnumerationOptions ScanOptions = new()
+	{
+		IgnoreInaccessible = true,
+		AttributesToSkip = FileAttributes.ReparsePoint,
+	};
+
 	private static IEnumerable<string> FindRepos(string root)
 	{
 		var stack = new Stack<string>();
@@ -139,11 +150,12 @@ public static class HookRepairer
 
 			try
 			{
-				subdirs = Directory.GetDirectories(dir);
+				subdirs = Directory.GetDirectories(dir, "*", ScanOptions);
 			}
-			catch (Exception)
+			catch (Exception ex)
+				when (ex is IOException or UnauthorizedAccessException)
 			{
-				// Skip directories we can't read (permissions, etc.).
+				// Gone since it was listed, or unreadable itself.
 				continue;
 			}
 
@@ -299,17 +311,15 @@ public static class HookRepairer
 			}
 		}
 
-		int updated =
-			results.Count(r => r.Outcome == HookRepairOutcome.Updated);
-		int current =
-			results.Count(r => r.Outcome == HookRepairOutcome.AlreadyCurrent);
-		int foreign =
-			results.Count(r => r.Outcome == HookRepairOutcome.SkippedForeign);
-		int none = results.Count(r => r.Outcome == HookRepairOutcome.NoHook);
-		int errors = results.Count(r => r.Outcome == HookRepairOutcome.Error);
+		Dictionary<HookRepairOutcome, int> counts = results
+			.CountBy(result => result.Outcome)
+			.ToDictionary();
 
 		await output.WriteLineAsync(
-			$"\n{verb}: {updated}, already current: {current}, skipped: {foreign}, no hook: {none}, errors: {errors}");
+			$"\n{verb}: {Count(HookRepairOutcome.Updated)}, already current: {Count(HookRepairOutcome.AlreadyCurrent)}, skipped: {Count(HookRepairOutcome.SkippedForeign)}, no hook: {Count(HookRepairOutcome.NoHook)}, errors: {Count(HookRepairOutcome.Error)}");
+
+		int Count(HookRepairOutcome outcome) =>
+			counts.GetValueOrDefault(outcome);
 	}
 
 	public static async Task<int> RunAsync(

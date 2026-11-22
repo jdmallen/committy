@@ -246,30 +246,15 @@ public sealed class AzureConfig : ProviderConfig
 	{
 		AzureCliTokenProviderOptions options = TokenProviderOptions();
 
-		if (!IsValid(options))
+		return options.FindInvalidProperty() switch
 		{
-			// The toolbox validates scope before tenant; retrying without the
-			// tenant tells the two apart.
-			return IsValid(options with { TenantId = null })
-				? $"{CommittyConfigResolver.AZURE_TENANT_KEY} must be a tenant GUID or domain name (got '{options.TenantId}')."
-				: $"{CommittyConfigResolver.AZURE_SCOPE_KEY} must be an https URL such as {AzureOpenAIScopes.DEFAULT} (got '{options.Scope}').";
-		}
-
-		return null;
-
-		static bool IsValid(AzureCliTokenProviderOptions candidate)
-		{
-			try
-			{
-				_ = new AzureCliTokenProvider(candidate);
-
-				return true;
-			}
-			catch (ArgumentException)
-			{
-				return false;
-			}
-		}
+			nameof(AzureCliTokenProviderOptions.TenantId) =>
+				$"{CommittyConfigResolver.AZURE_TENANT_KEY} must be a tenant GUID or domain name (got '{options.TenantId}').",
+			nameof(AzureCliTokenProviderOptions.Scope) =>
+				$"{CommittyConfigResolver.AZURE_SCOPE_KEY} must be an https URL such as {AzureOpenAIScopes.DEFAULT} (got '{options.Scope}').",
+			{ } property => $"Invalid Azure CLI setting: {property}.",
+			null => null,
+		};
 	}
 }
 

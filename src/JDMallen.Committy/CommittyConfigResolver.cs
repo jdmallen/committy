@@ -99,18 +99,38 @@ public static class CommittyConfigResolver
 	/// <summary>The accepted <see cref="PROVIDER_KEY" /> values.</summary>
 	public const string PROVIDER_NAMES = "azure, anthropic or openai";
 
+	private static readonly NameTable<Provider> ProviderNames = new(
+		Provider.Azure,
+		(Provider.Azure, "azure", []),
+		(Provider.Anthropic, "anthropic", ["claude"]),
+		(Provider.OpenAI, "openai", ["local"]));
+
+	private static readonly NameTable<AzureAuth> AzureAuthNames = new(
+		AzureAuth.ApiKey,
+		(AzureAuth.ApiKey, "apikey", ["api-key", "key"]),
+		(AzureAuth.AzureCli, "azurecli", ["azure-cli", "az", "cli"]),
+		(AzureAuth.AzureIdentity, "azureidentity",
+			["azure-identity", "identity", "entra"]));
+
+	private static readonly NameTable<AzureCredentialKind>
+		AzureCredentialNames = new(
+			AzureCredentialKind.InteractiveBrowser,
+			(AzureCredentialKind.InteractiveBrowser, "interactivebrowser",
+				["interactive-browser", "browser"]),
+			(AzureCredentialKind.DeviceCode, "devicecode",
+				["device-code", "device"]),
+			(AzureCredentialKind.Default, "default", ["defaultazurecredential"]),
+			(AzureCredentialKind.AzureCli, "azurecli",
+				["azure-cli", "az", "cli"]),
+			(AzureCredentialKind.AzureDeveloperCli, "azd",
+				["azuredevelopercli", "azure-developer-cli"]));
+
 	/// <summary>
 	/// Reads <c>committy.provider</c>: unset means Azure; null means the value
 	/// names no known provider.
 	/// </summary>
 	public static Provider? ParseProvider(string? name) =>
-		name?.Trim().ToLowerInvariant() switch
-		{
-			null or "" or "azure"   => Provider.Azure,
-			"anthropic" or "claude" => Provider.Anthropic,
-			"openai" or "local"     => Provider.OpenAI,
-			_                       => null,
-		};
+		ProviderNames.Parse(name);
 
 	/// <summary>
 	/// The canonical git config spelling for a provider, so
@@ -118,26 +138,14 @@ public static class CommittyConfigResolver
 	/// back identically.
 	/// </summary>
 	public static string ProviderName(Provider provider) =>
-		provider switch
-		{
-			Provider.Anthropic => "anthropic",
-			Provider.OpenAI    => "openai",
-			_                  => "azure",
-		};
+		ProviderNames.Name(provider);
 
 	/// <summary>
 	/// Reads <c>committy.azure.auth</c>: unset means an API key; null means the
 	/// value names no known method.
 	/// </summary>
 	public static AzureAuth? ParseAzureAuth(string? name) =>
-		name?.Trim().ToLowerInvariant() switch
-		{
-			null or "" or "apikey" or "api-key" or "key" => AzureAuth.ApiKey,
-			"azurecli" or "azure-cli" or "az" or "cli"   => AzureAuth.AzureCli,
-			"azureidentity" or "azure-identity" or "identity" or "entra" =>
-				AzureAuth.AzureIdentity,
-			_ => null,
-		};
+		AzureAuthNames.Parse(name);
 
 	/// <summary>
 	/// The canonical git config spelling for an Azure auth method, so
@@ -145,35 +153,14 @@ public static class CommittyConfigResolver
 	/// reads back identically.
 	/// </summary>
 	public static string AzureAuthName(AzureAuth auth) =>
-		auth switch
-		{
-			AzureAuth.AzureCli      => "azurecli",
-			AzureAuth.AzureIdentity => "azureidentity",
-			_                       => "apikey",
-		};
+		AzureAuthNames.Name(auth);
 
 	/// <summary>
 	/// Reads <c>committy.azure.credential</c>: unset means a browser sign-in;
 	/// null means the value names no known credential.
 	/// </summary>
 	public static AzureCredentialKind? ParseAzureCredential(string? name) =>
-		name?.Trim().ToLowerInvariant() switch
-		{
-			null
-				or ""
-				or "interactivebrowser"
-				or "interactive-browser"
-				or "browser" => AzureCredentialKind.InteractiveBrowser,
-			"devicecode" or "device-code" or "device" =>
-				AzureCredentialKind.DeviceCode,
-			"default" or "defaultazurecredential" =>
-				AzureCredentialKind.Default,
-			"azurecli" or "azure-cli" or "az" or "cli" =>
-				AzureCredentialKind.AzureCli,
-			"azd" or "azuredevelopercli" or "azure-developer-cli" =>
-				AzureCredentialKind.AzureDeveloperCli,
-			_ => null,
-		};
+		AzureCredentialNames.Parse(name);
 
 	/// <summary>
 	/// The canonical git config spelling for a credential, so
@@ -181,14 +168,7 @@ public static class CommittyConfigResolver
 	/// reads back identically.
 	/// </summary>
 	public static string AzureCredentialName(AzureCredentialKind kind) =>
-		kind switch
-		{
-			AzureCredentialKind.DeviceCode        => "devicecode",
-			AzureCredentialKind.Default           => "default",
-			AzureCredentialKind.AzureCli          => "azurecli",
-			AzureCredentialKind.AzureDeveloperCli => "azd",
-			_                                     => "interactivebrowser",
-		};
+		AzureCredentialNames.Name(kind);
 
 	/// <summary>
 	/// Reads an integer setting, falling back to <paramref name="fallback" /> when

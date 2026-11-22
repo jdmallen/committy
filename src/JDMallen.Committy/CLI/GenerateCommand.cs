@@ -153,12 +153,21 @@ public static class GenerateCommand
 			cancellationToken);
 		RecordUsage(suggestions.Usage);
 
+		if (suggestions.Messages.Count == 0)
+		{
+			await Console.Error.WriteLineAsync(
+				$"Error: {CommitMessageParser.NO_MESSAGE}",
+				cancellationToken);
+
+			return 1;
+		}
+
 		foreach (string suggestion in suggestions.Messages)
 		{
 			Console.WriteLine(suggestion);
 		}
 
-		if (copyToClipboard && suggestions.Messages.Count > 0)
+		if (copyToClipboard)
 		{
 			await CopyToClipboardAsync(
 				suggestions.Messages[0],

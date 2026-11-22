@@ -17,6 +17,15 @@
 	</ItemGroup>
 
 	<ItemGroup>
+		<!--
+			The installed hook's text. HookInstaller.Trampoline reads it, and
+			TrampolineTests pins its hash, since every installed hook is
+			compared against it.
+		-->
+		<EmbeddedResource Include="..\..\hooks\prepare-commit-msg" LogicalName="prepare-commit-msg"/>
+	</ItemGroup>
+
+	<ItemGroup>
 		<!-- Chat client types (IChatCompletionClient et al.) used throughout. -->
 		<Using Include="JDMallen.Toolbox.AI"/>
 	</ItemGroup>

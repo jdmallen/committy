@@ -481,8 +481,33 @@ public static class PatchCondenser
 		/// <summary>Line count before any truncation.</summary>
 		public int? TotalLines { get; set; }
 
-		/// <summary>The text to send, or null when it's left out entirely.</summary>
-		public string? Text { get; set; }
+		private string? _text;
+
+		private bool _textBuilt;
+
+		/// <summary>
+		/// The text to send, or null when it's left out entirely. Built from
+		/// the lines on first read, so a section replaced by a note first (a
+		/// multi-megabyte lock file) never builds its full text.
+		/// </summary>
+		public string? Text
+		{
+			get
+			{
+				if (!_textBuilt)
+				{
+					_text = string.Join('\n', _lines);
+					_textBuilt = true;
+				}
+
+				return _text;
+			}
+			set
+			{
+				_text = value;
+				_textBuilt = true;
+			}
+		}
 
 		/// <summary>Index of the first hunk or binary-patch line.</summary>
 		private int BodyStart { get; set; }
@@ -492,7 +517,6 @@ public static class PatchCondenser
 			var section = new FileSection
 			{
 				_lines = lines,
-				Text = string.Join('\n', lines),
 				BodyStart = lines.Length,
 			};
 			string? minusPath = null;

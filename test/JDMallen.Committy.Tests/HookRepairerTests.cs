@@ -241,6 +241,42 @@ public class HookRepairerTests
 	}
 
 	[Fact]
+	public async Task RunAsync_Scan_DoesNotFollowDirectorySymlinks()
+	{
+		string root = Directory.CreateTempSubdirectory("committy-scan-").FullName;
+		try
+		{
+			string repo = Path.Combine(root, "repo");
+			string emptyTemplate = Path.Combine(root, ".empty-template");
+			Directory.CreateDirectory(emptyTemplate);
+			await TestGit.RunAsync(
+				"init",
+				$"--template={emptyTemplate}",
+				repo);
+
+			// A link back up the tree: following it would find the same
+			// repository again at every level until the path got too long.
+			Directory.CreateSymbolicLink(Path.Combine(root, "loop"), root);
+			var output = new StringWriter();
+
+			int code = await HookRepairer.RunAsync(
+				[root],
+				[],
+				true,
+				true,
+				output);
+
+			Assert.Equal(0, code);
+			Assert.Contains("no hook: 1,", output.ToString());
+		}
+		finally
+		{
+			File.Delete(Path.Combine(root, "loop"));
+			Directory.Delete(root, true);
+		}
+	}
+
+	[Fact]
 	public async Task RunAsync_NonGitDirTarget_IsSkippedWithMessage()
 	{
 		string dir = Path.Combine(

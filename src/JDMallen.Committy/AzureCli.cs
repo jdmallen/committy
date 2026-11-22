@@ -92,13 +92,8 @@ public static class AzureCli
 	/// toolbox's token provider accepts.
 	/// </summary>
 	public static bool IsValidTenant(string tenant) =>
-		new AzureConfig
-		{
-			Auth = AzureAuth.AzureCli,
-			Deployment = "-",
-			Endpoint = "https://-",
-			TenantId = tenant,
-		}.Validate() is null;
+		new AzureCliTokenProviderOptions { TenantId = tenant }
+			.FindInvalidProperty() is null;
 
 	/// <summary>
 	/// <c>az login</c> for <paramref name="azure" />'s scope and tenant, so the

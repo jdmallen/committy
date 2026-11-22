@@ -86,7 +86,7 @@ public class CommitMessageGeneratorTests
 
 		CommitSuggestions result = await generator.GenerateAsync(PATCH, true);
 
-		Assert.Equal(5, result.Messages.Count);
+		Assert.Equal(["feat: a", "fix: b"], result.Messages);
 		Assert.Null(result.Usage);
 		await client.Received(1)
 			.GetCompletionAsync(

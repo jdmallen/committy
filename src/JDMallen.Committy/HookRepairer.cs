@@ -318,6 +318,8 @@ public static class HookRepairer
 		await output.WriteLineAsync(
 			$"\n{verb}: {Count(HookRepairOutcome.Updated)}, already current: {Count(HookRepairOutcome.AlreadyCurrent)}, skipped: {Count(HookRepairOutcome.SkippedForeign)}, no hook: {Count(HookRepairOutcome.NoHook)}, errors: {Count(HookRepairOutcome.Error)}");
 
+		return;
+
 		int Count(HookRepairOutcome outcome) =>
 			counts.GetValueOrDefault(outcome);
 	}

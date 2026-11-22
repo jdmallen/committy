@@ -253,7 +253,7 @@ public sealed class AzureConfig : ProviderConfig
 			nameof(AzureCliTokenProviderOptions.Scope) =>
 				$"{CommittyConfigResolver.AZURE_SCOPE_KEY} must be an https URL such as {AzureOpenAIScopes.DEFAULT} (got '{options.Scope}').",
 			{ } property => $"Invalid Azure CLI setting: {property}.",
-			null => null,
+			null         => null,
 		};
 	}
 }

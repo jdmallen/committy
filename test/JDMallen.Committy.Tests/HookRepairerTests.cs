@@ -243,7 +243,8 @@ public class HookRepairerTests
 	[Fact]
 	public async Task RunAsync_Scan_DoesNotFollowDirectorySymlinks()
 	{
-		string root = Directory.CreateTempSubdirectory("committy-scan-").FullName;
+		string root = Directory.CreateTempSubdirectory("committy-scan-")
+			.FullName;
 		try
 		{
 			string repo = Path.Combine(root, "repo");

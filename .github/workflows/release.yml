@@ -129,7 +129,7 @@ jobs:
   # Skipped for a build-only run, and anywhere but main, so a manual run on
   # another branch can never tag or release it.
   release:
-    needs: [check, build]
+    needs: [ check, build ]
     if: ${{ !inputs.build_only && github.ref == 'refs/heads/main' }}
     runs-on: ubuntu-latest
     steps:

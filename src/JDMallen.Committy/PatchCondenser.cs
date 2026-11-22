@@ -481,8 +481,6 @@ public static class PatchCondenser
 		/// <summary>Line count before any truncation.</summary>
 		public int? TotalLines { get; set; }
 
-		private string? _text;
-
 		private bool _textBuilt;
 
 		/// <summary>
@@ -494,17 +492,19 @@ public static class PatchCondenser
 		{
 			get
 			{
-				if (!_textBuilt)
+				if (_textBuilt)
 				{
-					_text = string.Join('\n', _lines);
-					_textBuilt = true;
+					return field;
 				}
 
-				return _text;
+				field = string.Join('\n', _lines);
+				_textBuilt = true;
+
+				return field;
 			}
 			set
 			{
-				_text = value;
+				field = value;
 				_textBuilt = true;
 			}
 		}
